@@ -1,0 +1,165 @@
+{
+  "name": "09 - Knowledge Retrieval",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tenant_id",
+              "type": "string"
+            },
+            {
+              "name": "query",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.voyageai.com/v1/embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ input: [$json.query], model: 'voyage-4-lite', input_type: 'query' }) }}"
+      },
+      "id": "embed_query",
+      "name": "Embed Query (Voyage AI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -580,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "voyage_api_key",
+          "name": "Voyage AI API Key (Authorization header)"
+        }
+      },
+      "notes": "Header Auth credential must send 'Authorization: Bearer <key>'. input_type: 'query' vs 'document' matters for Voyage's models -- queries and documents are embedded slightly differently for better retrieval, verify against current Voyage docs."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the embedding vector from Voyage's response.\nconst resp = $json;\nconst embedding = resp.data && resp.data[0] && resp.data[0].embedding;\nif (!embedding) { throw new Error('No embedding returned from Voyage AI -- check API key/credits'); }\nconst trigger = $('When Executed by Another Workflow').first().json;\nreturn [{ json: { tenant_id: trigger.tenant_id, query: trigger.query, embedding } }];"
+      },
+      "id": "extract_embedding",
+      "name": "Extract Embedding",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from match_document_chunks($1, $2::vector, 5);",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, JSON.stringify($json.embedding)] }}"
+        }
+      },
+      "id": "search_chunks",
+      "name": "Search Document Chunks",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -140,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "elliot_postgres_service_role",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Uses match_document_chunks RPC from migration 0003 -- tenant_id is a required argument to that function, so this cannot accidentally search across tenants regardless of which Postgres credential executes it."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize output shape for the Main Agent's 'Build Tool Result Message' node,\n// which expects each item to have content/document_id/section_ref.\nconst rows = $input.all().map(r => r.json);\nreturn rows.map(r => ({ json: {\n  content: r.content,\n  document_id: r.document_id,\n  section_ref: r.section_ref,\n  similarity: r.similarity\n}}));"
+      },
+      "id": "format_results",
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Embed Query (Voyage AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Query (Voyage AI)": {
+      "main": [
+        [
+          {
+            "node": "Extract Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Embedding": {
+      "main": [
+        [
+          {
+            "node": "Search Document Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Document Chunks": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

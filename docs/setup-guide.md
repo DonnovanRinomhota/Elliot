@@ -66,15 +66,31 @@ You need **two** Postgres credentials, both pointing at the same Supabase databa
 
 ---
 
-## 6. The Knowledge Retrieval sub-workflow forward-reference
+## 6. Phase 3: Knowledge Ingestion and Retrieval
 
-The "Execute: Knowledge Retrieval Sub-Workflow" node currently points at a placeholder ID — that workflow doesn't exist yet (it's Phase 3). **Don't try to run the full end-to-end flow yet** — test everything up through "Did Claude Request a Tool?" first. Full end-to-end testing happens once Phase 3 ships.
+Two more workflows to import: `n8n/workflows/08-knowledge-ingestion.json` and `n8n/workflows/09-knowledge-retrieval.json`. Same import process as the Main Agent (Step 3 above).
 
-For now, you can test the **non-tool path**: ask a question generic enough that Claude answers directly without calling `search_company_knowledge` (e.g. "hello, are you a bot?"). That exercises the whole workflow except the sub-workflow call.
+**Run migration 0009's companion, migration... actually no new migration needed here** — the `documents`, `document_chunks`, and `match_document_chunks` RPC were already created back in Phase 1's migration `0003_knowledge_rag.sql`. If you ran all 8 original migrations in order, this part's already done.
 
----
+1. **Create the Voyage AI credential.** Sign up at voyageai.com, get an API key (200M free tokens on the voyage-4 family as of when this was written — verify that's still current before assuming it's free). In n8n: **Credentials → New → Header Auth.** Header name: `Authorization`. Value: `Bearer <your-voyage-key>` (the word "Bearer" followed by a space, then the key — this differs from the Anthropic credential, which uses a bare key with no "Bearer" prefix). Name it exactly `Voyage AI API Key (Authorization header)`.
+2. Assign this credential to the HTTP Request nodes in both new workflows: "Embed Chunk (Voyage AI)" in Ingestion, "Embed Query (Voyage AI)" in Retrieval.
+3. Assign the Postgres service-role credential to the remaining Postgres nodes in both workflows (same credential you already created in Phase 1/2 — `Elliot Postgres (service role)`).
+4. **Connect Knowledge Retrieval to the Main Agent.** Once "09 - Knowledge Retrieval" is imported, find its workflow ID (visible in the browser URL when the workflow is open). Open the Main Agent workflow, find the **"Execute: Knowledge Retrieval Sub-Workflow"** node, and replace `PLACEHOLDER_KNOWLEDGE_RETRIEVAL_WORKFLOW_ID` with the real ID.
+5. **Test ingestion first, standalone**, before testing the full tool-calling path. Send a real request to the Ingestion webhook:
+```bash
+curl -X POST https://<your-n8n-instance>/webhook/ingest-document \
+  -H "Content-Type: application/json" \
+  -d '{"tenant_slug": "zebra-dev", "title": "Test FAQ", "source_type": "faq", "text": "We are open Monday through Friday, 9am to 6pm.\n\nViewings are by appointment only."}'
+```
+Expected response: `{ "document_id": "...", "status": "ready", "chunks_created": 1 }`. Confirm in Supabase:
+```sql
+select d.title, d.status, count(dc.id) as chunk_count
+from documents d left join document_chunks dc on dc.document_id = d.id
+group by d.id, d.title, d.status;
+```
+6. **Then test the full tool-calling path** — send a message to the Main Agent's chat webhook that should trigger a knowledge lookup, e.g. `"What are your opening hours?"` for the tenant you just ingested a document for. This time "Did Claude Request a Tool?" should branch **true**, and you should see the tool-call branch execute all the way through.
 
-## 7. First test run
+## 7. First test run (Main Agent, non-tool path)
 
 1. Activate the workflow (toggle in the top-right of the n8n editor) — this makes the webhook live.
 2. Copy the webhook URL from the "Chat Webhook" node (n8n shows both a test URL and a production URL — use the test URL while `active` is off, production URL once it's on).

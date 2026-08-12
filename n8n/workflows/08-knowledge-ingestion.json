@@ -1,0 +1,341 @@
+{
+  "name": "08 - Knowledge Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest-document",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook_trigger",
+      "name": "Ingest Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1400,
+        0
+      ],
+      "webhookId": "elliot-knowledge-ingest"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expected body: { tenant_slug, title, source_type, text }\n// Phase 3 scope: plain text content only (paste FAQ text, paste a policy doc, etc).\n// PDF/website extraction is a later phase -- flagged in the workflow spec, not built here.\nconst body = $input.first().json.body || {};\nfor (const f of ['tenant_slug', 'title', 'source_type', 'text']) {\n  if (!body[f]) throw new Error(`${f} is required`);\n}\nconst validTypes = ['pdf', 'website', 'faq', 'manual_text', 'other'];\nif (!validTypes.includes(body.source_type)) {\n  throw new Error(`source_type must be one of: ${validTypes.join(', ')}`);\n}\nreturn [{ json: body }];"
+      },
+      "id": "validate_input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1180,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id as tenant_id from tenants where slug = $1 and status = 'active';",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_slug] }}"
+        }
+      },
+      "id": "resolve_tenant",
+      "name": "Resolve Tenant",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -960,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "elliot_postgres_service_role",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tenantRows = $('Resolve Tenant').all();\nif (!tenantRows.length) { throw new Error('Unknown or inactive tenant_slug'); }\nconst input = $('Validate Input').first().json;\nreturn [{ json: { ...input, tenant_id: tenantRows[0].json.tenant_id } }];"
+      },
+      "id": "merge_tenant",
+      "name": "Merge Tenant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -740,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into documents (tenant_id, title, source_type, status) values ($1, $2, $3, 'processing') returning id as document_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.title, $json.source_type] }}"
+        }
+      },
+      "id": "create_document",
+      "name": "Create Document Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -520,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "elliot_postgres_service_role",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simple chunking: split on double-newlines (paragraphs), then merge small\n// paragraphs together up to a target size, so chunks aren't too tiny or too huge.\n// This is intentionally simple for Phase 3 -- a real implementation would use\n// sentence-aware splitting and overlap; flagged as a later improvement, not built now.\nconst ctx = $('Merge Tenant').first().json;\nconst doc = $('Create Document Row').first().json;\nconst TARGET_CHARS = 1000;\n\nconst paragraphs = ctx.text.split(/\\n\\s*\\n/).map(p => p.trim()).filter(Boolean);\nconst chunks = [];\nlet current = '';\nfor (const p of paragraphs) {\n  if ((current + '\\n\\n' + p).length > TARGET_CHARS && current) {\n    chunks.push(current);\n    current = p;\n  } else {\n    current = current ? current + '\\n\\n' + p : p;\n  }\n}\nif (current) chunks.push(current);\nif (!chunks.length) { throw new Error('No content to chunk -- text was empty after trimming'); }\n\nreturn chunks.map((content, i) => ({ json: {\n  tenant_id: ctx.tenant_id, document_id: doc.document_id, chunk_index: i, content\n}}));"
+      },
+      "id": "chunk_text",
+      "name": "Chunk Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.voyageai.com/v1/embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ input: [$json.content], model: 'voyage-4-lite', input_type: 'document' }) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 200
+            }
+          }
+        }
+      },
+      "id": "embed_chunk",
+      "name": "Embed Chunk (Voyage AI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -80,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "voyage_api_key",
+          "name": "Voyage AI API Key (Authorization header)"
+        }
+      },
+      "notes": "Runs once per chunk item (n8n's default per-item execution for HTTP Request nodes). batchInterval adds a small delay between calls to stay well under Voyage's rate limits on free tier -- tune this down if ingestion feels slow and you're not hitting rate limit errors."
+    },
+    {
+      "parameters": {
+        "jsCode": "const chunk = $('Chunk Text').item.json;\nconst resp = $json;\nconst embedding = resp.data && resp.data[0] && resp.data[0].embedding;\nif (!embedding) { throw new Error('No embedding returned for chunk ' + chunk.chunk_index); }\nreturn [{ json: { ...chunk, embedding } }];"
+      },
+      "id": "extract_chunk_embedding",
+      "name": "Extract Chunk Embedding",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into document_chunks (tenant_id, document_id, chunk_index, content, embedding) values ($1, $2, $3, $4, $5::vector);",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.document_id, $json.chunk_index, $json.content, JSON.stringify($json.embedding)] }}"
+        }
+      },
+      "id": "insert_chunk",
+      "name": "Insert Chunk",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        360,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "elliot_postgres_service_role",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update documents set status = 'ready' where id = $1;",
+        "options": {
+          "queryReplacement": "={{ [$('Create Document Row').first().json.document_id] }}"
+        }
+      },
+      "id": "mark_ready",
+      "name": "Mark Document Ready",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        580,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "elliot_postgres_service_role",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "This node runs once per incoming chunk item (n8n re-triggers it per item since it's downstream of a multi-item branch), so the UPDATE fires multiple times for a multi-chunk document. That's harmless (idempotent -- same value each time) but worth knowing; a cleaner version would aggregate first. Flagged, not blocking."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { document_id: $('Create Document Row').first().json.document_id, status: 'ready', chunks_created: $('Chunk Text').all().length } }}"
+      },
+      "id": "respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        800,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Ingest Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Resolve Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Tenant": {
+      "main": [
+        [
+          {
+            "node": "Merge Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Tenant": {
+      "main": [
+        [
+          {
+            "node": "Create Document Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Document Row": {
+      "main": [
+        [
+          {
+            "node": "Chunk Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunk Text": {
+      "main": [
+        [
+          {
+            "node": "Embed Chunk (Voyage AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Chunk (Voyage AI)": {
+      "main": [
+        [
+          {
+            "node": "Extract Chunk Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Chunk Embedding": {
+      "main": [
+        [
+          {
+            "node": "Insert Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Chunk": {
+      "main": [
+        [
+          {
+            "node": "Mark Document Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Document Ready": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
