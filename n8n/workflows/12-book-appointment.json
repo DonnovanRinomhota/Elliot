@@ -1,0 +1,179 @@
+{
+  "name": "12 - Book Appointment",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"contact_id\": \"a1a1a1a1-0000-0000-0000-000000000000\",\n  \"starts_at\": \"2026-08-17T10:00:00.000Z\",\n  \"ends_at\": \"2026-08-17T11:00:00.000Z\",\n  \"notes\": \"Property viewing requested via chat\"\n}"
+      },
+      "id": "67ead15b-3b6a-453d-87b7-834e99efd51f",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select ac.google_calendar_id, t.timezone, c.name as contact_name, c.email as contact_email\nfrom ai_config ac\njoin tenants t on t.id = ac.tenant_id\nleft join contacts c on c.id = $2\nwhere ac.tenant_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.contact_id] }}"
+        }
+      },
+      "id": "2815a349-90aa-45c6-8be0-49906f598e49",
+      "name": "Load Tenant + Contact Info",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Set the Postgres credential manually after import."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into appointments (tenant_id, contact_id, starts_at, ends_at, timezone, status, external_calendar_id, notes)\nvalues ($1, $2, $3, $4, $5, 'confirmed', $6, $7)\nreturning id, starts_at, ends_at, status;",
+        "options": {
+          "queryReplacement": "={{ [\n  $('When Executed by Another Workflow').first().json.tenant_id,\n  $('When Executed by Another Workflow').first().json.contact_id,\n  $('When Executed by Another Workflow').first().json.starts_at,\n  $('When Executed by Another Workflow').first().json.ends_at,\n  $('Load Tenant + Contact Info').first().json.timezone,\n  $json.id,\n  $('When Executed by Another Workflow').first().json.notes || null\n] }}"
+        }
+      },
+      "id": "3316b5cd-4e1a-46f7-894f-b5f29086aa11",
+      "name": "Insert Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        672,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YRsICohvmLikAevY",
+          "name": "Elliot Postgres (RLS-scoped)"
+        }
+      },
+      "notes": "Set the Postgres credential manually after import."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize output for the Main Agent's tool_result formatting.\nconst appt = $input.first().json;\nreturn [{\n  json: {\n    success: true,\n    appointment_id: appt.id,\n    starts_at: appt.starts_at,\n    ends_at: appt.ends_at,\n    status: appt.status\n  }\n}];"
+      },
+      "id": "68d67e04-e10d-4b5e-a22a-372357fb3733",
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ $json.google_calendar_id }}/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"summary\": \"Property viewing — {{ $json.contact_name }}\",\n  \"description\": \"{{ $('When Executed by Another Workflow').first().json.notes }}\",\n  \"start\": {\n    \"dateTime\": \"{{ $('When Executed by Another Workflow').first().json.starts_at }}\",\n    \"timeZone\": \"{{ $json.timezone }}\"\n  },\n  \"end\": {\n    \"dateTime\": \"{{ $('When Executed by Another Workflow').first().json.ends_at }}\",\n    \"timeZone\": \"{{ $json.timezone }}\"\n  },\n  \"attendees\": [\n    { \"email\": \"{{ $json.contact_email }}\" }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "a45ab1da-6a0e-46b9-9c51-3c03f00f2747",
+      "name": "HTTP Request",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "contact_id": "a1a1a1a1-0000-0000-0000-000000000000",
+          "starts_at": "2026-08-17T10:00:00.000Z",
+          "ends_at": "2026-08-17T11:00:00.000Z",
+          "notes": "Property viewing requested via chat"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load Tenant + Contact Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Tenant + Contact Info": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Appointment": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Insert Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "05f89481-6a9f-4cb8-ad6c-404e473954d8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "VNROj5sGjnwdFidx",
+  "tags": []
+}

@@ -2,22 +2,77 @@
   "tools": [
     {
       "name": "search_company_knowledge",
-      "description": "Search this business's knowledge base (uploaded documents, FAQs, policies, pricing, service descriptions) for information relevant to the customer's question. Always use this before answering any question about the business's specific policies, prices, services, or procedures. Never answer those from general knowledge — only from what this tool returns. If the tool returns no relevant results, say you don't have that information and offer to connect the customer with a human, rather than guessing.",
+      "description": "Search this business knowledge base for information relevant to the customer question. Always use before answering business-specific questions.",
       "input_schema": {
         "type": "object",
         "properties": {
-          "query": {
-            "type": "string",
-            "description": "A focused search query capturing what the customer wants to know. Rephrase their question into a clear, standalone query — don't just copy their raw message if it's vague or conversational."
-          }
+          "query": { "type": "string", "description": "Focused search query" }
         },
         "required": ["query"]
       }
+    },
+    {
+      "name": "capture_lead",
+      "description": "Record or update information about a potential lead based on what they've shared in conversation. Call this whenever the visitor shares their contact info (name, email, phone, company) or answers that help qualify them (budget, timeline, what they're looking for, urgency). You can call this multiple times in a conversation as you learn more -- it will update the existing lead rather than create a duplicate. Only include fields you actually know; omit anything not yet shared.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "The visitor's full name, if known" },
+              "email": { "type": "string", "description": "The visitor's email address, if known" },
+              "phone": { "type": "string", "description": "The visitor's phone number, if known" },
+              "company": { "type": "string", "description": "The visitor's company or organization, if known and relevant" }
+            }
+          },
+          "qualification_answers": {
+            "type": "object",
+            "properties": {
+              "budget": { "type": "string", "description": "Any budget or price range the visitor has mentioned" },
+              "timeline": { "type": "string", "description": "How soon they are looking to act, e.g. this month, just browsing, ASAP" },
+              "property_type": { "type": "string", "description": "What type of property or service they are interested in" },
+              "intent_signal": { "type": "string", "description": "Any explicit signal of buying/booking intent, e.g. wants to schedule a viewing, ready to talk to an agent" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "check_availability",
+      "description": "Check available appointment slots for the business within a date range. Call this when a visitor asks to schedule, book, or view something and you need to know what times are open. Always call this before book_appointment so you can offer real available times.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "date_range_start": { "type": "string", "description": "Start date in YYYY-MM-DD format" },
+          "date_range_end": { "type": "string", "description": "End date in YYYY-MM-DD format" }
+        },
+        "required": ["date_range_start", "date_range_end"]
+      }
+    },
+    {
+      "name": "book_appointment",
+      "description": "Book a confirmed appointment for the visitor at a specific available time. Only call this after the visitor has explicitly agreed to a specific slot returned by check_availability. Requires a contact_id, so capture_lead should typically be called first to ensure the contact exists.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "contact_id": { "type": "string", "description": "The UUID of the contact this appointment is for" },
+          "starts_at": { "type": "string", "description": "ISO 8601 UTC datetime the appointment starts, e.g. 2026-08-17T10:00:00.000Z" },
+          "ends_at": { "type": "string", "description": "ISO 8601 UTC datetime the appointment ends" },
+          "notes": { "type": "string", "description": "Brief note on what the appointment is for, based on the conversation" }
+        },
+        "required": ["contact_id", "starts_at", "ends_at"]
+      }
     }
   ],
+  "tool_choice": {
+    "type": "auto",
+    "disable_parallel_tool_use": true,
+    "note": "Claude can legitimately want to call more than one tool in a single turn (e.g. capture_lead + check_availability together). The agent loop only handles one tool_result per turn, so disable_parallel_tool_use forces Claude to make calls sequentially across loop iterations instead -- see KNOWN_ISSUES.md for the bug this fixes."
+  },
   "notes": [
-    "This is the ONLY tool wired up in Phase 2. The full tool list from the architecture doc (create_lead, book_appointment, etc.) gets added incrementally in later phases — adding them all now, before n8n can actually validate/execute them, would let Claude 'succeed' at proposing actions nothing can carry out.",
-    "input_schema follows the Claude Messages API tool-use format exactly: https://docs.claude.com/en/docs/build-with-claude/tool-use — verify against current docs before adding more tools, in case the schema shape has changed.",
-    "n8n never trusts this tool call blindly: it re-validates that search_company_knowledge is a real, enabled tool for this tenant before executing (see workflow spec)."
+    "This file is a reference copy of the tools array actually embedded in 01-main-ai-agent.json's 'Call Claude' node (jsonBody). If you change tools there, update this file in the same commit -- this file existing separately from the workflow JSON is exactly the kind of thing that drifts silently if not kept in sync deliberately.",
+    "input_schema follows the Claude Messages API tool-use format: https://docs.claude.com/en/docs/build-with-claude/tool-use -- verify against current docs before adding more tools.",
+    "All 4 tools listed here are live and wired end-to-end (Route by Tool -> matching Execute Sub-Workflow -> Build Tool Result Message) as of the Phase 4/5 build. Confirmed working live for all four."
   ]
 }

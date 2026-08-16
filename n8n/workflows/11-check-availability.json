@@ -1,0 +1,156 @@
+{
+  "name": "11 - Check Availability",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"date_range_start\": \"2026-08-17\",\n  \"date_range_end\": \"2026-08-21\"\n}"
+      },
+      "id": "18fa5f25-a861-45f6-a069-630da5ff7c5e",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select ac.business_hours, ac.google_calendar_id, t.timezone\nfrom ai_config ac\njoin tenants t on t.id = ac.tenant_id\nwhere ac.tenant_id = $1;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id] }}"
+        }
+      },
+      "id": "027851a3-3c16-431b-ac98-4c6984392e6b",
+      "name": "Load AI Config",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Set the Postgres credential manually after import. Requires ai_config.google_calendar_id column (add via: alter table ai_config add column google_calendar_id text default 'primary';)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Carry forward the original trigger data alongside the AI config, since the\n// next node (Google Calendar) needs tenant date range + calendar id together.\nconst trigger = $('When Executed by Another Workflow').first().json;\nconst config = $json;\nreturn [{\n  json: {\n    tenant_id: trigger.tenant_id,\n    date_range_start: trigger.date_range_start,\n    date_range_end: trigger.date_range_end,\n    business_hours: config.business_hours,\n    timezone: config.timezone || 'UTC',\n    google_calendar_id: config.google_calendar_id || 'primary'\n  }\n}];"
+      },
+      "id": "88ca0e1f-8620-4c99-a669-f5d8a9143fd7",
+      "name": "Merge Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/freeBusy",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"timeMin\": \"{{ $json.date_range_start }}T00:00:00.000Z\",\n  \"timeMax\": \"{{ $json.date_range_end }}T23:59:59.000Z\",\n  \"timeZone\": \"{{ $json.timezone }}\",\n  \"items\": [ { \"id\": \"{{ $json.google_calendar_id }}\" } ]\n}",
+        "options": {}
+      },
+      "id": "12e379d2-f7a5-4618-b306-57f4e2d05011",
+      "name": "Get Busy Times (Google FreeBusy API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compute open appointment slots: business_hours minus existing calendar events.\nconst config = $('Merge Config').first().json;\nconst freeBusyResult = $input.first().json;\nconst calendarId = config.google_calendar_id || 'primary';\nconst busy = (freeBusyResult.calendars?.[calendarId]?.busy) || [];\nconst businessHours = config.business_hours || {};\nconst timezone = config.timezone || 'UTC';\nconst SLOT_MINUTES = 60;\n// Safety cap on the total number of slots returned across the whole date range,\n// so a wide range does not produce an unbounded payload. Set high enough to\n// cover a full multi-day business week of hourly slots (previously this was 5,\n// which truncated a single day and hid real availability like 2pm-5pm).\nconst MAX_SLOTS = 200;\nconst dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];\n\nconst busyRanges = busy.map(b => ({\n  start: DateTime.fromISO(b.start),\n  end: DateTime.fromISO(b.end)\n}));\n\nfunction overlaps(slotStart, slotEnd) {\n  return busyRanges.some(b => slotStart < b.end && slotEnd > b.start);\n}\n\nconst startDate = DateTime.fromISO(config.date_range_start, { zone: timezone }).startOf('day');\nconst endDate = DateTime.fromISO(config.date_range_end, { zone: timezone }).startOf('day');\nconst now = DateTime.now().setZone(timezone);\nconst slots = [];\n\nfor (let d = startDate; d <= endDate && slots.length < MAX_SLOTS; d = d.plus({ days: 1 })) {\n  const dayName = dayNames[d.weekday % 7];\n  const hours = businessHours[dayName];\n  if (!hours) continue;\n\n  const [openH, openM] = hours.open.split(':').map(Number);\n  const [closeH, closeM] = hours.close.split(':').map(Number);\n\n  let slotStart = d.set({ hour: openH, minute: openM, second: 0, millisecond: 0 });\n  const dayClose = d.set({ hour: closeH, minute: closeM, second: 0, millisecond: 0 });\n\n  while (slotStart < dayClose && slots.length < MAX_SLOTS) {\n    const slotEnd = slotStart.plus({ minutes: SLOT_MINUTES });\n    if (slotEnd <= dayClose && slotStart > now && !overlaps(slotStart, slotEnd)) {\n      slots.push({\n        starts_at: slotStart.toUTC().toISO(),\n        ends_at: slotEnd.toUTC().toISO()\n      });\n    }\n    slotStart = slotStart.plus({ minutes: SLOT_MINUTES });\n  }\n}\n\nreturn [{ json: { available_slots: slots, timezone: config.timezone } }];"
+      },
+      "id": "5ebce626-d68f-4ee5-800a-b72511301bac",
+      "name": "Compute Available Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load AI Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load AI Config": {
+      "main": [
+        [
+          {
+            "node": "Merge Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Config": {
+      "main": [
+        [
+          {
+            "node": "Get Busy Times (Google FreeBusy API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Busy Times (Google FreeBusy API)": {
+      "main": [
+        [
+          {
+            "node": "Compute Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f88f926a-ad1a-4675-b85e-d66643ec2096",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "D94fGN3AjCPhGzCb",
+  "tags": []
+}

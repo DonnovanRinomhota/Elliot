@@ -2,7 +2,7 @@
 
 **Elliot** is a configurable, multi-tenant AI Business Assistant platform — an "AI employee" businesses can deploy for customer support, lead qualification, appointment scheduling, email handling, and CRM automation, built on Claude + n8n + Supabase.
 
-> Status: **pre-alpha / architecture phase.** No production code yet. See `docs/architecture.md` for the full technical blueprint.
+> Status: **active build.** Core agent loop, RAG, lead capture, and appointment scheduling are built and verified end-to-end against a live tenant (Zebra Real Estate, dev). See `docs/architecture.md` for the full technical blueprint and `KNOWN_ISSUES.md` for resolved bugs and open items.
 
 ## What Elliot does
 
@@ -43,16 +43,26 @@ Claude API · n8n · Supabase (Postgres + pgvector) · Next.js · Google/Microso
 
 Built incrementally, one component at a time, in this order:
 
-1. Multi-tenant schema + Row-Level Security
-2. Main AI Agent loop (single tool, single tenant)
-3. RAG knowledge ingestion + retrieval
-4. Human escalation & approval gates
-5. Lead capture & qualification
-6. Appointment management
-7. Email agent (gated auto-send)
-8. Follow-up engine
-9. CRM sync
-10. Multi-tenant hardening (second real tenant)
+1. ✅ Multi-tenant schema + Row-Level Security
+2. ✅ Main AI Agent loop — restructured since initial build into a proper
+   agentic loop (single `Call Claude` node, loops on tool calls up to a
+   safety cap, `disable_parallel_tool_use` to keep the tool-result contract
+   simple)
+3. ✅ RAG knowledge ingestion + retrieval
+4. 🟡 Human escalation & approval gates — **partially built out of order**:
+   the hot-lead escalation path inside Lead Capture (5) is built and fixed
+   (see `KNOWN_ISSUES.md`), but the broader phase — general escalation
+   triggers, a real approval-gate mechanism driven by `ai_config.autonomy_rules`,
+   human notification delivery — has not been built as its own phase yet.
+   **This is the actual next phase**, not a new "phase 6."
+5. ✅ Lead capture & qualification
+6. ✅ Appointment management — check-availability + book-appointment, with
+   DB-level double-booking protection
+7. ⬜ Email agent (gated auto-send) — blocked on (4) being finished first,
+   same as originally planned
+8. ⬜ Follow-up engine
+9. ⬜ CRM sync
+10. ⬜ Multi-tenant hardening (second real tenant)
 
 See `docs/architecture.md` for reasoning, database schema, security model, and what's deliberately **not** being built yet.
 

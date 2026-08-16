@@ -1,0 +1,237 @@
+{
+  "name": "10 - Lead Capture",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"conversation_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"contact\": {\n    \"name\": \"Jan\",\n    \"email\": \"jan@example.com\",\n    \"phone\": null,\n    \"company\": null\n  },\n  \"qualification_answers\": {\n    \"budget\": \"2M PLN\",\n    \"timeline\": \"ASAP\",\n    \"property_type\": \"apartment\",\n    \"intent_signal\": \"wants to schedule a viewing\"\n  },\n  \"source\": \"chat_widget\"\n}"
+      },
+      "id": "78770334-3b20-4c29-be74-04fc13ea1fcb",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into contacts (tenant_id, name, email, phone, company, source)\nvalues ($1, $2, $3, $4, $5, $6)\non conflict (tenant_id, email) do update\n  set name = coalesce(excluded.name, contacts.name),\n      phone = coalesce(excluded.phone, contacts.phone),\n      company = coalesce(excluded.company, contacts.company)\nreturning id;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.contact?.name || null, $json.contact?.email || null, $json.contact?.phone || null, $json.contact?.company || null, $json.source || 'chat_widget'] }}"
+        }
+      },
+      "id": "c08c9e4b-96f0-408a-bf6e-c52fe0ea5cd5",
+      "name": "Upsert Contact",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        96
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "REQUIRES: unique constraint contacts_tenant_email_unique (tenant_id, email). Set the 'Elliot Postgres (service role)' credential manually after import."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compute a simple qualification score + status from the trigger's qualification_answers.\nconst trigger = $('When Executed by Another Workflow').first().json;\nconst answers = trigger.qualification_answers || {};\nconst contactId = $json.id; // from Upsert Contact\n\nlet score = 0;\nif (answers.budget) score += 25;\nif (answers.timeline && /\\b(week|month|asap|now|soon)\\b/i.test(answers.timeline)) score += 25;\nif (answers.property_type) score += 15;\nif (answers.intent_signal) score += 20;\nif (trigger.contact?.email) score += 10;\nif (trigger.contact?.phone) score += 5;\n\nlet status = 'QUALIFYING';\nif (score >= 70) status = 'HOT';\nelse if (score >= 40) status = 'QUALIFIED';\n\nreturn [{\n  json: {\n    tenant_id: trigger.tenant_id,\n    contact_id: contactId,\n    status,\n    score,\n    qualification_answers: answers\n  }\n}];"
+      },
+      "id": "8446c984-524b-4d8b-a73c-fa428a6f1a5d",
+      "name": "Score Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into leads (tenant_id, contact_id, status, score, qualification_answers)\nvalues ($1, $2, $3, $4, $5)\non conflict (tenant_id, contact_id) do update\n  set status = excluded.status,\n      score = excluded.score,\n      qualification_answers = leads.qualification_answers || excluded.qualification_answers,\n      updated_at = now()\nreturning id, status, score;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.contact_id, $json.status, $json.score, JSON.stringify($json.qualification_answers)] }}"
+        }
+      },
+      "id": "edf3dc37-d488-4bd9-bffb-d6a12c2ab47f",
+      "name": "Upsert Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        672,
+        96
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "REQUIRES: unique constraint leads_tenant_contact_unique (tenant_id, contact_id). Set the 'Elliot Postgres (service role)' credential manually after import."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-hot-1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "HOT",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d644be57-29a3-49c1-823a-e9631cf2890e",
+      "name": "Is Hot Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from insert_escalation($1, $2, $3, $4, $5);",
+        "options": {
+          "queryReplacement": "={{ [\n  $('Upsert Lead').first().json.tenant_id || $('When Executed by Another Workflow').first().json.tenant_id,\n  $('When Executed by Another Workflow').first().json.conversation_id,\n  'other',\n  'high',\n  `Hot lead: score ${$json.score}, contact ${$('When Executed by Another Workflow').first().json.contact?.email || $('When Executed by Another Workflow').first().json.contact?.name || 'unknown'}, timeline: ${$('When Executed by Another Workflow').first().json.qualification_answers?.timeline || 'unknown'}`\n] }}"
+        }
+      },
+      "id": "e81416fc-57ee-448b-96cd-96bc8f6ba5a1",
+      "name": "Insert Escalation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1120,
+        0
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "REQUIRES: check/confirm actual escalations table column names before running -- this is a best-guess based on table name only, not a verified schema. Set the Postgres credential manually after import."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize output shape for the Main Agent's tool_result formatting.\n// IMPORTANT: return contact_id so the agent can pass a real UUID to\n// book_appointment. Read it from Score Lead (which carries the upserted\n// contact id), falling back to Upsert Lead if needed.\nconst leadResult = $('Upsert Lead').first().json;\nconst scored = $('Score Lead').first().json;\nconst trigger = $('When Executed by Another Workflow').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    lead_id: leadResult.id,\n    contact_id: scored.contact_id || null,\n    status: leadResult.status,\n    score: leadResult.score,\n    contact_email: trigger.contact?.email || null\n  }\n}];"
+      },
+      "id": "21e0450f-aadf-4e8d-bd06-f4be9da97243",
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        192
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Upsert Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Contact": {
+      "main": [
+        [
+          {
+            "node": "Score Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Lead": {
+      "main": [
+        [
+          {
+            "node": "Upsert Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Lead": {
+      "main": [
+        [
+          {
+            "node": "Is Hot Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Hot Lead?": {
+      "main": [
+        [
+          {
+            "node": "Insert Escalation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "50af2ee4-4a39-468b-9e16-a03598b9350c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "XVFzq7X38hyUZDqZ",
+  "tags": []
+}
