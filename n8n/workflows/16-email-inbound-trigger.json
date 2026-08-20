@@ -1,0 +1,537 @@
+{
+  "name": "16 - Email Inbound Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ]
+        },
+        "options": {}
+      },
+      "id": "dbf75273-56d0-4b49-9aa6-0a08e9594d2d",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1104,
+        64
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UEVuaDdqEf2Zd7CE",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "TODO: set the real Gmail OAuth2 credential. Polling every minute to start -- widen the interval once this is stable to reduce API usage. n8n's Gmail Trigger dedupes on message ID between polls by default, so re-processing the same message on every poll shouldn't happen, but worth confirming in testing."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extracts the fields the rest of the Phase 7 chain needs.\n// CONFIRMED real shape (via live test): n8n's Gmail Trigger here returns a\n// pre-parsed email object (MIME-parsed), not the raw Gmail API payload.headers/parts\n// structure originally assumed. Real fields: text, html, subject, from.value[0].address,\n// to.value[0].address, id, threadId.\nconst msg = $json;\n\nconst fromEmail = (msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].address) || '';\nconst toEmail = (msg.to && msg.to.value && msg.to.value[0] && msg.to.value[0].address) || '';\nconst subject = msg.subject || '';\n\n// Prefer plain text; fall back to a crude HTML strip if only html is present.\nlet body = msg.text || '';\nif (!body && msg.html) {\n  body = msg.html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nconst gmailMessageId = msg.id || msg.messageId || '';\nconst gmailThreadId = msg.threadId || gmailMessageId;\n\nreturn [{\n  json: {\n    gmail_message_id: gmailMessageId,\n    gmail_thread_id: gmailThreadId,\n    from_email: fromEmail,\n    to_email: toEmail,\n    subject,\n    body\n  }\n}];"
+      },
+      "id": "120df9b8-0e94-4ecf-9da5-6ffc002ba5ad",
+      "name": "Extract Email Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public",
+          "cachedResultUrl": ""
+        },
+        "table": "ai_config",
+        "where": {
+          "values": [
+            {
+              "column": "connected_gmail_address",
+              "value": "={{ $json.to_email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f82e125d-7e80-472e-b9c8-a9e50ced705d",
+      "name": "Lookup Tenant by Mailbox",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -656,
+        64
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "TODO: confirm the real column name/table storing each tenant's connected Gmail address -- assumed ai_config.connected_gmail_address here. Add it via migration if it doesn't exist yet. This is what lets one shared trigger workflow serve every tenant without cloning."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tenant_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "601a7d29-31b0-43e4-9070-922928ceb6ac",
+      "name": "If Tenant Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        64
+      ],
+      "notes": "No-match branch should log/alert rather than silently drop -- TODO: wire the false branch to a simple logging step (or Slack alert) so misrouted mail doesn't vanish silently."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Extract Email Fields').first().json.from_email }}",
+              "rightValue": "={{ $json.connected_gmail_address }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bdc03023-3a3a-4609-b8cb-c009b2dc8536",
+      "name": "If Not Self-Sent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        64
+      ],
+      "notes": "Loop-prevention: skips processing if the sender IS the tenant's own connected mailbox (e.g. Elliot's own sent replies landing back in a shared/CC'd inbox). TODO: verify this is sufficient in your actual Gmail setup -- if the mailbox is a shared alias, you may need a header-based marker instead (e.g. a custom X-Elliot-Sent header stamped by 15) for a more reliable check."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into contacts (tenant_id, email)\nvalues ($1, $2)\non conflict (tenant_id, email)\ndo update set email = excluded.email\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [$('Lookup Tenant by Mailbox').first().json.tenant_id, $('Extract Email Fields').first().json.from_email] }}"
+        }
+      },
+      "id": "ef564099-e992-4b7d-8326-2c9e9d7e6813",
+      "name": "Upsert Contact",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -16,
+        -32
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Upserts on the tenant_id+email unique constraint from Phase 5. Deliberately no lead scoring/escalation here -- this just makes sure an email from a new sender gets a contact row, same as chat does via capture_lead, so email leads don't fall outside the pipeline. TODO: confirm 'contacts' table has no other NOT NULL columns beyond tenant_id/email that would make a bare insert fail (e.g. a required 'source' or 'name' column) -- add them to the insert if so."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into conversations (tenant_id, contact_id, channel)\nselect $1, $2, 'email'\nwhere not exists (\n  select 1 from conversations\n  where tenant_id = $1 and contact_id = $2 and channel = 'email'\n)\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [$('Lookup Tenant by Mailbox').first().json.tenant_id, $json.id] }}"
+        }
+      },
+      "id": "9dd81ec1-a4d8-46fd-b524-e84e9f1f2fee",
+      "name": "Get or Create Conversation (Email)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        32,
+        224
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "TODO: this INSERT...WHERE NOT EXISTS returns nothing on the 'already exists' path (a Postgres quirk) -- you'll need a follow-up SELECT (or a CTE combining both) to reliably get the conversation_id either way. Also confirm 'conversations' table actually has a 'channel' column -- if it doesn't, this needs a small migration too, and email threads should probably map many gmail_thread_ids to one ongoing conversation per contact rather than one-per-thread; adjust the matching logic if so."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "d8BdZ5LChDnL52Bg",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/d8BdZ5LChDnL52Bg"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Lookup Tenant by Mailbox').first().json.tenant_id }}",
+            "from_email": "={{ $('Extract Email Fields').first().json.from_email }}",
+            "subject": "={{ $('Extract Email Fields').first().json.subject }}",
+            "body": "={{ $('Extract Email Fields').first().json.body }}",
+            "gmail_thread_id": "={{ $('Extract Email Fields').first().json.gmail_thread_id }}",
+            "gmail_message_id": "={{ $('Extract Email Fields').first().json.gmail_message_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "from_email",
+              "displayName": "from_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "a407880a-152a-4809-9b43-f7d1986f9128",
+      "name": "Execute: Classify Email",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        64
+      ],
+      "notes": "TODO: set real workflow ID for 13 - Classify Email."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "JQapNVb4y1mB8EjA",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/JQapNVb4y1mB8EjA"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Lookup Tenant by Mailbox').first().json.tenant_id }}",
+            "conversation_id": "={{ $('Get or Create Conversation (Email)').first()?.json?.id || null }}",
+            "contact_id": "={{ $('Upsert Contact').first()?.json?.id || null }}",
+            "from_email": "={{ $('Extract Email Fields').first().json.from_email }}",
+            "subject": "={{ $('Extract Email Fields').first().json.subject }}",
+            "body": "={{ $('Extract Email Fields').first().json.body }}",
+            "gmail_thread_id": "={{ $('Extract Email Fields').first().json.gmail_thread_id }}",
+            "gmail_message_id": "={{ $('Extract Email Fields').first().json.gmail_message_id }}",
+            "category": "={{ $json.category }}",
+            "confidence": "={{ $json.confidence }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "contact_id",
+              "displayName": "contact_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "from_email",
+              "displayName": "from_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "94fc6012-9ea6-4d7b-8071-fd84cbb5357c",
+      "name": "Execute: Draft Email Reply",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        64
+      ],
+      "notes": "TODO: set real workflow ID for 14 - Draft Email Reply."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Fields": {
+      "main": [
+        [
+          {
+            "node": "Lookup Tenant by Mailbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Tenant by Mailbox": {
+      "main": [
+        [
+          {
+            "node": "If Tenant Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Tenant Found": {
+      "main": [
+        [
+          {
+            "node": "If Not Self-Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Self-Sent": {
+      "main": [
+        [
+          {
+            "node": "Upsert Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Contact": {
+      "main": [
+        [
+          {
+            "node": "Get or Create Conversation (Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get or Create Conversation (Email)": {
+      "main": [
+        [
+          {
+            "node": "Execute: Classify Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Classify Email": {
+      "main": [
+        [
+          {
+            "node": "Execute: Draft Email Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1f742851-90aa-432a-9a1f-3e6d32e7839d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "rjv3bRMQLkTkCiGA",
+  "tags": []
+}

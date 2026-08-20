@@ -1,0 +1,150 @@
+{
+  "name": "17 - Manual Send Draft",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-approved-draft",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f5041366-7d38-472c-9a3f-92ba7655d0f2",
+      "name": "Send Draft Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "send-approved-draft",
+      "notes": "TODO: after activating, copy the real Production URL from this node and set it as NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL in the dashboard's .env.local."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validates the incoming request has a draft_id before calling 15.\nconst body = $input.first().json.body || {};\nif (!body.draft_id) {\n  throw new Error('draft_id is required');\n}\nreturn [{ json: { draft_id: body.draft_id } }];"
+      },
+      "id": "a070013d-42c9-46ca-8a2d-61ac6fa88b7c",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "5WtBLdM7JIbr0v3O",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/5WtBLdM7JIbr0v3O"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "draft_id": "={{ $json.draft_id }}",
+            "auto": false
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "draft_id",
+              "displayName": "draft_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "auto",
+              "displayName": "auto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "f2f2b462-4c45-4c70-9ba7-cd0e54a16437",
+      "name": "Execute: Send Approved Email",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        0
+      ],
+      "notes": "TODO: set real workflow ID for 15. auto:false since this is a human-approved send, not an automatic one -- 15's final status update should reflect that distinction if you want 'sent' vs 'auto_sent' to stay meaningful."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, draft_id: $json.draft_id }) }}",
+        "options": {}
+      },
+      "id": "2c4a9d8e-808c-4952-94e6-af44773e9b3b",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Send Draft Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Execute: Send Approved Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Send Approved Email": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ba936177-201e-4b2c-9a56-0d1135511a95",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "OuQA7dwKI2wPVNbo",
+  "tags": []
+}

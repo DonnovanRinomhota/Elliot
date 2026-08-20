@@ -1,0 +1,166 @@
+{
+  "name": "13 - Classify Email",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tenant_id"
+            },
+            {
+              "name": "from_email"
+            },
+            {
+              "name": "subject"
+            },
+            {
+              "name": "body"
+            },
+            {
+              "name": "gmail_thread_id"
+            },
+            {
+              "name": "gmail_message_id"
+            }
+          ]
+        }
+      },
+      "id": "f283629a-09d6-45d7-b7d5-0f7aab77630a",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the classification prompt for Claude.\n// TODO: adjust category descriptions if your real inbox needs differ.\nconst fromEmail = $json.from_email || '';\nconst subject = $json.subject || '';\nconst body = $json.body || '';\n\nconst prompt = `You are classifying an inbound email to a real estate agency so it can be routed correctly.\n\nCategories:\n- faq_answerable: A factual question answerable from the agency's own knowledge base (hours, general process, pricing structure, areas served, generic property-type questions). NOT this category if it references a specific property, listing, or requires looking up live data.\n- lead_inquiry: A new or existing prospect expressing interest in buying/selling/renting, asking about a specific property, or requesting more information that isn't a simple FAQ.\n- complaint: Expresses dissatisfaction, frustration, or a problem with service already received.\n- scheduling: Explicitly asking to book, reschedule, or cancel a viewing/appointment.\n- spam: Marketing, phishing, irrelevant solicitation, automated notifications not requiring a business reply.\n- other: Doesn't clearly fit any category above.\n\nEmail:\nFrom: ${fromEmail}\nSubject: ${subject}\nBody:\n${body}\n\nRespond with ONLY valid JSON, no other text:\n{\n  \"category\": \"<one of the 6 categories above>\",\n  \"confidence\": <float 0.0-1.0>,\n  \"reasoning\": \"<one sentence why>\"\n}`;\n\nreturn [{ json: { ...$json, prompt } }];"
+      },
+      "id": "4d659fdd-3e2e-42a9-898b-b21f4515eba5",
+      "name": "Build Claude Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"claude-sonnet-4-6\", max_tokens: 500, messages: [ { role: \"user\", content: $json.prompt } ] }) }}",
+        "options": {}
+      },
+      "id": "ebb4a347-de6a-485c-8e88-457ca98b9745",
+      "name": "Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        0
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "anthropicApi": {
+          "id": "ONpVZEdZ4bnOMO3X",
+          "name": "Anthropic account"
+        }
+      },
+      "notes": "TODO: confirm 'Anthropic account' credential is selected (Predefined Credential Type -> anthropicApi), same as 01-main-ai-agent."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parses and validates Claude's classification JSON.\n// TODO: add stricter error handling / retry-on-parse-failure if you see bad output in testing.\nconst ALLOWED = ['faq_answerable','lead_inquiry','complaint','scheduling','spam','other'];\n\nlet raw = '';\ntry {\n  raw = $json.content[0].text;\n} catch (e) {\n  throw new Error('Unexpected Claude response shape: ' + JSON.stringify($json));\n}\n\n// Strip any accidental markdown fences before parsing.\nconst cleaned = raw.replace(/```json|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Failed to parse classification JSON: ' + cleaned);\n}\n\nif (!ALLOWED.includes(parsed.category)) {\n  parsed.category = 'other';\n}\n\nlet confidence = Number(parsed.confidence);\nif (isNaN(confidence)) confidence = 0;\nconfidence = Math.max(0, Math.min(1, confidence));\n\nreturn [{\n  json: {\n    category: parsed.category,\n    confidence,\n    reasoning: parsed.reasoning || ''\n  }\n}];"
+      },
+      "id": "31540da1-be7d-4226-8ef6-ba6c3527510a",
+      "name": "Parse Classification Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "tenant_id": "<zebra tenant id>",
+          "from_email": "test@example.com",
+          "subject": "What are your office hours?",
+          "body": "Hi, is the 3-bedroom listing on Oak Street still available? I'd like to view it this weekend."
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Request": {
+      "main": [
+        [
+          {
+            "node": "Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Parse Classification Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1ff7bc4e-7ef2-4b86-8d05-3c458765b264",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "d8BdZ5LChDnL52Bg",
+  "tags": []
+}

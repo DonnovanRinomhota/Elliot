@@ -8,12 +8,12 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "webhook_trigger",
+      "id": "fb333bd2-ea62-4fc9-94b3-04cc36415adf",
       "name": "Ingest Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -1400,
+        0,
         0
       ],
       "webhookId": "elliot-knowledge-ingest"
@@ -22,12 +22,12 @@
       "parameters": {
         "jsCode": "// Expected body: { tenant_slug, title, source_type, text }\n// Phase 3 scope: plain text content only (paste FAQ text, paste a policy doc, etc).\n// PDF/website extraction is a later phase -- flagged in the workflow spec, not built here.\nconst body = $input.first().json.body || {};\nfor (const f of ['tenant_slug', 'title', 'source_type', 'text']) {\n  if (!body[f]) throw new Error(`${f} is required`);\n}\nconst validTypes = ['pdf', 'website', 'faq', 'manual_text', 'other'];\nif (!validTypes.includes(body.source_type)) {\n  throw new Error(`source_type must be one of: ${validTypes.join(', ')}`);\n}\nreturn [{ json: body }];"
       },
-      "id": "validate_input",
+      "id": "f69e1ae6-6eb6-4789-b400-4175d97f9c61",
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1180,
+        224,
         0
       ]
     },
@@ -39,17 +39,17 @@
           "queryReplacement": "={{ [$json.tenant_slug] }}"
         }
       },
-      "id": "resolve_tenant",
+      "id": "91b01549-6301-46a6-8c23-1d67a000566a",
       "name": "Resolve Tenant",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -960,
+        448,
         0
       ],
       "credentials": {
         "postgres": {
-          "id": "elliot_postgres_service_role",
+          "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
       }
@@ -58,12 +58,12 @@
       "parameters": {
         "jsCode": "const tenantRows = $('Resolve Tenant').all();\nif (!tenantRows.length) { throw new Error('Unknown or inactive tenant_slug'); }\nconst input = $('Validate Input').first().json;\nreturn [{ json: { ...input, tenant_id: tenantRows[0].json.tenant_id } }];"
       },
-      "id": "merge_tenant",
+      "id": "36bfe30b-f928-4786-8a66-d8c34ff2d092",
       "name": "Merge Tenant",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -740,
+        672,
         0
       ]
     },
@@ -75,17 +75,17 @@
           "queryReplacement": "={{ [$json.tenant_id, $json.title, $json.source_type] }}"
         }
       },
-      "id": "create_document",
+      "id": "85490261-64bd-441d-bac3-0560ae05cadd",
       "name": "Create Document Row",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -520,
+        880,
         0
       ],
       "credentials": {
         "postgres": {
-          "id": "elliot_postgres_service_role",
+          "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
       }
@@ -94,12 +94,12 @@
       "parameters": {
         "jsCode": "// Simple chunking: split on double-newlines (paragraphs), then merge small\n// paragraphs together up to a target size, so chunks aren't too tiny or too huge.\n// This is intentionally simple for Phase 3 -- a real implementation would use\n// sentence-aware splitting and overlap; flagged as a later improvement, not built now.\nconst ctx = $('Merge Tenant').first().json;\nconst doc = $('Create Document Row').first().json;\nconst TARGET_CHARS = 1000;\n\nconst paragraphs = ctx.text.split(/\\n\\s*\\n/).map(p => p.trim()).filter(Boolean);\nconst chunks = [];\nlet current = '';\nfor (const p of paragraphs) {\n  if ((current + '\\n\\n' + p).length > TARGET_CHARS && current) {\n    chunks.push(current);\n    current = p;\n  } else {\n    current = current ? current + '\\n\\n' + p : p;\n  }\n}\nif (current) chunks.push(current);\nif (!chunks.length) { throw new Error('No content to chunk -- text was empty after trimming'); }\n\nreturn chunks.map((content, i) => ({ json: {\n  tenant_id: ctx.tenant_id, document_id: doc.document_id, chunk_index: i, content\n}}));"
       },
-      "id": "chunk_text",
+      "id": "c154bc02-d8c0-4fb0-893c-b5210dbed290",
       "name": "Chunk Text",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -300,
+        1104,
         0
       ]
     },
@@ -130,17 +130,17 @@
           }
         }
       },
-      "id": "embed_chunk",
+      "id": "bb402b5e-a1de-43ed-8a22-b1073bc86bc1",
       "name": "Embed Chunk (Voyage AI)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -80,
+        1328,
         0
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "voyage_api_key",
+          "id": "ogmUkMs4GkHYSNLz",
           "name": "Voyage AI API Key (Authorization header)"
         }
       },
@@ -150,12 +150,12 @@
       "parameters": {
         "jsCode": "const chunk = $('Chunk Text').item.json;\nconst resp = $json;\nconst embedding = resp.data && resp.data[0] && resp.data[0].embedding;\nif (!embedding) { throw new Error('No embedding returned for chunk ' + chunk.chunk_index); }\nreturn [{ json: { ...chunk, embedding } }];"
       },
-      "id": "extract_chunk_embedding",
+      "id": "41a7f4f0-4d9f-4c82-85c4-d1186fc269e9",
       "name": "Extract Chunk Embedding",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        140,
+        1552,
         0
       ]
     },
@@ -167,17 +167,17 @@
           "queryReplacement": "={{ [$json.tenant_id, $json.document_id, $json.chunk_index, $json.content, JSON.stringify($json.embedding)] }}"
         }
       },
-      "id": "insert_chunk",
+      "id": "a7bd68db-4ed5-479d-b2f5-2a2437356ffc",
       "name": "Insert Chunk",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        360,
+        1760,
         0
       ],
       "credentials": {
         "postgres": {
-          "id": "elliot_postgres_service_role",
+          "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
       }
@@ -190,17 +190,17 @@
           "queryReplacement": "={{ [$('Create Document Row').first().json.document_id] }}"
         }
       },
-      "id": "mark_ready",
+      "id": "7f34a735-5ae1-4e12-b77e-1431f3728f7f",
       "name": "Mark Document Ready",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        580,
+        1984,
         0
       ],
       "credentials": {
         "postgres": {
-          "id": "elliot_postgres_service_role",
+          "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
       },
@@ -209,18 +209,33 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { document_id: $('Create Document Row').first().json.document_id, status: 'ready', chunks_created: $('Chunk Text').all().length } }}"
+        "responseBody": "={{ { document_id: $('Create Document Row').first().json.document_id, status: 'ready', chunks_created: $('Chunk Text').all().length } }}",
+        "options": {}
       },
-      "id": "respond",
+      "id": "fdd0b6cc-70d6-45c2-917d-70600618afcf",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        800,
+        2208,
         0
       ]
     }
   ],
+  "pinData": {
+    "Ingest Webhook": [
+      {
+        "json": {
+          "body": {
+            "tenant_slug": "zebra-dev",
+            "title": "Test FAQ",
+            "source_type": "faq",
+            "text": "We are open Monday through Friday, 9am to 6pm.\n\nViewings are by appointment only."
+          }
+        }
+      }
+    ]
+  },
   "connections": {
     "Ingest Webhook": {
       "main": [
@@ -333,9 +348,18 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
-  "pinData": {}
+  "versionId": "5c0cda4c-1652-464a-9d7b-bd2dde3c53a3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "qhZBjeBYWnghwlcQ",
+  "tags": []
 }

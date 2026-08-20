@@ -1,0 +1,665 @@
+{
+  "name": "14 - Draft Email Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tenant_id"
+            },
+            {
+              "name": "conversation_id"
+            },
+            {
+              "name": "contact_id"
+            },
+            {
+              "name": "from_email"
+            },
+            {
+              "name": "subject"
+            },
+            {
+              "name": "body"
+            },
+            {
+              "name": "gmail_thread_id"
+            },
+            {
+              "name": "gmail_message_id"
+            },
+            {
+              "name": "category"
+            },
+            {
+              "name": "confidence",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "37d5f343-7882-4b1f-9d08-41cd62e5c11f",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "faq_answerable",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fb5080c2-6327-4abd-be0b-a1a269be4386",
+      "name": "If FAQ Answerable",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "q3Q23QZ4329lF5Uk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $json.tenant_id }}",
+            "query": "={{ $json.subject + ' ' + $json.body }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "query",
+              "displayName": "query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "6fbaa835-0ec2-45b0-a111-664ad728f1fb",
+      "name": "Execute: Knowledge Retrieval",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "alwaysOutputData": true,
+      "notes": "TODO: set the real workflow ID for 09 - Knowledge Retrieval."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the FAQ-grounded draft prompt using retrieval results.\n// TODO: tune tone/signature to match the tenant's actual brand voice once you have tenant-level config for this.\nconst retrieval = $json.retrieval || $json; // shape depends on 09's actual output\nconst found = retrieval.found;\nconst results = retrieval.results || [];\n\nconst context = found\n  ? results.map(r => r.content || r.text).join('\\n\\n')\n  : 'No matching knowledge base content was found.';\n\nconst prompt = `Draft a professional, concise email reply on behalf of a real estate agency.\nThe customer's question should be answered ONLY using the knowledge base context below -- do not invent facts.\nIf the context doesn't actually answer the question, say the team will follow up with specifics rather than guessing.\n\nCustomer email:\nSubject: ${$('When Executed by Another Workflow').first().json.subject}\nBody: ${$('When Executed by Another Workflow').first().json.body}\n\nKnowledge base context:\n${context}\n\nRespond with ONLY the email body text, no subject line, no JSON, no markdown.`;\n\nreturn [{ json: { ...$('When Executed by Another Workflow').first().json, prompt } }];"
+      },
+      "id": "fc1abb94-51e5-4e0b-bb83-5bb6512daeb5",
+      "name": "Build FAQ Draft Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds a generic draft prompt for non-FAQ categories (always goes to human review).\n// TODO: consider category-specific tone (e.g. complaint needs an apologetic, careful tone).\nconst d = $('When Executed by Another Workflow').first().json;\n\nconst prompt = `Draft a professional, concise email reply on behalf of a real estate agency to the message below.\nThis draft will be reviewed by a human before sending, so it's OK to leave placeholders like [confirm availability] if specifics are unknown.\nCategory: ${d.category}\n\nCustomer email:\nSubject: ${d.subject}\nBody: ${d.body}\n\nRespond with ONLY the email body text, no subject line, no JSON, no markdown.`;\n\nreturn [{ json: { ...d, prompt } }];"
+      },
+      "id": "7b54efe8-6a62-4854-a80b-8a6f4339f689",
+      "name": "Build Generic Draft Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"claude-sonnet-4-6\", max_tokens: 600, messages: [ { role: \"user\", content: $json.prompt } ] }) }}",
+        "options": {}
+      },
+      "id": "62f29a8d-f7fe-4aff-aa8c-0b93d7c95cd4",
+      "name": "Call Claude (Draft)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        128
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "ONpVZEdZ4bnOMO3X",
+          "name": "Anthropic account"
+        }
+      },
+      "notes": "Receives input from both branches (FAQ and generic prompt builders)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extracts draft body text and computes auto_send_eligible.\n// TODO: adjust threshold (0.85) after reviewing real classification confidence in testing.\nconst AUTO_SEND_THRESHOLD = 0.85;\nconst input = $('When Executed by Another Workflow').first().json;\n\nlet draftBody = '';\ntry {\n  draftBody = $json.content[0].text.trim();\n} catch (e) {\n  throw new Error('Unexpected Claude draft response shape: ' + JSON.stringify($json));\n}\n\nconst category = input.category;\nconst confidence = Number(input.confidence) || 0;\nconst autoSendEligible = category === 'faq_answerable' && confidence >= AUTO_SEND_THRESHOLD;\n\nreturn [{\n  json: {\n    tenant_id: input.tenant_id,\n    conversation_id: input.conversation_id,\n    contact_id: input.contact_id,\n    gmail_thread_id: input.gmail_thread_id,\n    gmail_message_id: input.gmail_message_id,\n    to_email: input.from_email,\n    subject: 'Re: ' + (input.subject || ''),\n    body: draftBody,\n    category,\n    confidence,\n    auto_send_eligible: autoSendEligible,\n    status: autoSendEligible ? 'pending' : 'pending' // both start pending; gate decides send path downstream\n  }\n}];"
+      },
+      "id": "32b98e7b-34ac-4734-9dbc-5301651ee477",
+      "name": "Shape Draft Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public",
+          "cachedResultUrl": ""
+        },
+        "table": "email_drafts",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "auto_send_eligible": "={{ $json.auto_send_eligible }}",
+            "tenant_id": "={{ $json.tenant_id }}",
+            "gmail_thread_id": "={{ $json.gmail_thread_id }}",
+            "gmail_message_id": "={{ $json.gmail_message_id }}",
+            "to_email": "={{ $json.to_email }}",
+            "subject": "={{ $json.subject }}",
+            "body": "={{ $json.body }}",
+            "category": "={{ $json.category }}",
+            "status": "={{ $json.status }}",
+            "confidence": "={{ $json.confidence }}",
+            "conversation_id": "={{ $json.conversation_id }}",
+            "contact_id": "={{ $json.contact_id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contact_id",
+              "displayName": "contact_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "to_email",
+              "displayName": "to_email",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "from_email",
+              "displayName": "from_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "auto_send_eligible",
+              "displayName": "auto_send_eligible",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reviewed_by",
+              "displayName": "reviewed_by",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reviewed_at",
+              "displayName": "reviewed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sent_at",
+              "displayName": "sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "1cfa2857-d57c-430a-8ec3-bad567a00b40",
+      "name": "Insert email_drafts Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        880,
+        128
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "TODO: set real Postgres credential (service role, same pattern as 12 - Book Appointment) and map columns explicitly rather than relying on auto-mapping."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.auto_send_eligible }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bdd98ba2-5ada-4270-bff7-8aa0b3ce51ef",
+      "name": "If Auto-Send Eligible",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "5WtBLdM7JIbr0v3O",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/5WtBLdM7JIbr0v3O"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "draft_id": "={{ $json.id }}",
+            "auto": true
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "draft_id",
+              "displayName": "draft_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "auto",
+              "displayName": "auto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "d40dba66-1d58-4c4e-b6cc-eba286e1a0ef",
+      "name": "Execute: Send Approved Email",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1328,
+        48
+      ],
+      "notes": "TODO: set real workflow ID for 15 - Send Approved Email. Only reached for faq_answerable drafts >= threshold."
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "conversation_id": null,
+          "contact_id": null,
+          "from_email": "test@example.com",
+          "subject": "What are your office hours?",
+          "body": "Hi, just wondering what hours your office is open. Thanks!",
+          "gmail_thread_id": "test-thread-1",
+          "gmail_message_id": "test-msg-1",
+          "category": "faq_answerable",
+          "confidence": 0.95
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "If FAQ Answerable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If FAQ Answerable": {
+      "main": [
+        [
+          {
+            "node": "Execute: Knowledge Retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Generic Draft Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Knowledge Retrieval": {
+      "main": [
+        [
+          {
+            "node": "Build FAQ Draft Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build FAQ Draft Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call Claude (Draft)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Generic Draft Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call Claude (Draft)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude (Draft)": {
+      "main": [
+        [
+          {
+            "node": "Shape Draft Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Draft Record": {
+      "main": [
+        [
+          {
+            "node": "Insert email_drafts Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert email_drafts Row": {
+      "main": [
+        [
+          {
+            "node": "If Auto-Send Eligible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Auto-Send Eligible": {
+      "main": [
+        [
+          {
+            "node": "Execute: Send Approved Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "83ec6f56-0e5e-4892-aa39-0b0e4ee8d2e3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "JQapNVb4y1mB8EjA",
+  "tags": []
+}
