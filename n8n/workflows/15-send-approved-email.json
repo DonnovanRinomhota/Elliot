@@ -137,33 +137,84 @@
     },
     {
       "parameters": {
-        "operation": "update",
+        "operation": "executeQuery",
+        "query": "-- Replaces the \"Update\" operation entirely -- switch this node's Operation\n-- dropdown to \"Execute Query\" and paste this in as the query. n8n's Postgres\n-- node v2 \"Update\" operation has known parameter-binding bugs (confirmed via\n-- multiple GitHub issues) that can produce this exact confusing failure --\n-- the displayed values look correct but the underlying query is malformed.\n-- Execute Query with explicit parameters bypasses that buggy code path.\n\nupdate email_drafts\nset status = $2,\n    sent_at = $3\nwhere id = $1\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [ $('Load Draft').first().json.id, $('When Executed by Another Workflow').first().json.auto ? 'auto_sent' : 'sent', $now.toISO() ] }}"
+        }
+      },
+      "id": "555194f4-b2df-492a-a775-9918dca47e5f",
+      "name": "Update Draft Status (Sent)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "TODO: map status to 'auto_sent' if $json.auto is true (from trigger input), else 'sent' for human-approved sends. sent_at = now()."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4582bcfc-e7ca-4683-9cc5-b8eed4cdc9b2",
+              "leftValue": "={{ $('Load Draft').first().json.conversation_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        656,
+        0
+      ],
+      "id": "fd7e4ff9-2ddf-4484-b46a-58ee4290793a",
+      "name": "If Conversation Id Exists"
+    },
+    {
+      "parameters": {
         "schema": {
           "__rl": true,
           "mode": "list",
-          "value": "public"
+          "value": "public",
+          "cachedResultName": "public",
+          "cachedResultUrl": ""
         },
-        "table": "email_drafts",
+        "table": {
+          "__rl": true,
+          "value": "messages",
+          "mode": "list",
+          "cachedResultName": "messages"
+        },
         "columns": {
-          "0": "s",
-          "1": "t",
-          "2": "a",
-          "3": "t",
-          "4": "u",
-          "5": "s",
-          "6": ",",
-          "7": "s",
-          "8": "e",
-          "9": "n",
-          "10": "t",
-          "11": "_",
-          "12": "a",
-          "13": "t",
           "mappingMode": "defineBelow",
           "value": {
-            "id": "={{ $('Load Draft').first().json.id }}",
-            "sent_at": "={{ $now }}",
-            "status": "= {{ $('When Executed by Another Workflow').first().json.auto ? 'auto_sent' : 'sent' }}"
+            "tenant_id": "={{ $('Load Draft').first().json.tenant_id }}",
+            "conversation_id": "={{ $('Load Draft').first().json.conversation_id }}",
+            "role": "assistant",
+            "content": "={{ $('Load Draft').first().json.body }}"
           },
           "matchingColumns": [
             "id"
@@ -186,158 +237,43 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
               "id": "conversation_id",
               "displayName": "conversation_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "contact_id",
-              "displayName": "contact_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "gmail_thread_id",
-              "displayName": "gmail_thread_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "gmail_message_id",
-              "displayName": "gmail_message_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "to_email",
-              "displayName": "to_email",
               "required": true,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "from_email",
-              "displayName": "from_email",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "subject",
-              "displayName": "subject",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "body",
-              "displayName": "body",
+              "id": "role",
+              "displayName": "role",
               "required": true,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "category",
-              "displayName": "category",
+              "id": "content",
+              "displayName": "content",
               "required": true,
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             },
             {
-              "id": "confidence",
-              "displayName": "confidence",
+              "id": "tool_calls",
+              "displayName": "tool_calls",
               "required": false,
               "defaultMatch": false,
               "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "auto_send_eligible",
-              "displayName": "auto_send_eligible",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "reviewed_by",
-              "displayName": "reviewed_by",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "reviewed_at",
-              "displayName": "reviewed_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "sent_at",
-              "displayName": "sent_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": false
+              "type": "object",
+              "canBeUsedToMatch": true
             },
             {
               "id": "created_at",
@@ -346,18 +282,7 @@
               "defaultMatch": false,
               "display": true,
               "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": true
-            },
-            {
-              "id": "updated_at",
-              "displayName": "updated_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": true
+              "canBeUsedToMatch": true
             }
           ],
           "attemptToConvertTypes": false,
@@ -365,21 +290,20 @@
         },
         "options": {}
       },
-      "id": "555194f4-b2df-492a-a775-9918dca47e5f",
-      "name": "Update Draft Status (Sent)",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
+      "typeVersion": 2.7,
       "position": [
-        448,
-        0
+        832,
+        -112
       ],
+      "id": "10d2ae21-e1a8-4bcb-be73-c0302bd7f674",
+      "name": "Insert Outbound Message",
       "credentials": {
         "postgres": {
           "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
-      },
-      "notes": "TODO: map status to 'auto_sent' if $json.auto is true (from trigger input), else 'sent' for human-approved sends. sent_at = now()."
+      }
     }
   ],
   "pinData": {},
@@ -438,6 +362,28 @@
           }
         ]
       ]
+    },
+    "Update Draft Status (Sent)": {
+      "main": [
+        [
+          {
+            "node": "If Conversation Id Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Conversation Id Exists": {
+      "main": [
+        [
+          {
+            "node": "Insert Outbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -446,7 +392,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "451839db-0bae-40aa-9808-29ad2e5705df",
+  "versionId": "d6fc276e-22f8-44b9-ace8-a9aa3f940a95",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"

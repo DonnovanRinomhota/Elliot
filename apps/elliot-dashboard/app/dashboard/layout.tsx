@@ -12,8 +12,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
-  // Confirms this auth user is linked to a tenant -- also gives us tenant context
-  // for anything the layout itself needs later (e.g. showing tenant name).
   const { data: tenantUser } = await supabase
     .from("tenant_users")
     .select("tenant_id, email, role")
@@ -40,10 +38,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <a href="/dashboard/approvals" style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#111" }}>
             Pending Approvals
           </a>
-          {/* Placeholder nav items -- not built yet, kept here as a visible map of what's coming. */}
-          <span style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#bbb" }}>Leads (soon)</span>
-          <span style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#bbb" }}>Appointments (soon)</span>
-          <span style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#bbb" }}>Conversations (soon)</span>
+          <a href="/dashboard/leads" style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#111" }}>
+            Leads
+          </a>
+          <a href="/dashboard/appointments" style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#111" }}>
+            Appointments
+          </a>
+          <a href="/dashboard/conversations" style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#111" }}>
+            Conversations
+          </a>
         </div>
         <SignOutButton />
       </nav>

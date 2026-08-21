@@ -177,7 +177,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "insert into conversations (tenant_id, contact_id, channel)\nselect $1, $2, 'email'\nwhere not exists (\n  select 1 from conversations\n  where tenant_id = $1 and contact_id = $2 and channel = 'email'\n)\nreturning *;",
+        "query": "-- Replaces the current query in \"Get or Create Conversation (Email)\".\n-- Old version only returned a row on first creation -- returned nothing if\n-- the conversation already existed, which is fine when nothing downstream\n-- needs the ID, but message-logging needs a reliable ID every time.\nwith existing as (\n  select id from conversations\n  where tenant_id = $1 and contact_id = $2 and channel = 'email'\n  limit 1\n),\ninserted as (\n  insert into conversations (tenant_id, contact_id, channel)\n  select $1, $2, 'email'\n  where not exists (select 1 from existing)\n  returning id\n)\nselect id from existing\nunion all\nselect id from inserted;",
         "options": {
           "queryReplacement": "={{ [$('Lookup Tenant by Mailbox').first().json.tenant_id, $json.id] }}"
         }
@@ -427,6 +427,124 @@
         64
       ],
       "notes": "TODO: set real workflow ID for 14 - Draft Email Reply."
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "messages",
+          "mode": "list",
+          "cachedResultName": "messages"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Lookup Tenant by Mailbox').first().json.tenant_id }}",
+            "conversation_id": "={{ $json.id }}",
+            "role": "user",
+            "content": "={{ $('Extract Email Fields').first().json.body }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "tool_calls",
+              "displayName": "tool_calls",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        256,
+        224
+      ],
+      "id": "67912c35-ef07-4f1b-b144-eaeaf8d382c9",
+      "name": "Insert Inbound Message",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -501,7 +619,7 @@
       "main": [
         [
           {
-            "node": "Execute: Classify Email",
+            "node": "Insert Inbound Message",
             "type": "main",
             "index": 0
           }
@@ -518,6 +636,17 @@
           }
         ]
       ]
+    },
+    "Insert Inbound Message": {
+      "main": [
+        [
+          {
+            "node": "Execute: Classify Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -526,7 +655,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "1f742851-90aa-432a-9a1f-3e6d32e7839d",
+  "versionId": "e6b7a586-d840-45ae-90bb-4893a17e6166",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
