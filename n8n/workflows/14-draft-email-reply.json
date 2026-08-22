@@ -44,40 +44,8 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -448,
-        128
-      ]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "leftValue": "={{ $json.category }}",
-              "rightValue": "faq_answerable",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "fb5080c2-6327-4abd-be0b-a1a269be4386",
-      "name": "If FAQ Answerable",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        -224,
-        128
+        -688,
+        64
       ]
     },
     {
@@ -124,8 +92,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        0,
-        0
+        -240,
+        64
       ],
       "alwaysOutputData": true,
       "notes": "TODO: set the real workflow ID for 09 - Knowledge Retrieval."
@@ -139,8 +107,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
-        0
+        -16,
+        64
       ]
     },
     {
@@ -152,8 +120,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
-        240
+        -16,
+        256
       ]
     },
     {
@@ -185,8 +153,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        448,
-        128
+        208,
+        160
       ],
       "credentials": {
         "anthropicApi": {
@@ -198,15 +166,15 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extracts draft body text and computes auto_send_eligible.\n// TODO: adjust threshold (0.85) after reviewing real classification confidence in testing.\nconst AUTO_SEND_THRESHOLD = 0.85;\nconst input = $('When Executed by Another Workflow').first().json;\n\nlet draftBody = '';\ntry {\n  draftBody = $json.content[0].text.trim();\n} catch (e) {\n  throw new Error('Unexpected Claude draft response shape: ' + JSON.stringify($json));\n}\n\nconst category = input.category;\nconst confidence = Number(input.confidence) || 0;\nconst autoSendEligible = category === 'faq_answerable' && confidence >= AUTO_SEND_THRESHOLD;\n\nreturn [{\n  json: {\n    tenant_id: input.tenant_id,\n    conversation_id: input.conversation_id,\n    contact_id: input.contact_id,\n    gmail_thread_id: input.gmail_thread_id,\n    gmail_message_id: input.gmail_message_id,\n    to_email: input.from_email,\n    subject: 'Re: ' + (input.subject || ''),\n    body: draftBody,\n    category,\n    confidence,\n    auto_send_eligible: autoSendEligible,\n    status: autoSendEligible ? 'pending' : 'pending' // both start pending; gate decides send path downstream\n  }\n}];"
+        "jsCode": "// Extracts draft body text and computes auto_send_eligible.\n// TODO: adjust threshold (0.85) after reviewing real classification confidence in testing.\nconst AUTO_SEND_THRESHOLD = 0.85;\nconst input = $('When Executed by Another Workflow').first().json;\n\nlet draftBody = '';\ntry {\n  draftBody = $json.content[0].text.trim();\n} catch (e) {\n  throw new Error('Unexpected Claude draft response shape: ' + JSON.stringify($json));\n}\n\nconst category = input.category;\nconst confidence = Number(input.confidence) || 0;\nconst autoSendEligible = category === 'faq_answerable' && confidence >= AUTO_SEND_THRESHOLD;\n\n// Carries the confirmed slot (if any) from the scheduling branch through to\n// the saved draft row -- workflow 15 reads this at approval time to decide\n// whether to also call Book Appointment. Comes from $json (Parse Scheduling\n// Result's output) for the scheduling branch; undefined for every other\n// branch, so this correctly defaults to null for FAQ/generic drafts.\nconst proposedAppointment = $json.proposed_appointment || null;\n\nreturn [{\n  json: {\n    tenant_id: input.tenant_id,\n    conversation_id: input.conversation_id,\n    contact_id: input.contact_id,\n    gmail_thread_id: input.gmail_thread_id,\n    gmail_message_id: input.gmail_message_id,\n    to_email: input.from_email,\n    subject: 'Re: ' + (input.subject || ''),\n    body: draftBody,\n    category,\n    confidence,\n    auto_send_eligible: autoSendEligible,\n    status: autoSendEligible ? 'pending' : 'pending', // both start pending; gate decides send path downstream\n    proposed_appointment: proposedAppointment\n  }\n}];;"
       },
       "id": "32b98e7b-34ac-4734-9dbc-5301651ee477",
       "name": "Shape Draft Record",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
-        128
+        880,
+        64
       ]
     },
     {
@@ -233,7 +201,8 @@
             "status": "={{ $json.status }}",
             "confidence": "={{ $json.confidence }}",
             "conversation_id": "={{ $json.conversation_id }}",
-            "contact_id": "={{ $json.contact_id }}"
+            "contact_id": "={{ $json.contact_id }}",
+            "proposed_appointment": "={{ $json.proposed_appointment ? JSON.stringify($json.proposed_appointment) : null }}"
           },
           "matchingColumns": [
             "id"
@@ -256,7 +225,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "conversation_id",
@@ -285,7 +255,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "gmail_message_id",
@@ -294,7 +265,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "to_email",
@@ -303,7 +275,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "from_email",
@@ -322,7 +295,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "body",
@@ -331,7 +305,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "category",
@@ -340,7 +315,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "confidence",
@@ -359,7 +335,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "auto_send_eligible",
@@ -368,7 +345,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "boolean",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "reviewed_by",
@@ -377,7 +355,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "string",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "reviewed_at",
@@ -386,7 +365,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "dateTime",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "sent_at",
@@ -395,7 +375,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "dateTime",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "created_at",
@@ -404,7 +385,8 @@
               "defaultMatch": false,
               "display": true,
               "type": "dateTime",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
             },
             {
               "id": "updated_at",
@@ -413,7 +395,18 @@
               "defaultMatch": false,
               "display": true,
               "type": "dateTime",
-              "canBeUsedToMatch": true
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "proposed_appointment",
+              "displayName": "proposed_appointment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -426,8 +419,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        880,
-        128
+        1104,
+        64
       ],
       "credentials": {
         "postgres": {
@@ -465,8 +458,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1104,
-        128
+        1328,
+        64
       ]
     },
     {
@@ -516,10 +509,251 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        1328,
-        48
+        1552,
+        64
       ],
       "notes": "TODO: set real workflow ID for 15 - Send Approved Email. Only reached for faq_answerable drafts >= threshold."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "faq_answerable",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e5405e35-71e5-4e66-8a48-5258543245ff"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "FAQ"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c1cfdb86-4434-4557-accd-c356ce389116",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "scheduling",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "scheduling"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -464,
+        48
+      ],
+      "id": "c9ac7373-fcba-4dc1-94d9-0d9a0d6b6906",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "D94fGN3AjCPhGzCb",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/D94fGN3AjCPhGzCb"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('When Executed by Another Workflow').first().json.tenant_id }}",
+            "date_range_start": "={{ $now.toISODate() }}",
+            "date_range_end": "={{ $now.plus({ days: 6 }).toISODate() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date_range_start",
+              "displayName": "date_range_start",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date_range_end",
+              "displayName": "date_range_end",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -16,
+        -128
+      ],
+      "id": "75efcd88-6e80-46f4-ac26-e599fafd4304",
+      "name": "Execute: Check Availability"
+    },
+    {
+      "parameters": {
+        "jsCode": "// \"Build Scheduling Prompt\" -- new node for workflow 14's scheduling branch.\n// Combines the new email, recent conversation history (if any), and real\n// available slots, and asks Claude to decide whether this is a fresh\n// scheduling request or a confirmation of a previously offered time.\nconst trigger = $('When Executed by Another Workflow').first().json;\nconst availability = $('Execute: Check Availability').first().json;\nconst slots = availability.available_slots || [];\n\nlet history = '';\ntry {\n  const messages = $('Get Recent Messages').all().map(item => item.json);\n  if (messages.length > 0) {\n    history = messages\n      .map(m => `${m.role}: ${m.content}`)\n      .join('\\n\\n');\n  }\n} catch (e) {\n  // No prior messages (brand new conversation) -- treat as a fresh request.\n}\n\nconst slotsText = slots.length > 0\n  ? slots.slice(0, 8).map(s => `- ${s.starts_at} to ${s.ends_at}`).join('\\n')\n  : 'No open slots found in the checked date range.';\n\nconst prompt = `You are handling a scheduling email for a real estate agency.\n\n${history ? `Recent conversation history:\\n${history}\\n\\n` : 'This is the first message in the conversation.\\n\\n'}New customer email:\nSubject: ${trigger.subject}\nBody: ${trigger.body}\n\nCurrently available viewing slots (UTC):\n${slotsText}\n\nDecide one of three things:\n1. \"propose\" -- the customer is asking about availability but hasn't confirmed a specific time yet. Draft a reply listing 3-4 of the available slots above in a friendly, readable way (convert to a natural format, don't just paste raw ISO timestamps), asking them to pick one.\n2. \"confirm\" -- the customer's message clearly confirms one specific time that was previously offered in the conversation history AND that time is still in the available slots list above. Draft a reply confirming their requested time has been noted and that the team will finalize it shortly. Extract the exact starts_at and ends_at (in ISO 8601 UTC) for the confirmed slot from the available slots list.\n3. \"clarify\" -- ambiguous, or the customer referenced a time that is NOT in the available slots list (e.g. already booked or outside hours). Draft a reply explaining that time isn't available and offering the current real alternatives instead.\n\nRespond with ONLY valid JSON, no other text:\n{\n  \"action\": \"propose\" | \"confirm\" | \"clarify\",\n  \"confirmed_slot\": { \"starts_at\": \"<ISO 8601 UTC>\", \"ends_at\": \"<ISO 8601 UTC>\" } | null,\n  \"draft_body\": \"<the email reply body text>\"\n}`;\n\nreturn [{ json: { ...trigger, prompt } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        -128
+      ],
+      "id": "00be8931-2b79-465e-89d5-e232e3b5b9a9",
+      "name": "Build Scheduling Prompt"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"claude-sonnet-4-6\", max_tokens: 600, messages: [ { role: \"user\", content: $json.prompt } ] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        432,
+        -128
+      ],
+      "id": "1d4e857a-902e-4b9c-8dad-2f4b20ae7008",
+      "name": "Call Claude (Scheduling)",
+      "credentials": {
+        "anthropicApi": {
+          "id": "ONpVZEdZ4bnOMO3X",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// \"Parse Scheduling Result\" -- parses Claude's structured scheduling\n// decision and reshapes it to match what \"Shape Draft Record\" already\n// expects downstream (content[0].text for the draft body), plus carries\n// proposed_appointment through as an extra field.\nlet raw = '';\ntry {\n  raw = $json.content[0].text;\n} catch (e) {\n  throw new Error('Unexpected Claude scheduling response shape: ' + JSON.stringify($json));\n}\n\nconst cleaned = raw.replace(/```json|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error('Failed to parse scheduling JSON: ' + cleaned);\n}\n\nconst ALLOWED_ACTIONS = ['propose', 'confirm', 'clarify'];\nif (!ALLOWED_ACTIONS.includes(parsed.action)) {\n  parsed.action = 'clarify';\n}\n\n// Only trust confirmed_slot when the action is actually \"confirm\" -- avoids\n// accidentally booking something from a malformed/ambiguous response.\nconst proposedAppointment = parsed.action === 'confirm' && parsed.confirmed_slot\n  ? { starts_at: parsed.confirmed_slot.starts_at, ends_at: parsed.confirmed_slot.ends_at }\n  : null;\n\nreturn [{\n  json: {\n    content: [{ type: 'text', text: parsed.draft_body || '' }],\n    proposed_appointment: proposedAppointment\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        -128
+      ],
+      "id": "64ae95c4-8f35-4ebb-afa6-89fa30da071a",
+      "name": "Parse Scheduling Result"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public",
+          "cachedResultUrl": ""
+        },
+        "table": {
+          "__rl": true,
+          "value": "messages",
+          "mode": "name"
+        },
+        "limit": 10,
+        "where": {
+          "values": [
+            {
+              "column": "conversation_id",
+              "value": "={{ $('When Executed by Another Workflow').first().json.conversation_id }}"
+            }
+          ]
+        },
+        "sort": {
+          "values": [
+            {
+              "column": "created_at",
+              "direction": "DESC"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -240,
+        -128
+      ],
+      "id": "d6bcdaa0-8cb0-44f0-b7b2-981edfd7503e",
+      "name": "Get Recent Messages",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     }
   ],
   "pinData": {
@@ -545,25 +779,7 @@
       "main": [
         [
           {
-            "node": "If FAQ Answerable",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If FAQ Answerable": {
-      "main": [
-        [
-          {
-            "node": "Execute: Knowledge Retrieval",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Build Generic Draft Prompt",
+            "node": "Switch",
             "type": "main",
             "index": 0
           }
@@ -646,6 +862,86 @@
           }
         ]
       ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Execute: Knowledge Retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Recent Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Generic Draft Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Check Availability": {
+      "main": [
+        [
+          {
+            "node": "Build Scheduling Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude (Scheduling)": {
+      "main": [
+        [
+          {
+            "node": "Parse Scheduling Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Messages": {
+      "main": [
+        [
+          {
+            "node": "Execute: Check Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Scheduling Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call Claude (Scheduling)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Scheduling Result": {
+      "main": [
+        [
+          {
+            "node": "Shape Draft Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -654,7 +950,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "83ec6f56-0e5e-4892-aa39-0b0e4ee8d2e3",
+  "versionId": "e155c98b-d73c-40ed-9a50-a9ebde46df91",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
