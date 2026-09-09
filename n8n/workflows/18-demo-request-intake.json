@@ -1,0 +1,182 @@
+{
+  "name": "18 - Demo Request Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "demo-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5da07196-c4ec-45ba-b149-a27411b1ea7f",
+      "name": "Demo Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "demo-request",
+      "notes": "TODO: after activating, copy the real Production URL from this node and set it as NEXT_PUBLIC_ELLIOT_DEMO_REQUEST_WEBHOOK_URL in the elliot-web Vercel project. Public endpoint -- no tenant auth, this is a sales lead for Elliot itself, not a tenant-scoped request."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mirrors the DemoRequestPayload contract in elliot-web's services/elliotApi.ts.\n// Required: name, company, email, industry, employees. website/automate optional.\nconst body = $input.first().json.body || {};\n\nconst required = ['name', 'company', 'email', 'industry', 'employees'];\nfor (const field of required) {\n  if (!body[field] || String(body[field]).trim() === '') {\n    throw new Error(`${field} is required`);\n  }\n}\n\nconst emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailPattern.test(body.email)) {\n  throw new Error('email is not valid');\n}\n\nreturn [{\n  json: {\n    name: String(body.name).trim(),\n    company: String(body.company).trim(),\n    email: String(body.email).trim().toLowerCase(),\n    website: body.website ? String(body.website).trim() : null,\n    industry: String(body.industry).trim(),\n    employees: String(body.employees).trim(),\n    automate: body.automate ? String(body.automate).trim() : null,\n  }\n}];"
+      },
+      "id": "36784f0e-d042-4f7f-9fd5-2812b607654b",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into demo_requests (name, company, email, website, industry, employees, automate)\nvalues ($1, $2, $3, $4, $5, $6, $7)\nreturning id, created_at;",
+        "options": {
+          "queryReplacement": "={{ [$json.name, $json.company, $json.email, $json.website, $json.industry, $json.employees, $json.automate] }}"
+        }
+      },
+      "id": "cd0632a2-5bac-4188-86a3-1b5b1630053e",
+      "name": "Insert Demo Request",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        448,
+        0
+      ],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "REQUIRES: 0017_demo_requests.sql applied. Same shared Postgres credential used across the other workflows -- service role bypasses RLS, which is what we want here since demo_requests has no tenant_id."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the raw RFC 2822 notification email (base64url-encoded) for Gmail's send API.\n// Reuses the same message-building approach as workflow 15's 'Build Gmail Message'.\n// TODO: set NOTIFY_TO to wherever the team wants these to land (an inbox, or a\n// shared alias). Hardcoded here deliberately rather than per-request, since this\n// always goes to the same place regardless of who submitted the form.\nconst d = $json;\nconst NOTIFY_TO = 'team@spiritustec.com';\n\nconst subject = `New demo request: ${d.company}`;\nconst body =\n  `New demo request from the marketing site.\\n\\n` +\n  `Name: ${d.name}\\n` +\n  `Company: ${d.company}\\n` +\n  `Email: ${d.email}\\n` +\n  `Website: ${d.website || '(not provided)'}\\n` +\n  `Industry: ${d.industry}\\n` +\n  `Employees: ${d.employees}\\n` +\n  `Wants to automate: ${d.automate || '(not provided)'}\\n` +\n  `Submitted: ${d.created_at}`;\n\nconst raw =\n  `To: ${NOTIFY_TO}\\r\\n` +\n  `Subject: ${subject}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${body}`;\n\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\nreturn [{ json: { ...d, raw_message: encoded } }];"
+      },
+      "id": "8aab99e5-1976-488d-b10f-3fc47342a427",
+      "name": "Build Notification Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "options": {}
+      },
+      "id": "6127ff19-f9cf-4b88-9d30-e19fd6fd2270",
+      "name": "Send Notification via Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        0
+      ],
+      "notes": "TODO: set up an internal (non-tenant) Gmail OAuth2 credential for this -- separate from any tenant's connected inbox used in 15/16. Requires gmail.send scope. If this node fails, the demo request row is already saved (previous node), so a lead is never silently lost even if notification delivery breaks -- worth checking demo_requests directly if you suspect notifications are down.",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, id: $('Insert Demo Request').first().json.id }) }}",
+        "options": {}
+      },
+      "id": "905bbc5a-a4fb-4d9c-8ab6-77144a73551e",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Demo Request Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Insert Demo Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Demo Request": {
+      "main": [
+        [
+          {
+            "node": "Build Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notification Email": {
+      "main": [
+        [
+          {
+            "node": "Send Notification via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Notification via Gmail": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1a143233-8121-408b-abf9-51ba17b5d3b0",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "c9604e18-fd01-4b9d-9647-4ec250d77667",
+  "tags": []
+}
