@@ -37,6 +37,7 @@ Matches the `DemoRequestPayload` contract in `elliot-web` exactly. `website` and
 ## Error paths
 - Missing/invalid required fields → `Validate Input` throws, n8n's default webhook error response handles it (matches the pattern in workflow 17 — no custom error branch).
 - Gmail notification failing does NOT fail the whole request — the DB insert already happened, so the lead is safe even if notification delivery is broken. Check `demo_requests` directly if notifications seem to have stopped.
+- **`Insert Demo Request` must use `returning *`, not a partial column list.** A Postgres node's output *replaces* `$json` with only the columns named in `RETURNING` — the original input fields (name, company, email, etc.) are gone from that point on, not merged. An earlier version of this workflow used `returning id, created_at` and every downstream field showed as `undefined` in the notification email as a result. If a future edit narrows the `RETURNING` clause again, this bug comes back.
 
 ## Expected output
 ```json
