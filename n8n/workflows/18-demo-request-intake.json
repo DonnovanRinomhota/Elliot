@@ -35,7 +35,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "insert into demo_requests (name, company, email, website, industry, employees, automate)\nvalues ($1, $2, $3, $4, $5, $6, $7)\nreturning id, created_at;",
+        "query": "insert into demo_requests (name, company, email, website, industry, employees, automate)\nvalues ($1, $2, $3, $4, $5, $6, $7)\nreturning *;",
         "options": {
           "queryReplacement": "={{ [$json.name, $json.company, $json.email, $json.website, $json.industry, $json.employees, $json.automate] }}"
         }
