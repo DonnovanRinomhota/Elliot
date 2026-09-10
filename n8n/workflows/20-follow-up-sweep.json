@@ -1,0 +1,268 @@
+{
+  "name": "20 - Follow-Up Sweep",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+        }
+      },
+      "id": "2b200f8f-5040-42c6-9876-bb8f4027375b",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "notes": "Matches the interval named in docs/architecture.md section 4. Adjust freely in n8n -- this doesn't need a code change, just edit the trigger node directly."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  r.id as run_id,\n  r.tenant_id,\n  r.lead_id,\n  r.sequence_id,\n  r.current_step_index,\n  r.created_at as run_created_at,\n  s.steps,\n  l.contact_id,\n  c.name as contact_name,\n  c.email as contact_email,\n  ac.autonomy_rules,\n  ac.connected_gmail_address,\n  exists (\n    select 1 from messages m\n    join conversations conv on conv.id = m.conversation_id\n    where conv.contact_id = l.contact_id\n      and m.role = 'user'\n      and m.created_at > r.created_at\n  ) as contact_replied\nfrom follow_up_runs r\njoin follow_up_sequences s on s.id = r.sequence_id\njoin leads l on l.id = r.lead_id\njoin contacts c on c.id = l.contact_id\njoin ai_config ac on ac.tenant_id = r.tenant_id\nwhere r.status = 'running' and r.next_run_at <= now()\norder by r.next_run_at asc\nlimit 25;",
+        "options": {}
+      },
+      "id": "828fa7a9-af45-41a3-8c54-c527ba566bf7",
+      "name": "Query Due Runs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [224, 0],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Everything needed per due run in ONE query -- steps, contact info, autonomy_rules, AND the contact_replied check, all as a correlated subquery/join. Deliberately avoids chaining multiple Postgres nodes here: each one would either replace $json with just its RETURNING columns, or (worse) vanish the item entirely if it matched zero rows. One row per due run, capped at 25 per sweep so a backlog can't overload a single execution."
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per due run (from Query Due Runs). Decide what happens to it:\n// stop_replied | complete | send.\nconst r = $json;\nconst steps = r.steps || [];\n\nif (r.contact_replied) {\n  return [{ json: { action: 'stop_replied', run_id: r.run_id } }];\n}\n\nconst step = steps[r.current_step_index];\nif (!step) {\n  return [{ json: { action: 'complete', run_id: r.run_id } }];\n}\n\nconst isFinal = r.current_step_index === steps.length - 1;\nconst nextStep = isFinal ? null : steps[r.current_step_index + 1];\n\nconst contactName = r.contact_name || 'there';\nconst subject = (step.subject || '').replace(/\\{\\{\\s*contact_name\\s*\\}\\}/g, contactName);\nconst body = (step.body || '').replace(/\\{\\{\\s*contact_name\\s*\\}\\}/g, contactName);\n\nconst mode = r.autonomy_rules?.send_follow_up?.mode === 'autonomous' ? 'autonomous' : 'approval_required';\n\nreturn [{\n  json: {\n    action: 'send',\n    run_id: r.run_id,\n    tenant_id: r.tenant_id,\n    contact_id: r.contact_id,\n    contact_email: r.contact_email,\n    from_email: r.connected_gmail_address || null,\n    subject,\n    body,\n    mode,\n    draft_status: mode === 'autonomous' ? 'auto_sent' : 'pending',\n    is_final: isFinal,\n    next_step_day_offset: nextStep ? (nextStep.day_offset ?? 0) : null,\n  }\n}];"
+      },
+      "id": "9e1706bd-4fbd-4991-81cd-2072e13e8ebe",
+      "name": "Determine Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [448, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "cond-replied",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "stop_replied",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fcb9a9e9-1392-4253-9289-0edb9fa76c30",
+      "name": "Contact Replied?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [672, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "cond-complete",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "complete",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4e4c25eb-2960-46f4-84da-d4e5025474f6",
+      "name": "No Next Step?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [896, 96]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update follow_up_runs\nset status = 'stopped', stop_reason = 'contact_replied', next_run_at = null, updated_at = now()\nwhere id = $1;",
+        "options": { "queryReplacement": "={{ [$json.run_id] }}" }
+      },
+      "id": "ff152e87-4b73-402f-985c-1b6cdc7d015d",
+      "name": "Stop Run (Replied)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [896, -96],
+      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update follow_up_runs\nset status = 'completed', next_run_at = null, updated_at = now()\nwhere id = $1;",
+        "options": { "queryReplacement": "={{ [$json.run_id] }}" }
+      },
+      "id": "720ed208-2c21-414c-a446-a20c76f69110",
+      "name": "Complete Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1120, 192],
+      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into email_drafts (tenant_id, contact_id, to_email, from_email, subject, body, category, status, follow_up_run_id)\nvalues ($1, $2, $3, $4, $5, $6, 'follow_up', $7, $8)\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.contact_id, $json.contact_email, $json.from_email, $json.subject, $json.body, $json.draft_status, $json.run_id] }}"
+        }
+      },
+      "id": "3684e739-6d14-44c7-b57b-bc2f064d6997",
+      "name": "Insert Email Draft",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1120, 0],
+      "notesInFlow": true,
+      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } },
+      "notes": "ALWAYS insert a draft, regardless of autonomy mode -- full audit trail either way, matching the project's core design principle (every AI decision logged). status is 'auto_sent' or 'pending' depending on mode (set upstream in Determine Action). The 'pending' case surfaces in the dashboard's existing Pending Approvals screen for free -- no new UI needed."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "cond-autonomous",
+              "leftValue": "={{ $('Determine Action').item.json.mode }}",
+              "rightValue": "autonomous",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ad4f4c12-c7b2-42a0-9b1a-074a0a336ce1",
+      "name": "Autonomous?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1344, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Same raw RFC 2822 base64url pattern as 15/18.\nconst d = $json;\nconst raw =\n  `To: ${d.to_email}\\r\\n` +\n  `Subject: ${d.subject}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${d.body}`;\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nreturn [{ json: { ...d, raw_message: encoded } }];"
+      },
+      "id": "d3368ac6-6d07-4ad8-ab48-d07062a69f2f",
+      "name": "Build Raw Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1568, -96]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "options": {}
+      },
+      "id": "86304d59-6713-49e7-b2aa-097806102dcf",
+      "name": "Send via Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1792, -96],
+      "notes": "Same known limitation as everywhere else in this codebase: one shared Gmail credential per workflow, not dynamic per-tenant. Whichever tenant's inbox this credential belongs to is the only one that can actually autonomous-send today. continueOnFail:true -- the draft row is already saved, so a send failure never loses the record, and the run still advances below regardless (see Advance Run's note on this tradeoff).",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Passes through so Advance Run can read $('Determine Action').item.json for\n// run_id/is_final/next_step_day_offset regardless of which branch\n// (Autonomous? true or false) fed into it -- needed because a Gmail send\n// failure (continueOnFail) would otherwise still reach here with whatever\n// $json the failed HTTP node produced, not the original Determine Action data.\nreturn [{ json: $json }];"
+      },
+      "id": "f77b5543-3dd0-4e1a-8ce5-489815635ff7",
+      "name": "Merge Before Advance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1792, 96]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update follow_up_runs r\nset current_step_index = current_step_index + 1,\n    status = case when $2 then 'completed' else 'running' end,\n    next_run_at = case when $2 then null else r.created_at + ($3 || ' days')::interval end,\n    updated_at = now()\nfrom (select id from follow_up_runs where id = $1) sub\nwhere r.id = sub.id;",
+        "options": {
+          "queryReplacement": "={{ [$('Determine Action').item.json.run_id, $('Determine Action').item.json.is_final, $('Determine Action').item.json.next_step_day_offset || 0] }}"
+        }
+      },
+      "id": "28018bfc-3a79-4d02-a18e-275091fab451",
+      "name": "Advance Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2016, 0],
+      "notesInFlow": true,
+      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } },
+      "notes": "KNOWN, DELIBERATE LIMITATION: this runs immediately after queuing the draft, regardless of whether an approval_required draft has actually been approved and sent yet by a human. If approvals lag, the sequence keeps advancing to the next scheduled step on time anyway rather than waiting -- drafts can pile up in the approvals queue while the schedule marches forward. Documented here and in the spec doc, not hidden. Fixing it properly would mean tying advancement to 15 (Send Approved Email) confirming an actual send, which would require editing an already-live production workflow -- deliberately out of scope for this version."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [[{ "node": "Query Due Runs", "type": "main", "index": 0 }]]
+    },
+    "Query Due Runs": {
+      "main": [[{ "node": "Determine Action", "type": "main", "index": 0 }]]
+    },
+    "Determine Action": {
+      "main": [[{ "node": "Contact Replied?", "type": "main", "index": 0 }]]
+    },
+    "Contact Replied?": {
+      "main": [
+        [{ "node": "Stop Run (Replied)", "type": "main", "index": 0 }],
+        [{ "node": "No Next Step?", "type": "main", "index": 0 }]
+      ]
+    },
+    "No Next Step?": {
+      "main": [
+        [{ "node": "Complete Run", "type": "main", "index": 0 }],
+        [{ "node": "Insert Email Draft", "type": "main", "index": 0 }]
+      ]
+    },
+    "Insert Email Draft": {
+      "main": [[{ "node": "Autonomous?", "type": "main", "index": 0 }]]
+    },
+    "Autonomous?": {
+      "main": [
+        [{ "node": "Build Raw Email", "type": "main", "index": 0 }],
+        [{ "node": "Merge Before Advance", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Raw Email": {
+      "main": [[{ "node": "Send via Gmail", "type": "main", "index": 0 }]]
+    },
+    "Send via Gmail": {
+      "main": [[{ "node": "Merge Before Advance", "type": "main", "index": 0 }]]
+    },
+    "Merge Before Advance": {
+      "main": [[{ "node": "Advance Run", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f07ad840-2470-4b83-946a-838254604254",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "b14e30ab-562f-4829-b0b1-31b1992c55c0",
+  "tags": []
+}
