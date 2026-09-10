@@ -1,0 +1,178 @@
+{
+  "name": "19 - Tenant Onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "onboard-tenant",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "050efac7-d537-4a69-bec3-5b2300656367",
+      "name": "Onboarding Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "onboard-tenant",
+      "notes": "TODO: after activating, copy the Production URL. This endpoint is NOT public-facing like 18 -- it creates real tenants, so keep it internal (don't put this URL on the marketing site). No auth on the endpoint itself yet -- for now, 'internal' just means 'not linked from anywhere public'; add a shared-secret header check here before this is ever exposed more broadly."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Required: name, slug. Everything else has a sensible default so a minimal\n// call (just name+slug) is enough to get a working, safe-by-default tenant.\nconst body = $input.first().json.body || {};\n\nif (!body.name || String(body.name).trim() === '') {\n  throw new Error('name is required');\n}\nif (!body.slug || String(body.slug).trim() === '') {\n  throw new Error('slug is required');\n}\n\nconst slug = String(body.slug).trim().toLowerCase();\nif (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {\n  throw new Error('slug must be lowercase letters, numbers and hyphens only (e.g. \"acme-realty\") -- it gets used in widget embed URLs');\n}\n\nconst validPlans = ['trial', 'starter', 'pro', 'enterprise'];\nconst plan = body.plan || 'trial';\nif (!validPlans.includes(plan)) {\n  throw new Error(`plan must be one of: ${validPlans.join(', ')}`);\n}\n\n// Autonomy defaults are deliberately conservative (approval_required, not\n// autonomous) -- see roadmap notes: new tenants should run in a shadow/\n// approval-gated mode for their first stretch before anything is relaxed.\nconst defaultAutonomyRules = {\n  send_email: { mode: 'approval_required' },\n  book_appointment: { mode: 'approval_required' },\n};\nconst defaultEscalationThresholds = { min_confidence: 0.6 };\n\nreturn [{\n  json: {\n    name: String(body.name).trim(),\n    slug,\n    industry: body.industry ? String(body.industry).trim() : null,\n    plan,\n    timezone: body.timezone ? String(body.timezone).trim() : 'UTC',\n    autonomy_rules: body.autonomy_rules || defaultAutonomyRules,\n    escalation_thresholds: body.escalation_thresholds || defaultEscalationThresholds,\n    lead_scoring_rubric: body.lead_scoring_rubric || {},\n  }\n}];"
+      },
+      "id": "4383516c-a82d-4df5-aa2d-441e37936714",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into tenants (name, slug, industry, plan, timezone)\nvalues ($1, $2, $3, $4, $5)\non conflict (slug) do nothing\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [$json.name, $json.slug, $json.industry, $json.plan, $json.timezone] }}"
+        }
+      },
+      "id": "bcd009fc-2dd9-443d-9d3e-5d4b32ff6891",
+      "name": "Insert Tenant",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [448, 0],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "ON CONFLICT (slug) DO NOTHING means a duplicate slug returns zero rows rather than a raw constraint-violation error -- the next node turns that into a clean 'slug already taken' response instead of a 500."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-tenant-created",
+              "leftValue": "={{ $json.id !== undefined && $json.id !== null }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ff1fae58-acc9-4146-bc1c-ed2c0476931d",
+      "name": "Tenant Created?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [672, 0],
+      "notes": "Explicit boolean expression, not n8n's built-in empty-check operator -- that operator has behaved inconsistently with null before (see 15's proposed_appointment bug in KNOWN_ISSUES). Don't swap this for 'exists'/'isNotEmpty' without retesting."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into ai_config (tenant_id, autonomy_rules, escalation_thresholds, lead_scoring_rubric)\nvalues ($1, $2, $3, $4)\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [$json.id, JSON.stringify($('Validate Input').first().json.autonomy_rules), JSON.stringify($('Validate Input').first().json.escalation_thresholds), JSON.stringify($('Validate Input').first().json.lead_scoring_rubric)] }}"
+        }
+      },
+      "id": "318ae1c8-fe03-4595-bd5f-8e3e10dc1680",
+      "name": "Insert AI Config",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [896, -96],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "KNOWN EDGE CASE, not handled: if this insert fails after Insert Tenant already succeeded, you get an orphaned tenant row with no ai_config -- n8n doesn't span a transaction across separate Postgres nodes by default. Not expected to fail in practice (no constraints here beyond the FK, which always resolves since Tenant Created? already confirmed the tenant exists), but if it ever does, check for a tenant with no matching ai_config row and either insert one manually or delete the orphaned tenant."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the onboarding response, including the manual steps this workflow\n// deliberately does NOT automate (see workflow 19's spec doc for why).\nconst tenant = $('Insert Tenant').first().json;\nconst instanceHost = $('Onboarding Webhook').first().json.headers?.host || 'YOUR-N8N-HOST';\n\nreturn [{\n  json: {\n    success: true,\n    tenant_id: tenant.id,\n    slug: tenant.slug,\n    name: tenant.name,\n    next_steps: [\n      'Connect this tenant\\'s Google Calendar: currently a manual n8n credential setup, one Calendar OAuth2 credential per tenant is NOT yet supported dynamically at runtime -- same manual process used for the existing tenant(s).',\n      'Connect this tenant\\'s Gmail (if using the email agent): same manual limitation as Calendar -- one Gmail OAuth2 credential set up by hand in n8n, then set ai_config.connected_gmail_address to match.',\n      `Seed an initial knowledge base document (optional): curl -X POST https://${instanceHost}/webhook/ingest-document -H \"Content-Type: application/json\" -d '{\"tenant_slug\": \"${tenant.slug}\", \"title\": \"FAQ\", \"source_type\": \"faq\", \"text\": \"...\"}'`,\n      `Embed the chat widget on the tenant's site using tenant slug \"${tenant.slug}\" in the widget's data-tenant attribute.`,\n    ],\n  }\n}];"
+      },
+      "id": "0721a80a-1ee5-4cec-97e5-418cf1ff0c9d",
+      "name": "Format Onboarding Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, -96]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "6534498f-0f68-4ac7-8d1d-c425e009b3a7",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1344, -96]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: `slug '${$('Validate Input').first().json.slug}' is already in use` }) }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "0149db8a-19cf-4907-87d6-830782f88cb8",
+      "name": "Respond Slug Taken",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [896, 96]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Onboarding Webhook": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Input": {
+      "main": [[{ "node": "Insert Tenant", "type": "main", "index": 0 }]]
+    },
+    "Insert Tenant": {
+      "main": [[{ "node": "Tenant Created?", "type": "main", "index": 0 }]]
+    },
+    "Tenant Created?": {
+      "main": [
+        [{ "node": "Insert AI Config", "type": "main", "index": 0 }],
+        [{ "node": "Respond Slug Taken", "type": "main", "index": 0 }]
+      ]
+    },
+    "Insert AI Config": {
+      "main": [[{ "node": "Format Onboarding Result", "type": "main", "index": 0 }]]
+    },
+    "Format Onboarding Result": {
+      "main": [[{ "node": "Respond Success", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a4d55f30-e68b-4ebb-b24e-22da376d7759",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "0a12309c-5b33-4547-a0ce-81410f3f7bae",
+  "tags": []
+}
