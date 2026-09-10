@@ -1,0 +1,173 @@
+{
+  "name": "21 - Start Follow-Up Run",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "start-follow-up",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ceed5e3a-fdfd-4353-b68b-082c53c61b21",
+      "name": "Start Follow-Up Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "start-follow-up",
+      "notes": "Internal, same as 19 -- not linked anywhere public. This is how a follow_up_runs row actually gets created; nothing does that automatically yet. follow_up_sequences themselves are still hand-authored via SQL (steps: [{day_offset, channel, subject, body}], {{contact_name}} supported) -- same 'not truly self-serve' honesty as 19."
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nfor (const f of ['tenant_slug', 'lead_id', 'sequence_id']) {\n  if (!body[f]) throw new Error(`${f} is required`);\n}\nreturn [{ json: { tenant_slug: String(body.tenant_slug).trim(), lead_id: body.lead_id, sequence_id: body.sequence_id } }];"
+      },
+      "id": "8463b719-df92-49c9-9e39-d3e7122a2665",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  (select id from tenants where slug = $1) as tenant_id,\n  (select id from leads where id = $2::uuid and tenant_id = (select id from tenants where slug = $1)) as lead_id,\n  (select id from follow_up_sequences where id = $3::uuid and tenant_id = (select id from tenants where slug = $1) and is_active = true) as sequence_id,\n  (select steps from follow_up_sequences where id = $3::uuid) as steps,\n  exists(select 1 from follow_up_runs where lead_id = $2::uuid and sequence_id = $3::uuid and status = 'running') as already_running;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_slug, $json.lead_id, $json.sequence_id] }}"
+        }
+      },
+      "id": "906f4921-b18f-42e5-b807-e069ee8f6c05",
+      "name": "Resolve And Check",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [448, 0],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Deliberately written as scalar subqueries so this ALWAYS returns exactly one row, even when tenant/lead/sequence don't match -- a plain JOIN-based query returning zero rows would make the item vanish entirely downstream, leaving nothing for the next IF/Code node to branch on. tenant_id/lead_id/sequence_id come back NULL when not found rather than the row disappearing."
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nif (!r.tenant_id) return [{ json: { valid: false, status: 404, error: 'tenant not found' } }];\nif (!r.lead_id) return [{ json: { valid: false, status: 404, error: 'lead not found for this tenant' } }];\nif (!r.sequence_id) return [{ json: { valid: false, status: 404, error: 'sequence not found for this tenant, or not active' } }];\nif (r.already_running) return [{ json: { valid: false, status: 409, error: 'a run is already active for this lead + sequence' } }];\n\nconst steps = r.steps || [];\nif (!Array.isArray(steps) || steps.length === 0) {\n  return [{ json: { valid: false, status: 422, error: 'sequence has no steps' } }];\n}\n\nreturn [{\n  json: {\n    valid: true,\n    tenant_id: r.tenant_id,\n    lead_id: r.lead_id,\n    sequence_id: r.sequence_id,\n    first_step_day_offset: steps[0].day_offset ?? 0,\n  }\n}];"
+      },
+      "id": "cb67a5ae-dbd2-4e62-82b4-87f3ed797009",
+      "name": "Check Valid",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d207dfd3-7889-414a-b552-7f0ca3163192",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [896, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into follow_up_runs (tenant_id, lead_id, sequence_id, current_step_index, status, next_run_at)\nvalues ($1, $2, $3, 0, 'running', now() + ($4 || ' days')::interval)\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.lead_id, $json.sequence_id, $json.first_step_day_offset] }}"
+        }
+      },
+      "id": "efd65b9b-a021-4935-a33b-fc47266ad975",
+      "name": "Insert Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1120, -96],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, run_id: $json.id, next_run_at: $json.next_run_at }) }}",
+        "options": {}
+      },
+      "id": "aef4d3d2-6666-4552-8c6b-e1d56a33c07b",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1344, -96]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
+        "options": {
+          "responseCode": "={{ $json.status }}"
+        }
+      },
+      "id": "33abf147-5968-4dc7-b1b1-538894b83a1a",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 96]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start Follow-Up Webhook": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Input": {
+      "main": [[{ "node": "Resolve And Check", "type": "main", "index": 0 }]]
+    },
+    "Resolve And Check": {
+      "main": [[{ "node": "Check Valid", "type": "main", "index": 0 }]]
+    },
+    "Check Valid": {
+      "main": [[{ "node": "Valid?", "type": "main", "index": 0 }]]
+    },
+    "Valid?": {
+      "main": [
+        [{ "node": "Insert Run", "type": "main", "index": 0 }],
+        [{ "node": "Respond Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Insert Run": {
+      "main": [[{ "node": "Respond Success", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "3b6e1427-4e3a-4b71-a4e6-73a55e9472b8",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "a35859fc-1d5f-42f2-86e9-a80e181f16b9",
+  "tags": []
+}
