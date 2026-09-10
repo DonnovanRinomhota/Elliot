@@ -1,6 +1,6 @@
 # n8n Workflow Specs
 
-One markdown file per workflow, written before that workflow is built. Each spec covers:
+One markdown file per workflow, written alongside (not always strictly before, in practice) the workflow it documents. Each spec covers:
 
 - Trigger
 - Inputs
@@ -10,21 +10,6 @@ One markdown file per workflow, written before that workflow is built. Each spec
 - Error paths
 - Expected output
 
-Planned workflows (see /docs/architecture.md section 4 for the full list and build order):
+Specs exist for: `01` (main AI agent), `08`/`09` (knowledge ingestion/retrieval), `10` (lead capture), `11`/`12` (availability/booking), `18` (demo request intake), `19` (tenant onboarding).
 
-1. main-ai-agent.md
-2. customer-support.md
-3. lead-capture.md
-4. lead-qualification.md
-5. appointment-management.md
-6. email-processing.md
-7. follow-up-engine.md
-8. knowledge-ingestion.md
-9. knowledge-retrieval.md
-10. crm-synchronization.md
-11. human-escalation.md
-12. notifications.md
-13. error-handling.md
-14. scheduled-tasks.md
-
-None of these exist yet — they get written just before each workflow is built, not all up front.
+**Gap:** workflows `13`–`17` (email classify, draft, send, inbound trigger, manual send) are built and working but have no spec doc — they were built in a fast stretch (Phase 7) and the docs never caught up. Worth writing these retroactively at some point, mainly so a future you (or anyone else) doesn't have to reverse-engineer them from the JSON alone.

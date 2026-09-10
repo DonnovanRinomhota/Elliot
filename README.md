@@ -51,18 +51,28 @@ Built incrementally, one component at a time, in this order:
 3. ✅ RAG knowledge ingestion + retrieval
 4. 🟡 Human escalation & approval gates — **partially built out of order**:
    the hot-lead escalation path inside Lead Capture (5) is built and fixed
-   (see `KNOWN_ISSUES.md`), but the broader phase — general escalation
-   triggers, a real approval-gate mechanism driven by `ai_config.autonomy_rules`,
-   human notification delivery — has not been built as its own phase yet.
-   **This is the actual next phase**, not a new "phase 6."
+   (see `KNOWN_ISSUES.md`), and the email agent's gated auto-send (7) also
+   ended up built ahead of this being finished as its own phase. What's
+   still missing: general escalation triggers and human notification
+   delivery beyond the lead-capture path. Worth revisiting whether this is
+   still meaningfully "next phase" or now mostly done piecemeal.
 5. ✅ Lead capture & qualification
 6. ✅ Appointment management — check-availability + book-appointment, with
    DB-level double-booking protection
-7. ⬜ Email agent (gated auto-send) — blocked on (4) being finished first,
-   same as originally planned
+7. ✅ Email agent (classify, draft, gated auto-send) — built ahead of (4)
+   despite the original plan; see Phase 7 in commit history
 8. ⬜ Follow-up engine
 9. ⬜ CRM sync
-10. ⬜ Multi-tenant hardening (second real tenant)
+10. ⬜ Multi-tenant hardening (second real tenant) — tenant onboarding
+    (workflow 19) removes the manual-SQL friction for this, but Calendar/
+    Gmail OAuth connection per tenant is still a manual, one-off setup;
+    see `docs/workflow-specs/19-tenant-onboarding.md` for the actual gap
+
+Two more workflows exist outside this original phase list — internal
+tooling rather than agent capabilities: `18` (demo request intake, wires
+the marketing site's form to a real lead) and `19` (tenant onboarding,
+replaces hand-written SQL per tenant). See their specs in
+`docs/workflow-specs/`.
 
 See `docs/architecture.md` for reasoning, database schema, security model, and what's deliberately **not** being built yet.
 
