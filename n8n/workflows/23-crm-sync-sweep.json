@@ -1,0 +1,179 @@
+{
+  "name": "23 - CRM Sync Sweep",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
+      },
+      "id": "d5bbe018-ed70-4d3d-a336-da0b9fc69ea9",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "notes": "Shorter interval than the follow-up sweep (15 min) -- CRM sync is closer to real-time integration than a multi-day drip sequence, so pending rows shouldn't sit around as long. Adjust directly in this node if that's wrong for your case."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  l.id as sync_id,\n  l.tenant_id,\n  l.entity_type,\n  l.entity_id,\n  l.crm_provider,\n  l.retry_count,\n  t.slug as tenant_slug,\n  ac.crm_webhook_url,\n  case l.entity_type\n    when 'contact' then jsonb_build_object('name', c.name, 'email', c.email, 'phone', c.phone, 'source', c.source)\n    when 'lead' then jsonb_build_object('status', ld.status, 'score', ld.score, 'qualification_answers', ld.qualification_answers)\n    when 'appointment' then jsonb_build_object('starts_at', a.starts_at, 'ends_at', a.ends_at, 'status', a.status, 'notes', a.notes)\n  end as payload\nfrom crm_sync_log l\njoin tenants t on t.id = l.tenant_id\njoin ai_config ac on ac.tenant_id = l.tenant_id\nleft join contacts c on l.entity_type = 'contact' and c.id = l.entity_id\nleft join leads ld on l.entity_type = 'lead' and ld.id = l.entity_id\nleft join appointments a on l.entity_type = 'appointment' and a.id = l.entity_id\nwhere l.status = 'pending'\norder by l.created_at asc\nlimit 25;",
+        "options": {}
+      },
+      "id": "92e3d7f9-b191-442d-ab3e-0e2d05b34573",
+      "name": "Query Pending Syncs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [224, 0],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" }
+      },
+      "notes": "One query, same lesson as 20's due-runs query: the three LEFT JOINs are each gated by entity_type match, so exactly one of them contributes to the CASE-built payload per row, and everything needed (payload, webhook URL, tenant slug) comes back together -- no chained Postgres node to strip fields or vanish a zero-match row."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "cond-has-webhook",
+              "leftValue": "={{ !!$json.crm_webhook_url }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "926faa4e-f08b-4aaa-9b05-c770a7f88a92",
+      "name": "Webhook Configured?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [448, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update crm_sync_log\nset status = 'failed', last_error = 'no crm_webhook_url configured for this tenant in ai_config', updated_at = now()\nwhere id = $1;",
+        "options": { "queryReplacement": "={{ [$json.sync_id] }}" }
+      },
+      "id": "87861b38-ce63-4513-b094-9fe4bf72bd71",
+      "name": "Mark Failed (No Config)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [672, 96],
+      "notes": "Marked failed immediately, not left pending forever -- a silently-stuck-pending row with no explanation is worse than an honest failed status with a clear last_error the tenant/you can actually act on (go configure crm_webhook_url).",
+      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.crm_webhook_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ tenant_slug: $json.tenant_slug, entity_type: $json.entity_type, entity_id: $json.entity_id, provider: $json.crm_provider, data: $json.payload }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "897638f9-0ec6-4dff-bcf7-ce5be98ed5e5",
+      "name": "Send To CRM Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [672, -96],
+      "notesInFlow": true,
+      "notes": "This is the actual 'generic adapter' -- POSTs a normalized {tenant_slug, entity_type, entity_id, provider, data} payload to whatever URL the tenant configured. Works with any receiver that takes JSON: a CRM's native incoming webhook, a Zapier/Make webhook step, or a custom endpoint. continueOnFail:true -- a failed send is handled by the branch below (retry/give up), not treated as a workflow-halting error.",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "cond-http-ok",
+              "leftValue": "={{ $json.error !== undefined }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1b656a5b-9280-4b0a-ac1f-0c690b83d1dd",
+      "name": "Send Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [896, -96],
+      "notes": "continueOnFail nodes put an 'error' field on the output item instead of throwing -- checking for that field's presence is how the failure branch is detected here."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update crm_sync_log\nset status = case when retry_count + 1 >= 5 then 'failed' else 'pending' end,\n    retry_count = retry_count + 1,\n    last_error = $2,\n    updated_at = now()\nwhere id = $1;",
+        "options": {
+          "queryReplacement": "={{ [$('Query Pending Syncs').item.json.sync_id, $json.error?.message || 'send failed, no further detail available'] }}"
+        }
+      },
+      "id": "6cce78a3-d408-4fc1-9a13-00f549b56343",
+      "name": "Mark Retry Or Give Up",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1120, -192],
+      "notes": "Capped at 5 attempts total (retry_count is 0-indexed going in, so this is the 5th failure that finally sets status='failed' permanently). Left as 'pending' below that cap so the next sweep just picks it up again automatically -- no separate retry-scheduling logic needed, the existing 5-minute cadence IS the retry backoff.",
+      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update crm_sync_log\nset status = 'synced', updated_at = now()\nwhere id = $1;",
+        "options": { "queryReplacement": "={{ [$('Query Pending Syncs').item.json.sync_id] }}" }
+      },
+      "id": "d43e7025-38e5-4088-9912-1f4ba0019f41",
+      "name": "Mark Synced",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1120, 0],
+      "notes": "crm_record_id (the external system's ID for the synced record) is deliberately left null here -- a truly generic receiver has no fixed response shape to rely on for extracting it. If your receiver does return a stable ID, add a jsonBody-response field mapping here to populate it.",
+      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [[{ "node": "Query Pending Syncs", "type": "main", "index": 0 }]]
+    },
+    "Query Pending Syncs": {
+      "main": [[{ "node": "Webhook Configured?", "type": "main", "index": 0 }]]
+    },
+    "Webhook Configured?": {
+      "main": [
+        [{ "node": "Send To CRM Webhook", "type": "main", "index": 0 }],
+        [{ "node": "Mark Failed (No Config)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send To CRM Webhook": {
+      "main": [[{ "node": "Send Failed?", "type": "main", "index": 0 }]]
+    },
+    "Send Failed?": {
+      "main": [
+        [{ "node": "Mark Retry Or Give Up", "type": "main", "index": 0 }],
+        [{ "node": "Mark Synced", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "860db670-7d8c-406e-ac43-ce3df0ee6980",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "b6166dec-a3cd-4b36-8fa2-b6dc5a2dc22f",
+  "tags": []
+}

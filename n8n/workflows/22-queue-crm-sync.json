@@ -1,0 +1,148 @@
+{
+  "name": "22 - Queue CRM Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "queue-crm-sync",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "615ada02-faf8-4e52-9688-58a0e2f8810a",
+      "name": "Queue Sync Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "queue-crm-sync",
+      "notes": "Internal, same as 19/21. Nothing calls this automatically yet -- wiring it into 10 (lead capture) or 12 (book appointment) so syncs queue themselves on creation would mean editing already-live production workflows, deliberately out of scope here (same tradeoff as follow-up run advancement in 20). For now: call this manually/from elsewhere whenever something needs syncing."
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nfor (const f of ['tenant_slug', 'entity_type', 'entity_id']) {\n  if (!body[f]) throw new Error(`${f} is required`);\n}\nconst validTypes = ['contact', 'lead', 'appointment'];\nif (!validTypes.includes(body.entity_type)) {\n  throw new Error(`entity_type must be one of: ${validTypes.join(', ')}`);\n}\nreturn [{\n  json: {\n    tenant_slug: String(body.tenant_slug).trim(),\n    entity_type: body.entity_type,\n    entity_id: body.entity_id,\n    crm_provider: body.crm_provider ? String(body.crm_provider).trim() : 'generic_webhook',\n  }\n}];"
+      },
+      "id": "79000cb1-c03b-4789-b55c-47ab4c329d27",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  (select id from tenants where slug = $1) as tenant_id,\n  case $2\n    when 'contact' then (select id from contacts where id = $3::uuid and tenant_id = (select id from tenants where slug = $1))\n    when 'lead' then (select id from leads where id = $3::uuid and tenant_id = (select id from tenants where slug = $1))\n    when 'appointment' then (select id from appointments where id = $3::uuid and tenant_id = (select id from tenants where slug = $1))\n  end as entity_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_slug, $json.entity_type, $json.entity_id] }}"
+        }
+      },
+      "id": "65014efd-ad86-4bde-9fad-541916222797",
+      "name": "Verify Entity Belongs To Tenant",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [448, 0],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" }
+      },
+      "notes": "Scalar subqueries again, same reason as 21's resolver -- always exactly one row, entity_id comes back NULL rather than the item vanishing if the tenant/entity combo doesn't actually match. This is a real safety check, not just validation: without it, one tenant could queue a sync for another tenant's data by guessing a UUID."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "cond-found",
+              "leftValue": "={{ $json.tenant_id && $json.entity_id }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9f2abffc-4580-4f43-9c25-9c212ab11600",
+      "name": "Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [672, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into crm_sync_log (tenant_id, entity_type, entity_id, crm_provider, status)\nvalues ($1, $2, $3, $4, 'pending')\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $('Validate Input').item.json.entity_type, $json.entity_id, $('Validate Input').item.json.crm_provider] }}"
+        }
+      },
+      "id": "23b45131-fed7-4d9e-986c-01e127e1389e",
+      "name": "Insert Sync Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [896, -96],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" }
+      },
+      "notes": "No dedup -- calling this twice for the same entity creates two log rows. Acceptable for an audit-log-shaped table (crm_sync_log has no unique constraint to conflict on); the sweep just processes both. Not worth adding dedup logic without a real usage pattern showing it's actually a problem."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, sync_id: $json.id, status: $json.status }) }}",
+        "options": {}
+      },
+      "id": "2f84345f-9523-4c14-810f-acdb9e52cac3",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, -96]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'tenant not found, or entity_id does not belong to this tenant' }) }}",
+        "options": { "responseCode": 404 }
+      },
+      "id": "346983b4-214d-49e7-95c8-f5e1e00f10f7",
+      "name": "Respond Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [896, 96]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Queue Sync Webhook": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Input": {
+      "main": [[{ "node": "Verify Entity Belongs To Tenant", "type": "main", "index": 0 }]]
+    },
+    "Verify Entity Belongs To Tenant": {
+      "main": [[{ "node": "Found?", "type": "main", "index": 0 }]]
+    },
+    "Found?": {
+      "main": [
+        [{ "node": "Insert Sync Log", "type": "main", "index": 0 }],
+        [{ "node": "Respond Not Found", "type": "main", "index": 0 }]
+      ]
+    },
+    "Insert Sync Log": {
+      "main": [[{ "node": "Respond Success", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "940a9001-4b1e-49d0-90c6-3db7f8ae2995",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "80810a46-12fe-4422-b7f9-957eefb54dfc",
+  "tags": []
+}
