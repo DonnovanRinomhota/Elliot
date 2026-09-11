@@ -52,7 +52,7 @@
           "conditions": [
             {
               "id": "cond-found",
-              "leftValue": "={{ $json.tenant_id && $json.entity_id }}",
+              "leftValue": "={{ !!($json.tenant_id && $json.entity_id) }}",
               "rightValue": true,
               "operator": { "type": "boolean", "operation": "equals" }
             }
