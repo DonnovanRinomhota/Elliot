@@ -2,7 +2,7 @@
 
 **Elliot** is a configurable, multi-tenant AI Business Assistant platform — an "AI employee" businesses can deploy for customer support, lead qualification, appointment scheduling, email handling, and CRM automation, built on Claude + n8n + Supabase.
 
-> Status: **active build.** Core agent loop, RAG, lead capture, and appointment scheduling are built and verified end-to-end against a live tenant (Zebra Real Estate, dev). See `docs/architecture.md` for the full technical blueprint and `KNOWN_ISSUES.md` for resolved bugs and open items.
+> Status: **active build.** Every phase in the original roadmap (1-9) is now built and verified end-to-end, including the full email agent, follow-up engine, and CRM sync -- tested against both a dev tenant (Zebra Real Estate, dev) and a real live test tenant. What's left: item 4 (general escalation triggers beyond the lead-capture path) and item 10 (a second real tenant, which still needs manual Calendar/Gmail OAuth setup per tenant). See `docs/architecture.md` for the full technical blueprint and `KNOWN_ISSUES.md` for resolved bugs and open items.
 
 ## What Elliot does
 
@@ -10,7 +10,7 @@
 - Lead capture, qualification, and scoring (HOT/WARM/COLD), configurable per business
 - Appointment booking, rescheduling, cancellation with double-booking protection
 - Email classification, drafting, and gated auto-response
-- CRM sync (HubSpot or similar)
+- CRM sync — generic webhook adapter, not tied to one provider (see workflow 22/23)
 - Human escalation with full conversation context handoff
 - Full audit logging of every AI decision and tool call
 
@@ -61,18 +61,32 @@ Built incrementally, one component at a time, in this order:
    DB-level double-booking protection
 7. ✅ Email agent (classify, draft, gated auto-send) — built ahead of (4)
    despite the original plan; see Phase 7 in commit history
-8. ⬜ Follow-up engine
-9. ⬜ CRM sync
+8. ✅ Follow-up engine — cron sweep (20) + entry point (21). Content is
+   literal tenant-authored subject/body per step, not Claude-drafted
+   (deliberate — unattended/scheduled with no per-send human review in
+   autonomous mode). Every send reuses the existing email_drafts
+   approval-gate flow. See `docs/workflow-specs/20-follow-up-sweep.md`
+   for the real limitations (sequences still hand-authored via SQL; a
+   run advances on schedule regardless of whether a pending draft was
+   actually approved/sent yet).
+9. ✅ CRM sync — generic webhook adapter (22/23), not tied to one CRM
+   provider. Each tenant points `ai_config.crm_webhook_url` at whatever
+   receives their sync data (a CRM's native webhook, or Zapier/Make in
+   front of one that doesn't take webhooks directly). Verified live
+   end-to-end. See `docs/workflow-specs/22-crm-sync.md`.
 10. ⬜ Multi-tenant hardening (second real tenant) — tenant onboarding
     (workflow 19) removes the manual-SQL friction for this, but Calendar/
     Gmail OAuth connection per tenant is still a manual, one-off setup;
     see `docs/workflow-specs/19-tenant-onboarding.md` for the actual gap
 
-Two more workflows exist outside this original phase list — internal
-tooling rather than agent capabilities: `18` (demo request intake, wires
-the marketing site's form to a real lead) and `19` (tenant onboarding,
-replaces hand-written SQL per tenant). See their specs in
-`docs/workflow-specs/`.
+Six more workflows exist outside this original phase list — internal
+tooling rather than agent capabilities:
+- `18` demo request intake — wires the marketing site's form to a real lead
+- `19` tenant onboarding — replaces hand-written SQL per tenant
+- `20`/`21` follow-up engine — sweep + entry point
+- `22`/`23` CRM sync — sweep + entry point
+
+See their specs in `docs/workflow-specs/`.
 
 See `docs/architecture.md` for reasoning, database schema, security model, and what's deliberately **not** being built yet.
 
