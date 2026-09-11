@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import SignOutButton from "./sign-out-button";
+import SignOutButton from "./dashboard/sign-out-button";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -37,6 +37,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
           <a href="/dashboard/approvals" style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#111" }}>
             Pending Approvals
+          </a>
+          <a href="/dashboard/escalations" style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#111" }}>
+            Escalations
           </a>
           <a href="/dashboard/leads" style={{ display: "block", padding: "8px 0", fontSize: 14, color: "#111" }}>
             Leads

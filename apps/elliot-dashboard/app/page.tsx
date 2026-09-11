@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import AppointmentCard from "./appointment-card";
+import AppointmentCard from "./dashboard/appointments/appointment-card";
 
 export default async function AppointmentsPage() {
   const supabase = createClient();

@@ -1,0 +1,143 @@
+{
+  "name": "24 - Escalate To Human",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"conversation_id\": \"22222222-2222-2222-2222-222222222222\",\n  \"reason\": \"angry_customer\",\n  \"priority\": \"high\",\n  \"context_summary\": \"Customer is upset about a delayed refund and has asked twice for a human.\"\n}"
+      },
+      "id": "5a4981f4-2be7-4a83-9a1b-c210cd36b3ff",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Defense in depth -- 01's tool schema already constrains reason/priority\n// to an enum, but re-validate here rather than trust the caller blindly,\n// same as every other sub-workflow in this codebase.\nconst input = $input.first().json;\nconst validReasons = ['low_confidence', 'customer_requested_human', 'angry_customer', 'legal_issue', 'refund_requested', 'sensitive_info', 'no_trusted_source', 'action_exceeds_permissions', 'other'];\nconst validPriorities = ['low', 'normal', 'high', 'urgent'];\n\nconst reason = validReasons.includes(input.reason) ? input.reason : 'other';\nconst priority = validPriorities.includes(input.priority) ? input.priority : 'normal';\nconst contextSummary = input.context_summary && String(input.context_summary).trim()\n  ? String(input.context_summary).trim()\n  : 'No summary provided by the agent.';\n\nreturn [{ json: { tenant_id: input.tenant_id, conversation_id: input.conversation_id, reason, priority, context_summary: contextSummary } }];"
+      },
+      "id": "3879971a-d96d-49d2-a8b6-dffb971123f8",
+      "name": "Validate And Default",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  insert_escalation($1, $2, $3, $4, $5) as escalation_id,\n  (select escalation_notify_email from ai_config where tenant_id = $1) as notify_email,\n  (select name from tenants where id = $1) as tenant_name;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.conversation_id, $json.reason, $json.priority, $json.context_summary] }}"
+        }
+      },
+      "id": "c984089b-ceb2-410e-a1f4-cd252dcc4519",
+      "name": "Insert Escalation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [448, 0],
+      "notesInFlow": true,
+      "credentials": {
+        "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" }
+      },
+      "notes": "notify_email and tenant_name pulled in the SAME query as the escalation insert -- one round trip, same lesson as everywhere else (a chained Postgres node here would replace $json with only insert_escalation's scalar return value and lose these)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "cond-has-notify",
+              "leftValue": "={{ !!$json.notify_email }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "af43255e-8079-4f37-8e06-e40f359236d1",
+      "name": "Has Notify Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [672, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Same raw RFC 2822 base64url pattern as 15/18/20.\nconst d = $json;\nconst subject = `[Elliot] Escalation needs attention -- ${d.reason} (${d.priority})`;\nconst body =\n  `A conversation for ${d.tenant_name} has been escalated to a human.\\n\\n` +\n  `Reason: ${d.reason}\\n` +\n  `Priority: ${d.priority}\\n` +\n  `Summary: ${d.context_summary}\\n\\n` +\n  `Escalation ID: ${d.escalation_id}\\n` +\n  `Conversation ID: ${$('Validate And Default').item.json.conversation_id}`;\nconst raw =\n  `To: ${d.notify_email}\\r\\n` +\n  `Subject: ${subject}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${body}`;\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nreturn [{ json: { ...d, raw_message: encoded } }];"
+      },
+      "id": "597ead79-46d4-466d-8eef-5f7b2ae405ec",
+      "name": "Build Notification Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [896, -96]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "options": {}
+      },
+      "id": "bed38ab2-c72c-4f54-8710-0ef0d899a1ab",
+      "name": "Send Notification via Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, -96],
+      "notes": "Same known limitation as everywhere else in this codebase: one shared Gmail credential, not dynamic per-tenant. continueOnFail:true -- the escalation row is already saved by this point, so a notification failure never loses the escalation itself, only the push alert (it's still visible on the dashboard).",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final return value for the Execute Workflow node in 01 -- always return\n// the escalation_id regardless of which branch (notified or not) ran.\nreturn [{ json: { escalation_id: $('Insert Escalation').item.json.escalation_id, reason: $('Validate And Default').item.json.reason, priority: $('Validate And Default').item.json.priority } }];"
+      },
+      "id": "515bb408-f17f-4d6a-9163-0e3a6c7eb74e",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1344, 0]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [[{ "node": "Validate And Default", "type": "main", "index": 0 }]]
+    },
+    "Validate And Default": {
+      "main": [[{ "node": "Insert Escalation", "type": "main", "index": 0 }]]
+    },
+    "Insert Escalation": {
+      "main": [[{ "node": "Has Notify Email?", "type": "main", "index": 0 }]]
+    },
+    "Has Notify Email?": {
+      "main": [
+        [{ "node": "Build Notification Email", "type": "main", "index": 0 }],
+        [{ "node": "Return Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Notification Email": {
+      "main": [[{ "node": "Send Notification via Gmail", "type": "main", "index": 0 }]]
+    },
+    "Send Notification via Gmail": {
+      "main": [[{ "node": "Return Result", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1b5ed123-1f60-4599-97ce-c5205c545580",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "d367e30c-44f6-45af-9f56-33359bc5990e",
+  "tags": []
+}
