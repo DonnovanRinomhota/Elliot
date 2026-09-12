@@ -88,12 +88,28 @@ tell the visitor that time "wasn't available."
 **Fix:** cap raised to 200 in `11-check-availability.json`, which for any
 realistic date range means the returned list is effectively complete.
 
-## OPEN — book_appointment does not gracefully handle a double-booking collision
+## RESOLVED — book_appointment does not gracefully handle a double-booking collision
 If two visitors (or a stale offer) try to book the same slot, the DB's
 `excl_no_overlapping_appointments` exclusion constraint correctly rejects
-the second insert — but `12-book-appointment.json` doesn't catch that and
-turn it into a graceful "that time's no longer available, try another"
-reply. The error currently just propagates. Not yet fixed.
+the second insert. `12-book-appointment.json`'s `Insert Appointment` node
+now runs with `continueOnFail`, and a new `Handle Insert Result` node turns
+that into `{ success: false, error: 'slot_unavailable', message: "That
+time is no longer available -- someone else just booked it. Please choose
+a different slot." }` instead of letting the raw DB error propagate up
+through the agent's tool_result.
+
+## OPEN — A double-booking collision leaves an orphaned Google Calendar event
+Found while fixing the issue above, not fixed here (different, larger
+problem): `12-book-appointment.json` creates the Google Calendar event
+*before* inserting the DB row (`HTTP Request` runs, then `Insert
+Appointment`). If the DB insert fails on the exclusion constraint, the
+calendar event has already been created and is never cleaned up -- a
+phantom event with no matching `appointments` row. Fixing this properly
+means either reordering (insert the DB row first, create the calendar
+event only after it succeeds -- but then a *calendar* failure leaves an
+orphaned DB row instead, just moving the problem) or adding a compensating
+delete-event call to the Calendar API when the DB insert fails. Neither is
+a small change; scoped out of the graceful-response fix above.
 
 ## OPEN — Repo has a duplicated nested `elliot/` folder
 An early "Add files via upload" commit committed a full copy of the repo
