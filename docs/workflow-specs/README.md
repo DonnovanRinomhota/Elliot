@@ -10,6 +10,6 @@ One markdown file per workflow, written alongside (not always strictly before, i
 - Error paths
 - Expected output
 
-Specs exist for: `01` (main AI agent), `08`/`09` (knowledge ingestion/retrieval), `10` (lead capture), `11`/`12` (availability/booking), `18` (demo request intake), `19` (tenant onboarding).
+Specs exist for every workflow in the codebase: `01` (main AI agent), `08`/`09` (knowledge ingestion/retrieval), `10` (lead capture), `11`/`12` (availability/booking), `13`–`17` (the full email agent: classify, draft, send, inbound trigger, manual send), `18` (demo request intake), `19` (tenant onboarding), `20` (follow-up sweep — also covers `21`, its entry point), `22` (CRM sync — also covers `23`, its sweep counterpart), `24` (escalate to human).
 
-**Gap:** workflows `13`–`17` (email classify, draft, send, inbound trigger, manual send) are built and working but have no spec doc — they were built in a fast stretch (Phase 7) and the docs never caught up. Worth writing these retroactively at some point, mainly so a future you (or anyone else) doesn't have to reverse-engineer them from the JSON alone.
+No gaps remain as of 12 Sep 2026. `13`–`17` were the last ones missing — built fast in Phase 7, written up later once flagged.
