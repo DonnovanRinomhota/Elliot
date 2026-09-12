@@ -2,7 +2,7 @@
 
 **Elliot** is a configurable, multi-tenant AI Business Assistant platform — an "AI employee" businesses can deploy for customer support, lead qualification, appointment scheduling, email handling, and CRM automation, built on Claude + n8n + Supabase.
 
-> Status: **active build.** Every phase in the original roadmap (1-9) is now built and verified end-to-end, including the full email agent, follow-up engine, and CRM sync -- tested against both a dev tenant (Zebra Real Estate, dev) and a real live test tenant. What's left: item 4 (general escalation triggers beyond the lead-capture path) and item 10 (a second real tenant, which still needs manual Calendar/Gmail OAuth setup per tenant). See `docs/architecture.md` for the full technical blueprint and `KNOWN_ISSUES.md` for resolved bugs and open items.
+> Status: **active build.** Every phase in the original roadmap (1-10) is now built, except item 10 itself (a second real tenant) -- that one is inherently gated on having a real business to onboard, not a build task. Everything else, including the full email agent, follow-up engine, CRM sync, and human escalation handling, is built and verified end-to-end. See `docs/architecture.md` for the full technical blueprint and `KNOWN_ISSUES.md` for resolved bugs and open items.
 
 ## What Elliot does
 
@@ -49,16 +49,24 @@ Built incrementally, one component at a time, in this order:
    safety cap, `disable_parallel_tool_use` to keep the tool-result contract
    simple)
 3. ✅ RAG knowledge ingestion + retrieval
-4. 🟡 Human escalation & approval gates — **partially built out of order**:
-   the hot-lead escalation path inside Lead Capture (5) is built and fixed
-   (see `KNOWN_ISSUES.md`), and the email agent's gated auto-send (7) also
-   ended up built ahead of this being finished as its own phase. What's
-   still missing: general escalation triggers and human notification
-   delivery beyond the lead-capture path. Worth revisiting whether this is
-   still meaningfully "next phase" or now mostly done piecemeal.
+4. ✅ Human escalation & approval gates — `escalate_to_human` is a real
+   5th tool on the main agent (01), available in any conversation for any
+   of 9 defined reasons (angry customer, legal/refund issue, sensitive
+   info, exceeds permissions, etc.), not just the old lead-capture-only
+   hot-lead path. Creates a real `escalations` row, sends a notification
+   email if `ai_config.escalation_notify_email` is set, and is visible on
+   a dedicated dashboard screen with acknowledge/resolve actions. Verified
+   live end-to-end. See `docs/workflow-specs/24-escalate-to-human.md`.
+   Minor pre-existing redundancy not cleaned up: Lead Capture (5) still
+   has its own separate hardcoded escalation path (`reason: 'other'`)
+   for hot leads, which could now be unified with the agent's own tool
+   call instead, but isn't yet.
 5. ✅ Lead capture & qualification
 6. ✅ Appointment management — check-availability + book-appointment, with
-   DB-level double-booking protection
+   DB-level double-booking protection AND a graceful response when a
+   collision happens (`slot_unavailable`, not a raw DB error) — see
+   `KNOWN_ISSUES.md` for the one related edge case still open (an orphaned
+   Google Calendar event on collision, not yet fixed)
 7. ✅ Email agent (classify, draft, gated auto-send) — built ahead of (4)
    despite the original plan; see Phase 7 in commit history
 8. ✅ Follow-up engine — cron sweep (20) + entry point (21). Content is
@@ -92,7 +100,7 @@ See `docs/architecture.md` for reasoning, database schema, security model, and w
 
 ## MVP niche
 
-Real estate agencies — high-value leads worth qualifying, heavy scheduling need, FAQ-heavy, and a real design-partner relationship available to validate against before generalizing to other industries.
+Real estate agencies — high-value leads worth qualifying, heavy scheduling need, FAQ-heavy. Originally planned around a specific design-partner relationship (Zebra Real Estate) to validate against before generalizing; that partnership didn't materialize, so the vertical is built generic and company-agnostic instead (see the seed data's `zebra-dev` tenant, which is now just example/demo data, not a live client). Whatever real business becomes the first tenant can be configured without rework.
 
 ## License
 

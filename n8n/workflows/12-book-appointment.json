@@ -61,7 +61,47 @@
           "name": "Elliot Postgres (RLS-scoped)"
         }
       },
-      "notes": "Set the Postgres credential manually after import."
+      "notes": "Set the Postgres credential manually after import. continueOnFail:true -- a double-booking collision (excl_no_overlapping_appointments) must produce a friendly result for the agent to relay, not a raw DB error. See 'Handle Insert Result' immediately after this.",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns a double-booking collision into a result the agent can relay\n// naturally, instead of a raw Postgres error propagating up through the\n// tool_result. KNOWN LIMITATION, not fixed here: the Google Calendar event\n// (HTTP Request, runs before this insert) has already been created by this\n// point -- a collision here leaves that event orphaned in the calendar with\n// no matching DB row. Cleaning that up would mean a delete call back to the\n// Calendar API using the event id from HTTP Request's response; out of\n// scope for this fix, which is specifically about the graceful-response gap\n// noted in KNOWN_ISSUES.md.\nconst input = $input.first().json;\n\nif (input.error) {\n  const msg = (input.error.message || String(input.error) || '').toLowerCase();\n  const isCollision = msg.includes('excl_no_overlapping_appointments') || msg.includes('exclusion');\n\n  return [{\n    json: {\n      success: false,\n      error: isCollision ? 'slot_unavailable' : 'booking_failed',\n      message: isCollision\n        ? 'That time is no longer available -- someone else just booked it. Please choose a different slot.'\n        : 'Something went wrong while booking. Please try again or choose a different slot.',\n    }\n  }];\n}\n\nreturn [{ json: input }];"
+      },
+      "id": "01910437-1309-4d26-a6a7-68eb62cfc76b",
+      "name": "Handle Insert Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        776,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "cond-insert-ok",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": false,
+              "operator": { "type": "boolean", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9d4a278e-9b33-42d2-98ba-d81a8429497e",
+      "name": "Insert Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        776,
+        144
+      ],
+      "notes": "Only the failure path sets success:false explicitly (in Handle Insert Result) -- a genuine DB row from Insert Appointment has no 'success' field at all, so this checks 'not explicitly false' rather than 'is true', to correctly route the normal/successful case through to Format Results."
     },
     {
       "parameters": {
@@ -72,7 +112,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
+        1000,
         0
       ]
     },
@@ -131,11 +171,34 @@
       "main": [
         [
           {
-            "node": "Format Results",
+            "node": "Handle Insert Result",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Handle Insert Result": {
+      "main": [
+        [
+          {
+            "node": "Insert Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     },
     "HTTP Request": {
