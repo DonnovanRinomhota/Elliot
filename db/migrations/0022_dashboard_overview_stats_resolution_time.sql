@@ -6,6 +6,12 @@
 -- REPLACE FUNCTION here is itself the safe, additive way to extend it
 -- (same signature-extension pattern as adding a column elsewhere in this
 -- codebase, just for a function instead of a table).
+--
+-- Postgres won't let CREATE OR REPLACE change a function's return row
+-- type (adding a new OUT column counts as changing it) -- it requires
+-- dropping the old signature first. Real error hit while testing this
+-- migration live, not caught before shipping it -- fixed here.
+drop function if exists public.get_dashboard_overview_stats(int);
 
 create or replace function public.get_dashboard_overview_stats(p_days int default 7)
 returns table (

@@ -1,17 +1,17 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 export default function NavLink({
   href,
-  icon: Icon,
+  icon,
   label,
   badge,
   badgeTone = "neutral",
 }: {
   href: string;
-  icon: LucideIcon;
+  icon: ReactNode;
   label: string;
   badge?: number | null;
   badgeTone?: "neutral" | "danger" | "warning";
@@ -41,7 +41,7 @@ export default function NavLink({
         textDecoration: "none",
       }}
     >
-      <Icon size={15} strokeWidth={2} aria-hidden="true" />
+      {icon}
       {label}
       {badge != null && badge > 0 && (
         <span

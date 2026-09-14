@@ -122,20 +122,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 gap: 18,
               }}
             >
-              <NavLink href="/" icon={LayoutDashboard} label="Overview" />
+              <NavLink href="/" icon={<LayoutDashboard size={15} strokeWidth={2} aria-hidden="true" />} label="Overview" />
 
               <div>
                 <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Needs attention</div>
                 <NavLink
                   href="/dashboard/escalations"
-                  icon={AlertTriangle}
+                  icon={<AlertTriangle size={15} strokeWidth={2} aria-hidden="true" />}
                   label="Escalations"
                   badge={openEscalations}
                   badgeTone="danger"
                 />
                 <NavLink
                   href="/dashboard/approvals"
-                  icon={CheckSquare}
+                  icon={<CheckSquare size={15} strokeWidth={2} aria-hidden="true" />}
                   label="Approvals"
                   badge={pendingApprovals}
                   badgeTone="warning"
@@ -144,13 +144,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
               <div>
                 <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Customers</div>
-                <NavLink href="/dashboard/leads" icon={Users} label="Leads" />
-                <NavLink href="/dashboard/appointments" icon={Calendar} label="Appointments" />
-                <NavLink href="/dashboard/conversations" icon={MessageCircle} label="Conversations" />
+                <NavLink href="/dashboard/leads" icon={<Users size={15} strokeWidth={2} aria-hidden="true" />} label="Leads" />
+                <NavLink href="/dashboard/appointments" icon={<Calendar size={15} strokeWidth={2} aria-hidden="true" />} label="Appointments" />
+                <NavLink href="/dashboard/conversations" icon={<MessageCircle size={15} strokeWidth={2} aria-hidden="true" />} label="Conversations" />
               </div>
 
               <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-                <NavLink href="/dashboard/settings" icon={Settings} label="Settings" />
+                <NavLink href="/dashboard/settings" icon={<Settings size={15} strokeWidth={2} aria-hidden="true" />} label="Settings" />
                 <SignOutButton />
               </div>
             </nav>
