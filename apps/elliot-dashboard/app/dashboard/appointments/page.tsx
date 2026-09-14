@@ -10,23 +10,52 @@ export default async function AppointmentsPage() {
     .order("starts_at", { ascending: true });
 
   if (error) {
-    return <p style={{ color: "crimson" }}>Failed to load appointments: {error.message}</p>;
+    return <p className="text-sm text-red-700">Failed to load appointments: {error.message}</p>;
   }
+
+  const now = Date.now();
+  // "Upcoming" = starts in the future AND still an active booking (not
+  // cancelled). Everything else -- already happened, or cancelled regardless
+  // of when it was booked for -- is history. completed/no_show are set by
+  // staff after the fact; the DB doesn't do this automatically yet.
+  const upcoming = (appointments ?? []).filter(
+    (a: any) => new Date(a.starts_at).getTime() > now && a.status !== "cancelled"
+  );
+  const history = (appointments ?? []).filter(
+    (a: any) => new Date(a.starts_at).getTime() <= now || a.status === "cancelled"
+  );
 
   return (
     <div>
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>Appointments</h1>
-      <p style={{ color: "#666", marginBottom: 24, fontSize: 14 }}>
-        {appointments?.length ?? 0} appointment{appointments?.length === 1 ? "" : "s"}
+      <h1 className="mb-1 text-xl font-medium">Appointments</h1>
+      <p className="mb-6 text-sm text-gray-500">
+        {upcoming.length} upcoming, {history.length} in history
       </p>
 
-      {(!appointments || appointments.length === 0) && <p style={{ color: "#999" }}>No appointments yet.</p>}
+      {appointments?.length === 0 && <p className="text-sm text-gray-400">No appointments yet.</p>}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {appointments?.map((appt: any) => (
+      <div className="flex flex-col gap-3">
+        {upcoming.map((appt: any) => (
           <AppointmentCard key={appt.id} appointment={appt} />
         ))}
+        {upcoming.length === 0 && appointments && appointments.length > 0 && (
+          <p className="text-sm text-gray-400">Nothing upcoming.</p>
+        )}
       </div>
+
+      {history.length > 0 && (
+        <>
+          <div className="mb-3 mt-8 text-sm font-medium text-gray-500">History</div>
+          <div className="flex flex-col gap-3">
+            {history
+              .slice()
+              .reverse()
+              .map((appt: any) => (
+                <AppointmentCard key={appt.id} appointment={appt} />
+              ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
