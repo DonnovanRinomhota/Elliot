@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import LeadCard from "./lead-card";
 
+// CONVERTED/LOST are the only "closed" states in the schema's check
+// constraint -- everything else (NEW/QUALIFYING/HOT/WARM/COLD) is still
+// open. Closed leads stay fully visible here, not archived away, since the
+// whole point is being able to find and reopen one later.
+const CLOSED_STATUSES = ["CONVERTED", "LOST"];
+
 export default async function LeadsPage() {
   const supabase = createClient();
 
@@ -10,23 +16,37 @@ export default async function LeadsPage() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return <p style={{ color: "crimson" }}>Failed to load leads: {error.message}</p>;
+    return <p className="text-sm text-red-700">Failed to load leads: {error.message}</p>;
   }
+
+  const open = (leads ?? []).filter((l: any) => !CLOSED_STATUSES.includes(l.status));
+  const closed = (leads ?? []).filter((l: any) => CLOSED_STATUSES.includes(l.status));
 
   return (
     <div>
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>Leads</h1>
-      <p style={{ color: "#666", marginBottom: 24, fontSize: 14 }}>
-        {leads?.length ?? 0} lead{leads?.length === 1 ? "" : "s"}
+      <h1 className="mb-1 text-xl font-medium">Leads</h1>
+      <p className="mb-6 text-sm text-gray-500">
+        {open.length} open, {closed.length} closed
       </p>
 
-      {(!leads || leads.length === 0) && <p style={{ color: "#999" }}>No leads yet.</p>}
+      {leads?.length === 0 && <p className="text-sm text-gray-400">No leads yet.</p>}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {leads?.map((lead: any) => (
+      <div className="flex flex-col gap-3">
+        {open.map((lead: any) => (
           <LeadCard key={lead.id} lead={lead} />
         ))}
       </div>
+
+      {closed.length > 0 && (
+        <>
+          <div className="mb-3 mt-8 text-sm font-medium text-gray-500">Closed</div>
+          <div className="flex flex-col gap-3">
+            {closed.map((lead: any) => (
+              <LeadCard key={lead.id} lead={lead} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

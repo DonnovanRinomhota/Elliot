@@ -13,25 +13,32 @@ type Lead = {
   contact: { name: string | null; email: string | null; phone: string | null } | null;
 };
 
-// Real values confirmed via leads_status_check constraint -- uppercase, and
-// this specific set only (not the generic new/contacted/qualified/lost guess
-// used originally).
+// Real values confirmed via leads_status_check constraint.
 const STATUS_OPTIONS = ["NEW", "QUALIFYING", "HOT", "WARM", "COLD", "CONVERTED", "LOST"];
+const CLOSED_STATUSES = ["CONVERTED", "LOST"];
+
+const STATUS_STYLES: Record<string, string> = {
+  HOT: "bg-coral-soft text-coral-dark",
+  WARM: "bg-amber-soft text-amber-dark",
+  COLD: "bg-gray-100 text-gray-600",
+  NEW: "bg-blue-50 text-blue-700",
+  QUALIFYING: "bg-blue-50 text-blue-700",
+  CONVERTED: "bg-pulse-soft text-pulse-dark",
+  LOST: "bg-gray-100 text-gray-500",
+};
 
 export default function LeadCard({ lead }: { lead: Lead }) {
   const router = useRouter();
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isClosed = CLOSED_STATUSES.includes(lead.status);
 
   async function updateStatus(newStatus: string) {
     setBusy(true);
     setError(null);
 
-    const { error: updateError } = await supabase
-      .from("leads")
-      .update({ status: newStatus })
-      .eq("id", lead.id);
+    const { error: updateError } = await supabase.from("leads").update({ status: newStatus }).eq("id", lead.id);
 
     setBusy(false);
     if (updateError) {
@@ -42,50 +49,41 @@ export default function LeadCard({ lead }: { lead: Lead }) {
   }
 
   return (
-    <div style={{ background: "white", border: "1px solid #eee", borderRadius: 10, padding: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+    <div className={`rounded-xl border border-gray-200 bg-white p-5 ${isClosed ? "opacity-70" : ""}`}>
+      <div className="mb-2 flex items-start justify-between">
         <div>
-          <strong>{lead.contact?.name || lead.contact?.email || "Unknown contact"}</strong>
-          <span style={{ marginLeft: 8, fontSize: 12, color: "#999" }}>
+          <span className="font-medium">{lead.contact?.name || lead.contact?.email || "Unknown contact"}</span>
+          <span className="ml-2 text-xs text-gray-400">
             {lead.contact?.email} {lead.contact?.phone ? `· ${lead.contact.phone}` : ""}
           </span>
         </div>
-        <span style={{ fontSize: 12, color: "#999" }}>
-          {new Date(lead.created_at).toLocaleString("en-GB", { timeZone: "UTC" })}
+        <span className="text-xs text-gray-400">
+          {new Date(lead.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
         </span>
       </div>
 
-      <div style={{ display: "flex", gap: 16, fontSize: 13, color: "#666", marginBottom: 12 }}>
-        <span>
-          Status: <strong>{lead.status}</strong>
+      <div className="mb-3 flex items-center gap-3 text-xs">
+        <span className={`rounded-md px-2 py-0.5 font-medium ${STATUS_STYLES[lead.status] || "bg-gray-100 text-gray-600"}`}>
+          {lead.status}
         </span>
-        {lead.score != null && <span>Score: {lead.score}</span>}
+        {lead.score != null && <span className="text-gray-500">Score: {lead.score}</span>}
       </div>
 
       {lead.qualification_answers && Object.keys(lead.qualification_answers).length > 0 && (
-        <pre
-          style={{
-            background: "#f7f7f8",
-            padding: 10,
-            borderRadius: 6,
-            fontSize: 12,
-            overflowX: "auto",
-            marginBottom: 12,
-          }}
-        >
+        <pre className="mb-3 overflow-x-auto rounded-md bg-gray-50 p-2.5 text-xs">
           {JSON.stringify(lead.qualification_answers, null, 2)}
         </pre>
       )}
 
-      {error && <p style={{ color: "crimson", fontSize: 13, marginBottom: 8 }}>{error}</p>}
+      {error && <p className="mb-2 text-xs text-red-700">{error}</p>}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="flex flex-wrap gap-2">
         {STATUS_OPTIONS.filter((s) => s !== lead.status).map((s) => (
           <button
             key={s}
             onClick={() => updateStatus(s)}
             disabled={busy}
-            style={{ padding: "6px 12px", background: "white", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
+            className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
           >
             Mark {s}
           </button>

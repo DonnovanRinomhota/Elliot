@@ -35,6 +35,18 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: "#dc2626",
 };
 
+function formatDuration(startIso: string, endIso: string) {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return `${hours}h ${remMins}m`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return `${days}d ${remHours}h`;
+}
+
 export default function EscalationCard({ escalation }: { escalation: Escalation }) {
   const router = useRouter();
   const supabase = createClient();
@@ -80,6 +92,11 @@ export default function EscalationCard({ escalation }: { escalation: Escalation 
         <span>
           Status: <strong>{escalation.status}</strong>
         </span>
+        {escalation.status === "resolved" && escalation.resolved_at && (
+          <span>
+            Resolved in <strong>{formatDuration(escalation.created_at, escalation.resolved_at)}</strong>
+          </span>
+        )}
         <a href={`/dashboard/conversations/${escalation.conversation_id}`} style={{ color: "#2563eb" }}>
           View conversation →
         </a>
