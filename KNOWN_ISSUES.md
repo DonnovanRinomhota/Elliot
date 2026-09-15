@@ -98,18 +98,30 @@ time is no longer available -- someone else just booked it. Please choose
 a different slot." }` instead of letting the raw DB error propagate up
 through the agent's tool_result.
 
-## OPEN — A double-booking collision leaves an orphaned Google Calendar event
-Found while fixing the issue above, not fixed here (different, larger
-problem): `12-book-appointment.json` creates the Google Calendar event
-*before* inserting the DB row (`HTTP Request` runs, then `Insert
-Appointment`). If the DB insert fails on the exclusion constraint, the
-calendar event has already been created and is never cleaned up -- a
-phantom event with no matching `appointments` row. Fixing this properly
-means either reordering (insert the DB row first, create the calendar
-event only after it succeeds -- but then a *calendar* failure leaves an
-orphaned DB row instead, just moving the problem) or adding a compensating
-delete-event call to the Calendar API when the DB insert fails. Neither is
-a small change; scoped out of the graceful-response fix above.
+## RESOLVED — A double-booking collision leaves an orphaned Google Calendar event
+`12-book-appointment.json` creates the Google Calendar event *before*
+inserting the DB row (`HTTP Request` runs, then `Insert Appointment`). If
+the DB insert fails on the exclusion constraint (or any other reason), the
+calendar event had already been created and was never cleaned up -- a
+phantom event with no matching `appointments` row.
+
+**Fix:** added a compensating delete, not a reorder (reordering just moves
+the same problem to the DB side instead). `Insert Succeeded?`'s false
+branch now routes to a new `Delete Orphaned Calendar Event` node (`DELETE
+/calendars/{google_calendar_id}/events/{event_id}`, using the event id
+captured from the original `HTTP Request` node and the calendar id from
+`Load Tenant + Contact Info`), then `Finalize Booking Failure` re-emits the
+same graceful `slot_unavailable` / `booking_failed` message regardless of
+whether the cleanup call itself succeeded -- `continueOnFail: true` on the
+delete step ensures a cleanup hiccup (e.g. event already gone) never blocks
+the visitor-facing error response. `_calendar_cleanup: 'ok' | 'failed'` is
+included in the returned object for internal debugging/logging only.
+
+**Not yet verified live:** this needs a real double-booking test against a
+live Google Calendar + Supabase instance before shipping (see testing note
+below) -- reasoned and wired correctly against the actual node structure,
+but no substitute for watching two real concurrent bookings collide and
+confirming the calendar event actually disappears.
 
 ## OPEN — Repo has a duplicated nested `elliot/` folder
 An early "Add files via upload" commit committed a full copy of the repo
