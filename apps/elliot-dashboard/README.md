@@ -1,36 +1,52 @@
 # Elliot Dashboard
 
-Minimal Next.js dashboard: Supabase Auth login + a Pending Approvals page for
-reviewing/approving/rejecting Elliot's email drafts.
+Next.js tenant admin UI, authenticated via Supabase Auth. Every screen
+except onboarding is scoped to the logged-in user's own tenant via RLS.
 
 ## Setup
 
 1. `npm install`
-2. Copy `.env.local.example` to `.env.local` and fill in:
-   - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase project settings -> API)
-   - `NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL` (the Production URL from workflow 17's webhook node, after you import and activate it)
+2. Create `.env.local` with:
+   - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase project settings → API)
+   - `NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL` (workflow 17's webhook, Production URL, after importing and activating it)
+   - `NEXT_PUBLIC_N8N_ONBOARD_WEBHOOK_URL` (workflow 19's webhook)
+   - `NEXT_PUBLIC_N8N_INGEST_WEBHOOK_URL` (workflow 08's webhook)
 3. `npm run dev` and open http://localhost:3000
 
-## Known gaps / things to verify before trusting this in real use
+Same four env vars need to be set in Vercel (Settings → Environment
+Variables) for the production/preview deployments, each enabled for
+Production, Preview, and Development.
 
-1. **RLS on `email_drafts` may not work with this client as-is.** The migration's
-   RLS policy checks `tenant_id = current_tenant_id()`, where `current_tenant_id()`
-   was built for the n8n/service-role pattern. This dashboard uses the Supabase
-   *anon* key plus a real logged-in user's session (via `auth.uid()`), which is a
-   different auth context. You likely need either: (a) a version of
-   `current_tenant_id()` that also works by looking up `tenant_users` via
-   `auth.uid()`, or (b) a separate RLS policy on `email_drafts` specifically for
-   authenticated dashboard users, joining through `tenant_users.auth_user_id =
-   auth.uid()`. Test this by logging in and confirming the approvals list
-   actually loads -- if it comes back empty or errors, this is why.
+## Screens
 
-2. **Workflow 15's final status update is currently hardcoded to `'auto_sent'`**
-   regardless of how it was triggered. Since workflow 17 also calls 15 (for
-   human-approved sends), those will incorrectly show as `auto_sent` too. Fix:
-   in 15's "Update Draft Status" node, use `{{ $('When Executed by Another
-   Workflow').first().json.auto ? 'auto_sent' : 'sent' }}` instead of the fixed
-   string, so the two paths stay distinguishable.
+- **`/`** — Overview analytics: conversations, new leads, appointments,
+  auto-resolved/escalation rates, avg response time, activity charts. Real
+  data via `get_dashboard_overview_stats`.
+- **`/dashboard/escalations`** — Open escalations with acknowledge/resolve
+  actions and a link into the conversation.
+- **`/dashboard/approvals`** — Review/approve/reject Elliot's AI-drafted
+  emails before they send.
+- **`/dashboard/leads`** — Leads with status, score, and a structured
+  breakdown of *why* they scored that way (mirrors `10-lead-capture.json`'s
+  scoring logic exactly). Status can be updated inline.
+- **`/dashboard/appointments`** — Booked appointments.
+- **`/dashboard/conversations`** / **`/dashboard/conversations/[id]`** —
+  Full message history per conversation. On `email`-channel conversations
+  with a known contact email, includes a "Reply as human" box that sends a
+  real email through the existing draft-approval pipeline (see
+  `KNOWN_ISSUES.md` for why this doesn't work on `chat_widget`
+  conversations yet).
+- **`/dashboard/knowledge`** — Add content to the tenant's knowledge base.
+  Plain pasted text only -- no PDF/website parsing yet, regardless of which
+  source type you pick in the form.
+- **`/dashboard/onboarding`** — Create a new tenant, wrapping workflow 19.
+  **No access control** -- any logged-in user of any tenant can reach this
+  and create new tenants. See `KNOWN_ISSUES.md`.
+- **`/dashboard/settings`** — Tenant profile, autonomy rules per action,
+  integration config (Gmail/Calendar/CRM/escalation email).
 
-3. Only the Pending Approvals screen is built. The nav has placeholder text for
-   Leads / Appointments / Conversations -- not real links yet, intentionally,
-   per the "foundation now, screens later" scope decision.
+## Known gaps
+
+See the root `KNOWN_ISSUES.md` for the two real open items that affect
+this app specifically: no access gate on `/dashboard/onboarding`, and
+human takeover being email-only pending a real chat widget.

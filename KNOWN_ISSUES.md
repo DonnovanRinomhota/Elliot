@@ -117,11 +117,8 @@ delete step ensures a cleanup hiccup (e.g. event already gone) never blocks
 the visitor-facing error response. `_calendar_cleanup: 'ok' | 'failed'` is
 included in the returned object for internal debugging/logging only.
 
-**Not yet verified live:** this needs a real double-booking test against a
-live Google Calendar + Supabase instance before shipping (see testing note
-below) -- reasoned and wired correctly against the actual node structure,
-but no substitute for watching two real concurrent bookings collide and
-confirming the calendar event actually disappears.
+**Verified live:** tested a real double-booking collision against live Google
+Calendar + Supabase. Confirmed working as designed.
 
 ## OPEN — Repo has a duplicated nested `elliot/` folder
 An early "Add files via upload" commit committed a full copy of the repo
@@ -140,3 +137,30 @@ development and were never captured as migrations until now:
 **Process fix going forward:** any schema change made in Supabase's SQL
 editor during live debugging should be turned into a numbered migration
 file in the same session, not after the fact.
+
+## OPEN — `/dashboard/onboarding` has no access control
+Any user logged into *any* tenant's dashboard can currently reach
+`/dashboard/onboarding` and create new tenants -- there is no
+platform-admin role or route gate. This matches the underlying webhook's
+own pre-existing lack of auth (`19-tenant-onboarding.json` has never had
+authentication on its endpoint), so this isn't a new hole so much as
+surfacing an existing one in the UI where it's easier to hit by accident.
+Fine with a single operator; becomes a real problem the moment more than
+one person has a dashboard login. Needs either a platform-level admin role
+(nothing in the schema distinguishes "runs the platform" from "runs one
+tenant" right now -- `tenant_users.role` is per-tenant only) or, at
+minimum, a hardcoded allow-list of auth user ids in the route.
+
+## OPEN — Human takeover only works for email conversations
+The dashboard's conversation detail page can send a reply as a human
+(`0023_manual_email_draft_rpc.sql`, `reply-form.tsx`) for `email`-channel
+conversations with a known contact email. It does *not* work for
+`chat_widget` conversations, and can't, without more built first:
+`apps/web-chat-widget` is an unbuilt placeholder (see its own README), and
+even once it exists, the current `chat` webhook (`01-main-ai-agent.json`'s
+trigger) is a one-shot synchronous request/response -- a visitor sends one
+message, gets one reply in the same HTTP call, and nothing is left
+listening afterward for a human reply to interrupt. Supporting takeover on
+chat_widget conversations needs the widget to exist *and* some kind of
+persistent connection (polling or Supabase Realtime) for it to receive a
+message that didn't come from its own request. Not started.

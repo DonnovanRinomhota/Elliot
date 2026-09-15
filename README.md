@@ -2,7 +2,46 @@
 
 **Elliot** is a configurable, multi-tenant AI Business Assistant platform — an "AI employee" businesses can deploy for customer support, lead qualification, appointment scheduling, email handling, and CRM automation, built on Claude + n8n + Supabase.
 
-> Status: **active build.** Every phase in the original roadmap (1-10) is now built, except item 10 itself (a second real tenant) -- that one is inherently gated on having a real business to onboard, not a build task. Everything else, including the full email agent, follow-up engine, CRM sync, and human escalation handling, is built and verified end-to-end. See `docs/architecture.md` for the full technical blueprint and `KNOWN_ISSUES.md` for resolved bugs and open items.
+> Status: **active build.** Every phase in the original roadmap (1-10) is now built, except item 10 itself (a second real tenant) -- that one is inherently gated on having a real business to onboard, not a build task. Everything else, including the full email agent, follow-up engine, CRM sync, and human escalation handling, is built and verified end-to-end. Beyond the original 10-phase roadmap, the dashboard now also covers tenant onboarding, knowledge base uploads, human takeover on email conversations, and structured lead-scoring reasoning -- see "What's built beyond the original roadmap" below. See `docs/architecture.md` for the full technical blueprint and `KNOWN_ISSUES.md` for resolved bugs and open items.
+
+## Live links
+
+- **Dashboard (production):** https://elliot-real-estate-five.vercel.app
+- **Vercel project:** https://vercel.com/elliot-1b82/elliot-real-estate — deployments, env vars, build logs
+- **GitHub repo:** https://github.com/DonnovanRinomhota/Elliot
+- **n8n instance:** https://makodevops.app.n8n.cloud — workflow editor, executions, credentials
+- **Supabase project:** Project ref `drnthityffeuwlddjorx` — https://supabase.com/dashboard/project/drnthityffeuwlddjorx — table editor, SQL editor, auth users
+
+Deploys are automatic: pushing to `main` on GitHub triggers a new Vercel
+build. n8n workflow changes do **not** deploy automatically -- exported
+JSON in `n8n/workflows/` is the source-controlled copy, but you have to
+manually re-import/activate a workflow in the n8n editor for a change to
+actually take effect. Database migrations are the same: files in
+`db/migrations/` are source-controlled, but you have to run each one
+against Supabase yourself (SQL Editor) -- nothing applies them
+automatically. See "Making a change" below.
+
+## Making a change
+
+Different parts of this repo deploy differently -- there's no single "push
+and everything updates" step:
+
+| Change type | Where it lives | How it goes live |
+|---|---|---|
+| Dashboard code (`apps/elliot-dashboard`) | Next.js / Vercel | Push to `main` → Vercel auto-builds & deploys |
+| n8n workflow (`n8n/workflows/*.json`) | n8n | Manually re-import the JSON into the n8n editor and activate/publish -- git push does **not** touch the live workflow |
+| Database schema (`db/migrations/*.sql`) | Supabase | Manually run the new migration file's SQL in Supabase's SQL Editor -- git push does **not** run it |
+| Env vars (Supabase keys, n8n webhook URLs) | Vercel project settings | Add/edit directly in Vercel → Settings → Environment Variables, enabled for Production **and** Preview **and** Development |
+
+Normal flow for a dashboard-only change: edit on a feature branch, push,
+open a PR into `main`, merge, Vercel builds automatically.
+
+Normal flow for anything touching n8n or the database: make the change
+locally, run the SQL migration in Supabase and/or re-import the workflow
+in n8n **first**, confirm it actually works, *then* push/merge the code
+that depends on it -- merging the dashboard code first (with an RPC or
+webhook it depends on not existing yet) will deploy successfully but the
+feature will fail at runtime.
 
 ## What Elliot does
 
@@ -22,8 +61,9 @@ The AI (Claude) never performs privileged actions directly. It proposes a tool c
 
 ```
 /apps
-  /web-chat-widget     — embeddable chat UI (Next.js)
-  /dashboard           — tenant admin UI (Next.js)
+  /elliot-dashboard    — tenant admin UI (Next.js) -- the real, built one
+  /web-chat-widget     — embeddable customer-facing chat UI (Next.js) -- NOT built yet, placeholder only
+  /dashboard           — stray leftover placeholder from before the dashboard was renamed to elliot-dashboard; dead, safe to delete
 /n8n
   /workflows           — exported n8n workflow JSON (version-controlled)
 /db
@@ -63,10 +103,10 @@ Built incrementally, one component at a time, in this order:
    call instead, but isn't yet.
 5. ✅ Lead capture & qualification
 6. ✅ Appointment management — check-availability + book-appointment, with
-   DB-level double-booking protection AND a graceful response when a
-   collision happens (`slot_unavailable`, not a raw DB error) — see
-   `KNOWN_ISSUES.md` for the one related edge case still open (an orphaned
-   Google Calendar event on collision, not yet fixed)
+   DB-level double-booking protection, a graceful response when a
+   collision happens (`slot_unavailable`, not a raw DB error), and a
+   compensating delete for the Google Calendar event on collision so
+   nothing is left orphaned -- see `KNOWN_ISSUES.md`, verified live.
 7. ✅ Email agent (classify, draft, gated auto-send) — built ahead of (4)
    despite the original plan; see Phase 7 in commit history
 8. ✅ Follow-up engine — cron sweep (20) + entry point (21). Content is
@@ -82,10 +122,40 @@ Built incrementally, one component at a time, in this order:
    receives their sync data (a CRM's native webhook, or Zapier/Make in
    front of one that doesn't take webhooks directly). Verified live
    end-to-end. See `docs/workflow-specs/22-crm-sync.md`.
-10. ⬜ Multi-tenant hardening (second real tenant) — tenant onboarding
-    (workflow 19) removes the manual-SQL friction for this, but Calendar/
-    Gmail OAuth connection per tenant is still a manual, one-off setup;
-    see `docs/workflow-specs/19-tenant-onboarding.md` for the actual gap
+10. 🟡 Multi-tenant hardening (second real tenant) — tenant onboarding
+    (workflow 19) removes the manual-SQL friction for this, and it now has
+    a dashboard form (`/dashboard/onboarding`) instead of being API-only.
+    Calendar/Gmail OAuth connection per tenant is still a manual, one-off
+    setup, and the onboarding page itself has no access control yet (see
+    `KNOWN_ISSUES.md`); see `docs/workflow-specs/19-tenant-onboarding.md`
+    for the OAuth gap specifically.
+
+## What's built beyond the original roadmap
+
+The dashboard grew past "approve/reject email drafts" into a real
+operating surface:
+
+- **Real analytics** (`/`) — conversations, new leads, appointments booked,
+  auto-resolved rate, escalation rate, avg response time, activity/leads
+  charts. Backed by a real Postgres RPC (`get_dashboard_overview_stats`),
+  not placeholder numbers.
+- **Structured lead-scoring reasoning** (`/dashboard/leads`) — each lead
+  shows *why* it scored what it did (budget provided, urgent timeline,
+  etc.), mirroring `10-lead-capture.json`'s actual scoring logic exactly,
+  not an approximation. Raw qualification answers are still viewable via a
+  toggle.
+- **Human takeover** (`/dashboard/conversations/[id]`) — reply as a human
+  directly from the dashboard, on `email`-channel conversations with a
+  known contact email (see `KNOWN_ISSUES.md` for why chat_widget isn't
+  supported). Reuses the existing draft-approval send pipeline
+  (`create_manual_email_draft` → workflow 17 → 15) rather than a separate
+  send path, and correctly tags the message as `human_agent` (not
+  `assistant`) in the conversation log.
+- **Tenant onboarding UI** (`/dashboard/onboarding`) — a form wrapping
+  workflow 19, instead of calling the webhook by hand.
+- **Knowledge base upload UI** (`/dashboard/knowledge`) — a form wrapping
+  workflow 08's ingestion webhook. Plain text only; no PDF/website parsing
+  yet, matching what the backend actually does.
 
 Six more workflows exist outside this original phase list — internal
 tooling rather than agent capabilities:
