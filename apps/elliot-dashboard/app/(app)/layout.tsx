@@ -56,6 +56,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .slice(0, 2)
       .join("") || "?";
 
+  const HEADER_HEIGHT = 57;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <header
@@ -63,9 +65,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "10px 24px",
+          height: HEADER_HEIGHT,
+          padding: "0 24px",
           borderBottom: "1px solid #eee",
           background: "white",
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -115,6 +121,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <nav
           style={{
             width: 200,
+            flexShrink: 0,
+            alignSelf: "flex-start",
+            position: "sticky",
+            top: HEADER_HEIGHT,
+            height: `calc(100vh - ${HEADER_HEIGHT}px)`,
+            overflowY: "auto",
             background: "white",
             borderRight: "1px solid #eee",
             padding: "16px 14px",
@@ -123,7 +135,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             gap: 18,
           }}
         >
-          <NavLink href="/" icon={<LayoutDashboard size={15} strokeWidth={2} aria-hidden="true" />} label="Overview" />
+          <NavLink href="/" icon={<LayoutDashboard size={15} strokeWidth={2} aria-hidden="true" />} label="Dashboard" />
 
           <div>
             <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Needs attention</div>
