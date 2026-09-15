@@ -11,7 +11,15 @@ type Draft = {
   body: string;
   category: string;
   confidence: string | number;
+  status: string;
   created_at: string;
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  pending: "bg-amber-soft text-amber-dark",
+  auto_sent: "bg-violet-50 text-violet-600",
+  approved: "bg-pulse-soft text-pulse-dark",
+  rejected: "bg-coral-soft text-coral-dark",
 };
 
 export default function ApprovalCard({ draft }: { draft: Draft }) {
@@ -105,9 +113,16 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
             {draft.category} · confidence {draft.confidence}
           </span>
         </div>
-        <span style={{ fontSize: 12, color: "#999" }}>
-          {new Date(draft.created_at).toLocaleString("en-GB", { timeZone: "UTC" })}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span
+            className={`rounded-md px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[draft.status] || "bg-gray-100 text-gray-600"}`}
+          >
+            {draft.status.replace(/_/g, " ")}
+          </span>
+          <span style={{ fontSize: 12, color: "#999" }}>
+            {new Date(draft.created_at).toLocaleString("en-GB", { timeZone: "UTC" })}
+          </span>
+        </div>
       </div>
 
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{draft.subject}</div>
@@ -125,29 +140,35 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
 
       {error && <p style={{ color: "crimson", fontSize: 13, marginTop: 8 }}>{error}</p>}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button
-          onClick={handleApprove}
-          disabled={busy}
-          style={{ padding: "8px 16px", background: "#111", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
-        >
-          {isEditing ? "Save & Send" : "Approve & Send"}
-        </button>
-        <button
-          onClick={() => setIsEditing((v) => !v)}
-          disabled={busy}
-          style={{ padding: "8px 16px", background: "white", border: "1px solid #ddd", borderRadius: 6, cursor: "pointer" }}
-        >
-          {isEditing ? "Cancel Edit" : "Edit"}
-        </button>
-        <button
-          onClick={handleReject}
-          disabled={busy}
-          style={{ padding: "8px 16px", background: "white", color: "crimson", border: "1px solid #fbb", borderRadius: 6, cursor: "pointer" }}
-        >
-          Reject
-        </button>
-      </div>
+      {draft.status === "pending" ? (
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={handleApprove}
+            disabled={busy}
+            style={{ padding: "8px 16px", background: "#111", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+          >
+            {isEditing ? "Save & Send" : "Approve & Send"}
+          </button>
+          <button
+            onClick={() => setIsEditing((v) => !v)}
+            disabled={busy}
+            style={{ padding: "8px 16px", background: "white", border: "1px solid #ddd", borderRadius: 6, cursor: "pointer" }}
+          >
+            {isEditing ? "Cancel Edit" : "Edit"}
+          </button>
+          <button
+            onClick={handleReject}
+            disabled={busy}
+            style={{ padding: "8px 16px", background: "white", color: "crimson", border: "1px solid #fbb", borderRadius: 6, cursor: "pointer" }}
+          >
+            Reject
+          </button>
+        </div>
+      ) : (
+        <p style={{ fontSize: 12, color: "#999", marginTop: 12 }}>
+          {draft.status === "auto_sent" ? "Sent automatically -- no review needed." : `Already ${draft.status}. No further action.`}
+        </p>
+      )}
     </div>
   );
 }
