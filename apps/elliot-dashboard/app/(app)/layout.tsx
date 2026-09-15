@@ -10,6 +10,8 @@ import {
   Calendar,
   MessageCircle,
   Settings,
+  BookOpen,
+  PlusCircle,
 } from "lucide-react";
 
 // Auth-gated layout for every real dashboard route (/ , /dashboard/*).
@@ -160,6 +162,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <NavLink href="/dashboard/leads" icon={<Users size={15} strokeWidth={2} aria-hidden="true" />} label="Leads" />
             <NavLink href="/dashboard/appointments" icon={<Calendar size={15} strokeWidth={2} aria-hidden="true" />} label="Appointments" />
             <NavLink href="/dashboard/conversations" icon={<MessageCircle size={15} strokeWidth={2} aria-hidden="true" />} label="Conversations" />
+            <NavLink href="/dashboard/knowledge" icon={<BookOpen size={15} strokeWidth={2} aria-hidden="true" />} label="Knowledge base" />
+          </div>
+
+          <div>
+            {/* Internal-only, not access-gated -- see onboarding/page.tsx's own warning banner. */}
+            <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Platform admin</div>
+            <NavLink href="/dashboard/onboarding" icon={<PlusCircle size={15} strokeWidth={2} aria-hidden="true" />} label="New tenant" />
           </div>
 
           <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
