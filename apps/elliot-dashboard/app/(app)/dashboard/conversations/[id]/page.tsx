@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import ReplyForm from "./reply-form";
 
 export default async function ConversationDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
 
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
-    .select("id, channel, status, created_at, contact:contacts(name, email, phone)")
+    .select("id, channel, status, created_at, contact:contacts(id, name, email, phone)")
     .eq("id", params.id)
     .single();
 
@@ -24,10 +25,26 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   // can't infer the cardinality from the select string and types it as an array. Assert
   // the real runtime shape here rather than indexing into it as an array.
   const contact = conversation.contact as unknown as {
+    id: string;
     name: string | null;
     email: string | null;
     phone: string | null;
   } | null;
+
+  // "Reply as human" only makes sense where a reply can actually be delivered
+  // somewhere real. There is no live chat widget yet (apps/web-chat-widget is
+  // unbuilt) -- chat_widget conversations are one-shot request/response with
+  // nothing left listening on the other end, so a dashboard reply there would
+  // silently go nowhere. Email is async and has a real send pipeline
+  // (workflow 17 -> 15), so that's the only channel this supports today.
+  const canReplyAsHuman = conversation.channel === "email" && !!contact?.email;
+
+  const ROLE_LABEL: Record<string, string> = {
+    user: "user",
+    assistant: "elliot",
+    human_agent: "you (human)",
+    system: "system",
+  };
 
   return (
     <div>
@@ -45,27 +62,48 @@ export default async function ConversationDetailPage({ params }: { params: { id:
       {msgError && <p style={{ color: "crimson" }}>Failed to load messages: {msgError.message}</p>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {messages?.map((m: any) => (
-          <div
-            key={m.id}
-            style={{
-              alignSelf: m.role === "assistant" ? "flex-end" : "flex-start",
-              maxWidth: "70%",
-              background: m.role === "assistant" ? "#111" : "white",
-              color: m.role === "assistant" ? "white" : "#111",
-              border: m.role === "assistant" ? "none" : "1px solid #eee",
-              borderRadius: 10,
-              padding: "10px 14px",
-            }}
-          >
-            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>{m.role}</div>
-            <div style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{m.content}</div>
-          </div>
-        ))}
+        {messages?.map((m: any) => {
+          const isOutbound = m.role === "assistant" || m.role === "human_agent";
+          const isHuman = m.role === "human_agent";
+          return (
+            <div
+              key={m.id}
+              style={{
+                alignSelf: isOutbound ? "flex-end" : "flex-start",
+                maxWidth: "70%",
+                background: isHuman ? "#0a7d3a" : isOutbound ? "#111" : "white",
+                color: isOutbound ? "white" : "#111",
+                border: isOutbound ? "none" : "1px solid #eee",
+                borderRadius: 10,
+                padding: "10px 14px",
+              }}
+            >
+              <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>
+                {ROLE_LABEL[m.role] || m.role}
+              </div>
+              <div style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{m.content}</div>
+            </div>
+          );
+        })}
         {(!messages || messages.length === 0) && !msgError && (
           <p style={{ color: "#999" }}>No messages in this conversation.</p>
         )}
       </div>
+
+      {canReplyAsHuman && (
+        <ReplyForm
+          conversationId={conversation.id}
+          contactId={contact!.id}
+          toEmail={contact!.email!}
+          defaultSubject=""
+        />
+      )}
+      {!canReplyAsHuman && conversation.channel !== "email" && (
+        <p style={{ marginTop: 24, fontSize: 12, color: "#999", borderTop: "1px solid #eee", paddingTop: 16 }}>
+          Replying from the dashboard isn&apos;t available on {conversation.channel} conversations yet -- there&apos;s
+          no live channel to deliver it through.
+        </p>
+      )}
     </div>
   );
 }

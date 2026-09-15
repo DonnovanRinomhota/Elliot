@@ -213,7 +213,7 @@
           "value": {
             "tenant_id": "={{ $('Load Draft').first().json.tenant_id }}",
             "conversation_id": "={{ $('Load Draft').first().json.conversation_id }}",
-            "role": "assistant",
+            "role": "={{ $('Load Draft').first().json.authored_by === 'human' ? 'human_agent' : 'assistant' }}",
             "content": "={{ $('Load Draft').first().json.body }}"
           },
           "matchingColumns": [
@@ -303,7 +303,8 @@
           "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
-      }
+      },
+      "notes": "role was previously hardcoded to 'assistant' for every send, including manually-authored human takeover replies (see 0023_manual_email_draft_rpc.sql) -- now reads Load Draft's authored_by column so the messages log actually distinguishes who sent what."
     },
     {
       "parameters": {
