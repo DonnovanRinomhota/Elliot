@@ -19,6 +19,16 @@ export default async function ConversationDetailPage({ params }: { params: { id:
     return <p style={{ color: "crimson" }}>Failed to load conversation: {convError?.message}</p>;
   }
 
+  // Supabase returns `contact` as a single object at runtime (conversations.contact_id
+  // is a many-to-one FK to contacts), but without generated Database types, postgrest-js
+  // can't infer the cardinality from the select string and types it as an array. Assert
+  // the real runtime shape here rather than indexing into it as an array.
+  const contact = conversation.contact as unknown as {
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+  } | null;
+
   return (
     <div>
       <a href="/dashboard/conversations" style={{ fontSize: 13, color: "#666" }}>
@@ -26,10 +36,10 @@ export default async function ConversationDetailPage({ params }: { params: { id:
       </a>
 
       <h1 style={{ fontSize: 22, margin: "8px 0 4px" }}>
-        {conversation.contact?.name || conversation.contact?.email || "Unknown contact"}
+        {contact?.name || contact?.email || "Unknown contact"}
       </h1>
       <p style={{ color: "#666", marginBottom: 24, fontSize: 14 }}>
-        {conversation.channel} · {conversation.status} · {conversation.contact?.email}
+        {conversation.channel} · {conversation.status} · {contact?.email}
       </p>
 
       {msgError && <p style={{ color: "crimson" }}>Failed to load messages: {msgError.message}</p>}
