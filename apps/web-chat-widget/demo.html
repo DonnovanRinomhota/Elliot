@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Elliot widget -- demo host page</title>
+<style>
+  body { font-family: sans-serif; max-width: 640px; margin: 60px auto; padding: 0 20px; color: #333; }
+  h1 { font-size: 20px; }
+  code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <h1>Demo host page</h1>
+  <p>
+    This simulates a client's website with the Elliot widget embedded on it,
+    exactly the way the real snippet works -- nothing here is special-cased
+    for the demo. Open this file directly in a browser (no build step, no
+    server needed) to see the widget bubble in the bottom-right corner.
+  </p>
+  <p>
+    Before this works against a real backend, edit the <code>data-webhook-url</code>
+    below to point at a tenant that actually exists in your database, or
+    remove that attribute to use the default production URL.
+  </p>
+
+  <!--
+    This is the exact snippet a client would paste into their own site.
+    data-webhook-url is only here to make local testing easy against a
+    non-production n8n URL; a real client's embed snippet wouldn't include it.
+  -->
+  <script
+    src="./widget.js"
+    data-tenant="acme-realty"
+    data-title="Acme Realty"
+    data-greeting="Hi! Looking to buy or sell?"
+    data-accent="#0a7d3a"
+    async
+  ></script>
+</body>
+</html>

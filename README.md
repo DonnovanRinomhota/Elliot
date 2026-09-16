@@ -62,7 +62,7 @@ The AI (Claude) never performs privileged actions directly. It proposes a tool c
 ```
 /apps
   /elliot-dashboard    — tenant admin UI (Next.js) -- the real, built one
-  /web-chat-widget     — embeddable customer-facing chat UI (Next.js) -- NOT built yet, placeholder only
+  /web-chat-widget     — embeddable customer-facing chat widget (vanilla JS, not Next.js -- see its own README for why) -- built, unit-tested, CORS with real third-party origins not yet verified live (see ROADMAP.md)
   /dashboard           — stray leftover placeholder from before the dashboard was renamed to elliot-dashboard; dead, safe to delete
 /n8n
   /workflows           — exported n8n workflow JSON (version-controlled)
