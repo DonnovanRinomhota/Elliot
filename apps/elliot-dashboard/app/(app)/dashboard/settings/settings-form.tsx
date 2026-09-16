@@ -11,6 +11,7 @@ type Tenant = {
   plan: string;
   status: string;
   timezone: string;
+  avg_deal_value: number | null;
 };
 
 type AiConfig = {
@@ -74,7 +75,12 @@ export default function SettingsForm({
   const router = useRouter();
   const supabase = createClient();
 
-  const [profile, setProfile] = useState({ name: tenant.name, industry: tenant.industry ?? "", timezone: tenant.timezone });
+  const [profile, setProfile] = useState({
+    name: tenant.name,
+    industry: tenant.industry ?? "",
+    timezone: tenant.timezone,
+    avg_deal_value: tenant.avg_deal_value != null ? String(tenant.avg_deal_value) : "",
+  });
   const [autonomy, setAutonomy] = useState<Record<string, string>>(
     Object.fromEntries(AUTONOMY_ACTIONS.map((a) => [a.key, aiConfig?.autonomy_rules?.[a.key]?.mode ?? "approval_required"]))
   );
@@ -92,9 +98,20 @@ export default function SettingsForm({
   async function saveProfile() {
     setSaving("profile");
     setErrors((e) => ({ ...e, profile: "" }));
+
+    let avgDealValue: number | null = null;
+    if (profile.avg_deal_value.trim() !== "") {
+      const parsed = Number(profile.avg_deal_value);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        setSaving(null);
+        return setErrors((e) => ({ ...e, profile: "Average deal value must be a positive number, or left blank." }));
+      }
+      avgDealValue = parsed;
+    }
+
     const { error } = await supabase
       .from("tenants")
-      .update({ name: profile.name, industry: profile.industry || null, timezone: profile.timezone })
+      .update({ name: profile.name, industry: profile.industry || null, timezone: profile.timezone, avg_deal_value: avgDealValue })
       .eq("id", tenant.id);
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, profile: error.message }));
@@ -156,6 +173,22 @@ export default function SettingsForm({
         <div className="mb-3">
           <label className={labelClass}>Timezone</label>
           <input className={inputClass} value={profile.timezone} onChange={(e) => setProfile({ ...profile, timezone: e.target.value })} placeholder="e.g. Europe/Warsaw" />
+        </div>
+        <div className="mb-3">
+          <label className={labelClass}>Average deal value</label>
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            step="any"
+            value={profile.avg_deal_value}
+            onChange={(e) => setProfile({ ...profile, avg_deal_value: e.target.value })}
+            placeholder="e.g. 8000"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Your estimated revenue or commission per converted lead. Drives the revenue estimate on the Overview
+            page -- leave blank to hide that estimate rather than show a guessed number.
+          </p>
         </div>
         <div className="mb-4 flex gap-4 text-xs text-gray-500">
           <span>

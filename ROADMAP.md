@@ -70,10 +70,20 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   workflow 08 exists and works, but it's plain-text paste only. No real
   PDF, brochure, or website ingestion yet, regardless of which source
   type you pick in the form.
-- ⬜ **AI Revenue / ROI dashboard.** Turning "Elliot answered 500
-  conversations" into "Elliot generated an estimated €84k pipeline" --
-  qualified leads × an assumed commission value per tenant. Would build on
-  the analytics work already done. Not started.
+- 🟡 **AI Revenue / ROI dashboard.** Built: `tenants.avg_deal_value`
+  (tenant-set, Settings page) drives `get_revenue_dashboard_stats()`
+  (`0024_revenue_dashboard_stats.sql`), showing estimated pipeline
+  (qualified leads × avg deal value) and estimated closed value (converted
+  leads × avg deal value) as a banner on the Overview page. Returns null
+  estimates, not zero, until a tenant actually sets a value -- never
+  invents a number. Verified via `tsc --noEmit` and a full production
+  build; **not yet run against live Supabase data** -- run the migration
+  and confirm the numbers look right against real leads/appointments
+  before treating this as done. No currency field exists anywhere in the
+  schema, so the figure is shown unlabeled (assumed to match whatever the
+  tenant is thinking in) -- fine for a single-currency pilot, would need a
+  real currency field before this means anything with multiple tenants in
+  different countries.
 - ⬜ **Follow-up sequence configuration UI.** Sequences are still
   hand-authored via SQL (see `docs/workflow-specs/20-follow-up-sweep.md`);
   a run can still advance on schedule even if a pending draft wasn't
