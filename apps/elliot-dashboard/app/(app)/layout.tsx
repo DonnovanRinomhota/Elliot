@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminEmail } from "@/lib/admin";
 import SignOutButton from "./dashboard/sign-out-button";
 import NavLink from "./dashboard/nav-link";
 import {
@@ -165,11 +166,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <NavLink href="/dashboard/knowledge" icon={<BookOpen size={15} strokeWidth={2} aria-hidden="true" />} label="Knowledge base" />
           </div>
 
-          <div>
-            {/* Internal-only, not access-gated -- see onboarding/page.tsx's own warning banner. */}
-            <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Platform admin</div>
-            <NavLink href="/dashboard/onboarding" icon={<PlusCircle size={15} strokeWidth={2} aria-hidden="true" />} label="New tenant" />
-          </div>
+          {isAdminEmail(user.email) && (
+            <div>
+              <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Platform admin</div>
+              <NavLink href="/dashboard/onboarding" icon={<PlusCircle size={15} strokeWidth={2} aria-hidden="true" />} label="New tenant" />
+            </div>
+          )}
 
           <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
             <NavLink href="/dashboard/settings" icon={<Settings size={15} strokeWidth={2} aria-hidden="true" />} label="Settings" />

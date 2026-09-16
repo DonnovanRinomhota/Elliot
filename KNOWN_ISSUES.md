@@ -138,18 +138,26 @@ development and were never captured as migrations until now:
 editor during live debugging should be turned into a numbered migration
 file in the same session, not after the fact.
 
-## OPEN — `/dashboard/onboarding` has no access control
-Any user logged into *any* tenant's dashboard can currently reach
-`/dashboard/onboarding` and create new tenants -- there is no
-platform-admin role or route gate. This matches the underlying webhook's
-own pre-existing lack of auth (`19-tenant-onboarding.json` has never had
-authentication on its endpoint), so this isn't a new hole so much as
-surfacing an existing one in the UI where it's easier to hit by accident.
-Fine with a single operator; becomes a real problem the moment more than
-one person has a dashboard login. Needs either a platform-level admin role
-(nothing in the schema distinguishes "runs the platform" from "runs one
-tenant" right now -- `tenant_users.role` is per-tenant only) or, at
-minimum, a hardcoded allow-list of auth user ids in the route.
+## PARTIALLY RESOLVED — `/dashboard/onboarding` has no access control
+**Fixed:** the dashboard route itself is now gated. `lib/admin.ts`'s
+`isAdminEmail()` checks the logged-in user's email against `ADMIN_EMAILS`
+(a comma-separated env var, server-only, no `NEXT_PUBLIC_` prefix). Anyone
+not on that list sees a plain "you don't have access" message instead of
+the form, and the nav link itself is hidden for non-admins too
+(`app/(app)/layout.tsx`). Unit-verified against case-sensitivity,
+whitespace, empty-list, and multi-entry edge cases.
+
+**Still open:** this only gates the *dashboard route*. The underlying n8n
+webhook (`19-tenant-onboarding.json`) still has no authentication of its
+own -- anyone who finds that URL directly can call it and create tenants
+without ever going through the dashboard or this check at all. Real fix
+needs auth on the webhook itself (a shared-secret header, checked in the
+workflow's Validate Input node, is the smallest version of this). Nothing
+in the schema distinguishes "runs the platform" from "runs one tenant"
+either (`tenant_users.role` is per-tenant only) -- the env-var allow-list
+is a deliberately simple stopgap for a single operator, not a real
+permission system; revisit if more than one person ever needs this level
+of access.
 
 ## OPEN — Human takeover only works for email conversations
 The dashboard's conversation detail page can send a reply as a human
