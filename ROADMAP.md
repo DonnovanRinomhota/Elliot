@@ -23,13 +23,17 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   automatically at `apps/elliot-dashboard/public/widget.js` via a
   `prebuild`/`predev` npm hook that copies the canonical source, so the
   two can't silently drift out of sync.
-  **Not yet done:** CORS behavior against a real third-party origin has
-  not been verified live -- the `chat` webhook node has no explicit CORS
-  config, so this relies on n8n's default behavior. **Test this on an
-  actual client site (not localhost) before relying on it** -- see the
-  widget's own README for what to check and how to fix it if it fails.
-  Once that's confirmed, this unblocks human takeover and the items below
-  it working the way they were originally meant to.
+  **Not yet done:** a full round-trip reply hasn't been confirmed on a real
+  third-party origin -- tested on a GitHub Pages page
+  (donnovanrinomhota.github.io/Elliot-web), and the request correctly
+  reached n8n, resolved the tenant, and hit Anthropic's API (confirmed via
+  the n8n execution log), which is strong evidence CORS is fine -- a true
+  CORS block would have stopped the request before it left the browser.
+  The actual failure hit was Anthropic API credits being exhausted, which
+  is unrelated to CORS/the widget/n8n and just needs billing topped up.
+  **Once credits are restored, resend a message on that same test page to
+  close this out for real** -- everything else in the chain is already
+  proven working.
 - ⬜ **Marketing site** (separate repo:
   [`DonnovanRinomhota/Elliot-web`](https://github.com/DonnovanRinomhota/Elliot-web)
   -- intentionally kept out of this monorepo, not a stray duplicate). The
