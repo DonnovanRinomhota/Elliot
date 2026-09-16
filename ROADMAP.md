@@ -62,9 +62,10 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   *and* has some persistent connection (polling/Realtime) to receive a
   message that didn't come from its own request. See `KNOWN_ISSUES.md`.
 - 🟡 **Tenant onboarding UI** (`/dashboard/onboarding`) -- form wrapping
-  workflow 19 exists and works. Gap: **no access control** -- any user
-  logged into any tenant's dashboard can currently reach it and create
-  new tenants. See `KNOWN_ISSUES.md`.
+  workflow 19 exists and works. Route is now gated to admins listed in
+  `ADMIN_EMAILS` (`lib/admin.ts`), nav link hidden for everyone else.
+  Remaining gap: the underlying n8n webhook itself still has no auth of
+  its own -- see `KNOWN_ISSUES.md`.
 - 🟡 **Knowledge base upload** (`/dashboard/knowledge`) -- form wrapping
   workflow 08 exists and works, but it's plain-text paste only. No real
   PDF, brochure, or website ingestion yet, regardless of which source
@@ -83,8 +84,9 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
 
 - ✅ Orphaned Google Calendar event on a booking collision -- fixed with a
   compensating delete, tested live against a real double-booking.
-- ⬜ Onboarding page access control (same item as above, listed here too
-  since it's a real reliability/security gap, not just a missing feature).
+- 🟡 Onboarding page access control -- dashboard route gated (see above);
+  the n8n webhook underneath still has no auth of its own, so this isn't
+  fully closed out yet.
 
 ## Business / non-code
 
