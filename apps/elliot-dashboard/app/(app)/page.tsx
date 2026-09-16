@@ -8,6 +8,7 @@ import {
   Sparkles,
   ArrowRight,
   TrendingUp,
+  DollarSign,
 } from "lucide-react";
 
 type ActivityItem = {
@@ -47,6 +48,16 @@ export default async function DashboardPage() {
     { p_days: 7 }
   );
   const stats = statsRows?.[0] ?? null;
+
+  // Separate call, separate (longer) window -- a revenue estimate over just
+  // 7 days reads as tiny/unconvincing next to "pipeline," and this is
+  // meant to answer "what has Elliot generated" as an ongoing headline
+  // figure, not a weekly snapshot like the stat cards above.
+  const { data: revenueRows, error: revenueError } = await supabase.rpc(
+    "get_revenue_dashboard_stats",
+    { p_days: 30 }
+  );
+  const revenue = revenueRows?.[0] ?? null;
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 6);
@@ -260,6 +271,49 @@ export default async function DashboardPage() {
           {Number(stats.escalations_count) > 0
             ? `${stats.escalations_count} escalation${Number(stats.escalations_count) === 1 ? "" : "s"} in the last 7 days -- check the Escalations page.`
             : "No activity in the last 7 days yet."}
+        </a>
+      )}
+
+      {revenueError && (
+        <p className="mb-4 text-sm text-red-700">Failed to load revenue estimate: {revenueError.message}</p>
+      )}
+
+      {revenue && revenue.avg_deal_value != null ? (
+        <div className="mb-6 rounded-xl border border-gray-100 bg-ink p-5 text-white shadow-sm">
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
+            <DollarSign size={14} /> Estimated impact -- last 30 days
+          </div>
+          <div className="flex items-end gap-8">
+            <div>
+              <div className="text-3xl font-extrabold tracking-tight">
+                {Number(revenue.estimated_pipeline_value).toLocaleString()}
+              </div>
+              <div className="text-xs text-white/60">
+                Estimated pipeline -- {revenue.qualified_leads_count} qualified lead
+                {Number(revenue.qualified_leads_count) === 1 ? "" : "s"} × {Number(revenue.avg_deal_value).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <div className="text-3xl font-extrabold tracking-tight">
+                {Number(revenue.estimated_closed_value).toLocaleString()}
+              </div>
+              <div className="text-xs text-white/60">
+                Estimated closed value -- {revenue.converted_leads_count} converted lead
+                {Number(revenue.converted_leads_count) === 1 ? "" : "s"}
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] text-white/40">
+            Estimate based on your average deal value ({Number(revenue.avg_deal_value).toLocaleString()}, set in
+            Settings) -- not a computed fact, an assumption you provided. No currency conversion is applied.
+          </p>
+        </div>
+      ) : (
+        <a
+          href="/dashboard/settings"
+          className="mb-6 block rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 no-underline transition hover:border-gray-300 hover:bg-gray-100"
+        >
+          Set your average deal value in Settings to see an estimated pipeline/revenue figure here.
         </a>
       )}
 
