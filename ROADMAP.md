@@ -14,26 +14,21 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
 
 ## Customer-facing channels
 
-- 🟡 **Web chat widget** (`apps/web-chat-widget`, in this repo). Built:
-  a single dependency-free `widget.js` (Shadow DOM, no framework runtime
-  required on the host site), matching the real `chat` webhook's request/
-  response contract. Unit-tested (jsdom + mocked fetch) covering mount,
-  send, conversation-id persistence/threading, network-failure handling,
-  and XSS-safety of rendered replies -- 30/30 assertions passing. Served
+- ✅ **Web chat widget** (`apps/web-chat-widget`, in this repo). A single
+  dependency-free `widget.js` (Shadow DOM, no framework runtime required
+  on the host site), matching the real `chat` webhook's request/response
+  contract. Unit-tested (jsdom + mocked fetch) covering mount, send,
+  conversation-id persistence/threading, network-failure handling, and
+  XSS-safety of rendered replies -- 30/30 assertions passing. Served
   automatically at `apps/elliot-dashboard/public/widget.js` via a
   `prebuild`/`predev` npm hook that copies the canonical source, so the
-  two can't silently drift out of sync.
-  **Not yet done:** a full round-trip reply hasn't been confirmed on a real
-  third-party origin -- tested on a GitHub Pages page
-  (donnovanrinomhota.github.io/Elliot-web), and the request correctly
-  reached n8n, resolved the tenant, and hit Anthropic's API (confirmed via
-  the n8n execution log), which is strong evidence CORS is fine -- a true
-  CORS block would have stopped the request before it left the browser.
-  The actual failure hit was Anthropic API credits being exhausted, which
-  is unrelated to CORS/the widget/n8n and just needs billing topped up.
-  **Once credits are restored, resend a message on that same test page to
-  close this out for real** -- everything else in the chain is already
-  proven working.
+  two can't silently drift out of sync. Full round-trip confirmed live on
+  a real third-party origin (GitHub Pages,
+  donnovanrinomhota.github.io/Elliot-web) -- message sent, reached n8n,
+  resolved the tenant, hit Anthropic's API, and a real reply rendered back
+  in the widget with no console errors. This unblocks the two items below
+  it, and unblocks selling Elliot as an "AI website assistant" rather than
+  just an email agent.
 - ⬜ **Marketing site** (separate repo:
   [`DonnovanRinomhota/Elliot-web`](https://github.com/DonnovanRinomhota/Elliot-web)
   -- intentionally kept out of this monorepo, not a stray duplicate). The
@@ -70,20 +65,17 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   workflow 08 exists and works, but it's plain-text paste only. No real
   PDF, brochure, or website ingestion yet, regardless of which source
   type you pick in the form.
-- 🟡 **AI Revenue / ROI dashboard.** Built: `tenants.avg_deal_value`
-  (tenant-set, Settings page) drives `get_revenue_dashboard_stats()`
+- ✅ **AI Revenue / ROI dashboard.** `tenants.avg_deal_value` (tenant-set,
+  Settings page) drives `get_revenue_dashboard_stats()`
   (`0024_revenue_dashboard_stats.sql`), showing estimated pipeline
   (qualified leads × avg deal value) and estimated closed value (converted
   leads × avg deal value) as a banner on the Overview page. Returns null
   estimates, not zero, until a tenant actually sets a value -- never
-  invents a number. Verified via `tsc --noEmit` and a full production
-  build; **not yet run against live Supabase data** -- run the migration
-  and confirm the numbers look right against real leads/appointments
-  before treating this as done. No currency field exists anywhere in the
-  schema, so the figure is shown unlabeled (assumed to match whatever the
-  tenant is thinking in) -- fine for a single-currency pilot, would need a
-  real currency field before this means anything with multiple tenants in
-  different countries.
+  invents a number. Verified live against real Supabase data. No currency
+  field exists anywhere in the schema, so the figure is shown unlabeled
+  (assumed to match whatever the tenant is thinking in) -- fine for a
+  single-currency pilot, would need a real currency field before this
+  means anything with multiple tenants in different countries.
 - ⬜ **Follow-up sequence configuration UI.** Sequences are still
   hand-authored via SQL (see `docs/workflow-specs/20-follow-up-sweep.md`);
   a run can still advance on schedule even if a pending draft wasn't
