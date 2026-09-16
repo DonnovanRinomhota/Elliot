@@ -14,11 +14,19 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
 
 ## Customer-facing channels
 
-- ⬜ **Web chat widget.** `apps/web-chat-widget` is still an empty
-  placeholder README. Nothing customer-facing exists yet -- the only way
-  to talk to Elliot right now is a raw webhook call. This is the single
-  biggest gap between "impressive backend" and "something you can put on
-  a client's site," and it blocks the two items below it.
+- ⬜ **Web chat widget** (`apps/web-chat-widget`, in this repo). The
+  embeddable chat bubble a client puts on *their own* website, for *their*
+  customers to talk to Elliot through. Still an empty placeholder README.
+  This is the one that blocks the two items below it, and blocks selling
+  Elliot as an "AI website assistant" rather than just an email agent.
+- ⬜ **Marketing site** (separate repo:
+  [`DonnovanRinomhota/Elliot-web`](https://github.com/DonnovanRinomhota/Elliot-web)
+  -- intentionally kept out of this monorepo, not a stray duplicate). The
+  public-facing site for *finding* clients -- not something a pilot
+  client's customers would ever touch. Currently one commit, README only,
+  nothing built. Doesn't block giving Elliot to a pilot client you already
+  have a relationship with; only matters for inbound/at-scale client
+  acquisition later.
 - ⬜ **Voice** (e.g. Retell or similar usage-based voice agent
   infrastructure). Not started. Depends on having a real always-on
   channel first, same underlying gap as the widget.
