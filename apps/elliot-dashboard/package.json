@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node -e \"require('fs').mkdirSync('public',{recursive:true});require('fs').copyFileSync('../web-chat-widget/widget.js','public/widget.js')\"",
+    "predev": "node -e \"require('fs').mkdirSync('public',{recursive:true});require('fs').copyFileSync('../web-chat-widget/widget.js','public/widget.js')\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

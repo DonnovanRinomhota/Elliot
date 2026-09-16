@@ -155,12 +155,12 @@ minimum, a hardcoded allow-list of auth user ids in the route.
 The dashboard's conversation detail page can send a reply as a human
 (`0023_manual_email_draft_rpc.sql`, `reply-form.tsx`) for `email`-channel
 conversations with a known contact email. It does *not* work for
-`chat_widget` conversations, and can't, without more built first:
-`apps/web-chat-widget` is an unbuilt placeholder (see its own README), and
-even once it exists, the current `chat` webhook (`01-main-ai-agent.json`'s
-trigger) is a one-shot synchronous request/response -- a visitor sends one
-message, gets one reply in the same HTTP call, and nothing is left
-listening afterward for a human reply to interrupt. Supporting takeover on
-chat_widget conversations needs the widget to exist *and* some kind of
-persistent connection (polling or Supabase Realtime) for it to receive a
-message that didn't come from its own request. Not started.
+`chat_widget` conversations, and can't yet, even though the widget itself
+(`apps/web-chat-widget`) is now built: the `chat` webhook
+(`01-main-ai-agent.json`'s trigger) is a one-shot synchronous
+request/response -- a visitor sends one message, gets one reply in the
+same HTTP call, and nothing is left listening afterward for a human reply
+to interrupt. Supporting takeover on chat_widget conversations needs some
+kind of persistent connection on the widget side (polling or Supabase
+Realtime) so it can receive a message that didn't come from its own
+request. Not started.

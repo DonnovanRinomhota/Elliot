@@ -14,11 +14,22 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
 
 ## Customer-facing channels
 
-- ⬜ **Web chat widget** (`apps/web-chat-widget`, in this repo). The
-  embeddable chat bubble a client puts on *their own* website, for *their*
-  customers to talk to Elliot through. Still an empty placeholder README.
-  This is the one that blocks the two items below it, and blocks selling
-  Elliot as an "AI website assistant" rather than just an email agent.
+- 🟡 **Web chat widget** (`apps/web-chat-widget`, in this repo). Built:
+  a single dependency-free `widget.js` (Shadow DOM, no framework runtime
+  required on the host site), matching the real `chat` webhook's request/
+  response contract. Unit-tested (jsdom + mocked fetch) covering mount,
+  send, conversation-id persistence/threading, network-failure handling,
+  and XSS-safety of rendered replies -- 30/30 assertions passing. Served
+  automatically at `apps/elliot-dashboard/public/widget.js` via a
+  `prebuild`/`predev` npm hook that copies the canonical source, so the
+  two can't silently drift out of sync.
+  **Not yet done:** CORS behavior against a real third-party origin has
+  not been verified live -- the `chat` webhook node has no explicit CORS
+  config, so this relies on n8n's default behavior. **Test this on an
+  actual client site (not localhost) before relying on it** -- see the
+  widget's own README for what to check and how to fix it if it fails.
+  Once that's confirmed, this unblocks human takeover and the items below
+  it working the way they were originally meant to.
 - ⬜ **Marketing site** (separate repo:
   [`DonnovanRinomhota/Elliot-web`](https://github.com/DonnovanRinomhota/Elliot-web)
   -- intentionally kept out of this monorepo, not a stray duplicate). The

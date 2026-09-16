@@ -32,11 +32,12 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   } | null;
 
   // "Reply as human" only makes sense where a reply can actually be delivered
-  // somewhere real. There is no live chat widget yet (apps/web-chat-widget is
-  // unbuilt) -- chat_widget conversations are one-shot request/response with
-  // nothing left listening on the other end, so a dashboard reply there would
-  // silently go nowhere. Email is async and has a real send pipeline
-  // (workflow 17 -> 15), so that's the only channel this supports today.
+  // somewhere real. chat_widget conversations are still one-shot request/
+  // response (the widget itself is built -- apps/web-chat-widget -- but the
+  // chat webhook has no persistent connection for a human reply to interrupt),
+  // so a dashboard reply there would silently go nowhere. Email is async and
+  // has a real send pipeline (workflow 17 -> 15), so that's the only channel
+  // this supports today. See KNOWN_ISSUES.md.
   const canReplyAsHuman = conversation.channel === "email" && !!contact?.email;
 
   const ROLE_LABEL: Record<string, string> = {
