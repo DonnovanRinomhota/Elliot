@@ -4,6 +4,9 @@
 `POST /webhook/ingest-document` — called manually (via curl/Postman) for Phase 3. A dashboard upload UI is a later phase.
 
 ## Inputs (JSON body)
+Two shapes, depending on `source_type`:
+
+**Pasted text** (`faq`, `manual_text`, `other`, or `pdf`):
 ```json
 {
   "tenant_slug": "zebra-dev",
@@ -12,23 +15,47 @@
   "text": "We are open Monday through Friday...\n\nOur pricing starts at..."
 }
 ```
-- `source_type` must be one of: `pdf`, `website`, `faq`, `manual_text`, `other` (matches the `documents` table constraint).
-- **Phase 3 scope is plain text only.** `text` is the actual content to ingest — pasted in directly, not a file upload. PDF text extraction and website scraping are explicitly NOT built yet (see "Known limitations" below).
+`pdf` is included here deliberately: this webhook never receives a raw PDF file. The dashboard's upload form extracts text from the PDF client-side (in the browser, via pdfjs-dist) and submits it through this same pasted-text contract with `source_type: 'pdf'` — this workflow has no PDF-parsing logic of its own.
+
+**Website** (`source_type: 'website'`):
+```json
+{
+  "tenant_slug": "zebra-dev",
+  "title": "About Us Page",
+  "source_type": "website",
+  "url": "https://example.com/about"
+}
+```
+The workflow fetches the URL itself and extracts readable text server-side — see "Website fetching" below.
+
+`source_type` must be one of: `pdf`, `website`, `faq`, `manual_text`, `other` (matches the `documents` table constraint).
 
 ## Nodes (in order)
 | Node | What it does |
 |---|---|
 | Ingest Webhook | Receives the POST |
-| Validate Input | Checks required fields and that `source_type` is a valid value |
+| Validate Input | Checks required fields; `text` required unless `source_type` is `website`, in which case `url` is required instead |
 | Resolve Tenant | Looks up tenant by slug (service-role credential, same pattern as the Main Agent) |
 | Merge Tenant | Combines resolved tenant_id with the input |
-| Create Document Row | Inserts into `documents` with `status = 'processing'` |
+| Is Website? | Branches on `source_type === 'website'` |
+| Fetch Website *(website branch only)* | GETs the URL as raw text/HTML, with a User-Agent header set (some sites reject requests without one) |
+| Extract Website Text *(website branch only)* | Dependency-free regex-based HTML-to-text extraction — see "Website fetching" below |
+| Resolve Content | Both branches converge here into one consistent `{tenant_id, title, source_type, source_url, text}` shape — see the design note below |
+| Create Document Row | Inserts into `documents` with `status = 'processing'`, including `source_url` (null for non-website sources) |
 | Chunk Text | Splits `text` into ~1000-character chunks on paragraph boundaries (see algorithm notes below) |
 | Embed Chunk (Voyage AI) | Calls Voyage's embeddings API once per chunk, `input_type: 'document'` |
 | Extract Chunk Embedding | Pulls the embedding vector out of Voyage's response |
 | Insert Chunk | Writes to `document_chunks` |
 | Mark Document Ready | Updates `documents.status = 'ready'` |
 | Respond to Webhook | Returns `{ document_id, status, chunks_created }` |
+
+## Website fetching — what it does and doesn't handle
+`Extract Website Text` is a regex-based HTML strip, not a real DOM parser — n8n's Code node sandbox has no guaranteed npm access for something like cheerio or jsdom. It removes `<script>`/`<style>` blocks and comments, turns block-level tags into line breaks, strips remaining tags, decodes a handful of common HTML entities, and collapses whitespace. This works reasonably well for FAQ/policy/about pages with real server-rendered HTML.
+
+**Known limitation, not hidden:** this will produce empty or garbled output on heavily JS-rendered pages (React/Vue single-page apps that render content client-side, after the initial HTML has already loaded) — a proper fix needs a headless browser (Puppeteer/Playwright), which is out of scope for an n8n Code node. Some sites will also block the fetch entirely (bot detection, login walls). If a website ingestion fails or comes back garbled, that's the likely cause — worth checking the source page's raw HTML (view-source) before assuming the extraction logic is broken.
+
+## Why "Resolve Content" exists as its own node
+Both paths (pasted text and website fetch) need to converge before `Create Document Row`, but relying on `$json` directly at that convergence point would be fragile — whichever branch actually ran determines what `$json` holds, and reading the wrong upstream node's output is exactly the class of bug already documented elsewhere in this codebase (a Postgres node's `RETURNING` clause replacing `$json`; see the lessons in `/areas/ai-business-assistant-platform.md`-style notes across other workflow specs). `Resolve Content` reads `tenant_id`/`title`/`source_type`/`url` from `Merge Tenant` specifically — always correct regardless of which branch ran — and only takes `text` from whatever fed into it. `Chunk Text` and `Create Document Row` both read from `Resolve Content`, not from `Merge Tenant` or `$json` directly, for the same reason.
 
 ## Chunking algorithm — tested, with a known limitation
 The chunker splits on blank lines (paragraph breaks) and merges paragraphs together up to ~1000 characters per chunk. Tested against 4 cases before shipping:
@@ -52,7 +79,8 @@ The chunker splits on blank lines (paragraph breaks) and merges paragraphs toget
 { "document_id": "…uuid…", "status": "ready", "chunks_created": 3 }
 ```
 
-## Known limitations (Phase 3 scope, not bugs)
-- No PDF or website ingestion — plain text only.
-- No de-duplication — re-ingesting the same content twice creates two separate documents with duplicate chunks.
+## Known limitations (still real, not fixed here)
+- Website extraction is regex-based, not a real DOM parser — see "Website fetching" above for what that does and doesn't handle.
+- PDF extraction happens client-side in the dashboard, not in this workflow — see the dashboard's `knowledge-form.tsx` for that logic and its own limitations (e.g. scanned/image-only PDFs with no real text layer).
+- No de-duplication — re-ingesting the same content (or re-fetching the same URL) twice creates two separate documents with duplicate chunks.
 - "Mark Document Ready" runs once per chunk (harmless but redundant) rather than once per document — a later cleanup, not a correctness issue since the update is idempotent.
