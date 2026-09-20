@@ -86,11 +86,25 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   (assumed to match whatever the tenant is thinking in) -- fine for a
   single-currency pilot, would need a real currency field before this
   means anything with multiple tenants in different countries.
-- ⬜ **Follow-up sequence configuration UI.** Sequences are still
-  hand-authored via SQL (see `docs/workflow-specs/20-follow-up-sweep.md`);
-  a run can still advance on schedule even if a pending draft wasn't
-  actually approved/sent yet. No dashboard page exists for a client to
-  configure their own Day 0 / Day 1 / Day 3 / Day 7 / Day 14 steps.
+- 🟡 **Follow-up sequence configuration UI** (`/dashboard/follow-ups`) --
+  create, edit, activate/deactivate, and delete sequences without SQL. Each
+  step is a day, subject, and message, saved in the same `steps` shape
+  workflow 20 reads. Only `{{contact_name}}` is substituted by the sweep, so
+  any other placeholder is rejected before saving (it would otherwise be sent
+  to the contact literally), and steps are saved sorted by day because the
+  sweep indexes them by position. Validation is unit-tested (`npm test` in
+  `apps/elliot-dashboard`, 14 cases) and the UI was exercised in a browser
+  with the Supabase calls intercepted (payload shapes, validation,
+  edit/toggle/delete) -- **not yet tested live** against the real database
+  with RLS, so this stays 🟡 until it is. Remaining gaps: nothing enrolls a
+  lead into a sequence automatically -- workflow 21 is still only reachable
+  by calling its webhook by hand, so a sequence created here sends nothing
+  until then; deactivating only blocks new enrolments, since the sweep
+  doesn't filter on `is_active` and in-flight runs finish; a run can still
+  advance on schedule even if a pending draft wasn't approved yet (unchanged,
+  see `docs/workflow-specs/20-follow-up-sweep.md`); and editing steps under
+  in-flight runs can skip or repeat a message, because runs track progress by
+  step position (the editor warns about this).
 
 ## Reliability (tracked in detail in `KNOWN_ISSUES.md`)
 

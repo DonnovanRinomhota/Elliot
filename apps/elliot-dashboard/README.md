@@ -37,9 +37,15 @@ Production, Preview, and Development.
   real email through the existing draft-approval pipeline (see
   `KNOWN_ISSUES.md` for why this doesn't work on `chat_widget`
   conversations yet).
-- **`/dashboard/knowledge`** — Add content to the tenant's knowledge base.
-  Plain pasted text only -- no PDF/website parsing yet, regardless of which
-  source type you pick in the form.
+- **`/dashboard/knowledge`** — Add content to the tenant's knowledge base
+  as pasted text, a PDF (parsed in the browser), or a website URL (fetched
+  and extracted server-side). Scanned/image-only PDFs and JavaScript-
+  rendered websites don't extract -- see
+  `docs/workflow-specs/08-knowledge-ingestion.md`.
+- **`/dashboard/follow-ups`** — Create, edit, activate/deactivate, and
+  delete follow-up sequences (the scheduled emails workflow 20 sends).
+  Writes `follow_up_sequences` directly under RLS. Starting a sequence for
+  a lead is still manual -- see `docs/workflow-specs/20-follow-up-sweep.md`.
 - **`/dashboard/onboarding`** — Create a new tenant, wrapping workflow 19.
   Gated to admins listed in `ADMIN_EMAILS`. The n8n webhook underneath
   still has no auth of its own -- see `KNOWN_ISSUES.md`.
