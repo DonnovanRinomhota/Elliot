@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Expected body: { tenant_slug, title, source_type, text }\n// Phase 3 scope: plain text content only (paste FAQ text, paste a policy doc, etc).\n// PDF/website extraction is a later phase -- flagged in the workflow spec, not built here.\nconst body = $input.first().json.body || {};\nfor (const f of ['tenant_slug', 'title', 'source_type', 'text']) {\n  if (!body[f]) throw new Error(`${f} is required`);\n}\nconst validTypes = ['pdf', 'website', 'faq', 'manual_text', 'other'];\nif (!validTypes.includes(body.source_type)) {\n  throw new Error(`source_type must be one of: ${validTypes.join(', ')}`);\n}\nreturn [{ json: body }];"
+        "jsCode": "// Expected body: { tenant_slug, title, source_type, text } for pasted content,\n// or { tenant_slug, title, source_type: 'website', url } for a website fetch.\n// PDF is handled client-side (the dashboard form extracts text from the PDF\n// in the browser before ever calling this webhook, using the same 'text'\n// contract as everything else) -- this workflow never sees a raw PDF file.\nconst body = $input.first().json.body || {};\nfor (const f of ['tenant_slug', 'title', 'source_type']) {\n  if (!body[f]) throw new Error(`${f} is required`);\n}\nconst validTypes = ['pdf', 'website', 'faq', 'manual_text', 'other'];\nif (!validTypes.includes(body.source_type)) {\n  throw new Error(`source_type must be one of: ${validTypes.join(', ')}`);\n}\nif (body.source_type === 'website') {\n  if (!body.url) throw new Error('url is required when source_type is website');\n  try { new URL(body.url); } catch { throw new Error('url is not a valid URL'); }\n} else if (!body.text) {\n  throw new Error('text is required');\n}\nreturn [{ json: body }];"
       },
       "id": "f69e1ae6-6eb6-4789-b400-4175d97f9c61",
       "name": "Validate Input",
@@ -69,10 +69,100 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "insert into documents (tenant_id, title, source_type, status) values ($1, $2, $3, 'processing') returning id as document_id;",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-is-website",
+              "leftValue": "={{ $json.source_type }}",
+              "rightValue": "website",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7ab560a6-3e36-4a42-8550-8db5ff423e42",
+      "name": "Is Website?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        796,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "method": "GET",
         "options": {
-          "queryReplacement": "={{ [$json.tenant_id, $json.title, $json.source_type] }}"
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000,
+          "headers": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "Mozilla/5.0 (compatible; ElliotBot/1.0)"
+              }
+            ]
+          }
+        }
+      },
+      "id": "fd50332e-edbb-4417-8755-5f9b32bbd296",
+      "name": "Fetch Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        -96
+      ],
+      "notes": "TODO after import: confirm in n8n's UI that Response Format is set to 'text'/'String' (not JSON) so the raw HTML lands as a string, not a parse error. A User-Agent header is set since some sites reject requests without one; some sites will still block this entirely (bot detection, login walls, JS-only rendering) -- that's a real, unfixed limitation of a simple server-side fetch, not a bug."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lightweight, dependency-free HTML-to-text extraction. n8n's Code node\n// sandbox has no guaranteed npm access for a real HTML parser (cheerio,\n// jsdom), so this is a regex-based strip rather than a proper DOM parse:\n// remove script/style blocks and comments, turn block-level tags into line\n// breaks, strip all remaining tags, decode a handful of common entities,\n// collapse excess whitespace. Good enough for FAQ/policy/about pages.\n// KNOWN LIMITATION, not hidden: this will produce empty or garbled output\n// on heavily JS-rendered pages (React/Vue SPAs that render client-side) --\n// a real fix needs a headless browser, out of scope for a Code node.\nconst html = String($json.data ?? $json.body ?? '');\nlet text = html\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<!--[\\s\\S]*?-->/g, ' ')\n  .replace(/<(br|\\/p|\\/div|\\/li|\\/h[1-6]|\\/tr)[^>]*>/gi, '\\n')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/gi, ' ')\n  .replace(/&amp;/gi, '&')\n  .replace(/&lt;/gi, '<')\n  .replace(/&gt;/gi, '>')\n  .replace(/&quot;/gi, '\"')\n  .replace(/&#39;/g, \"'\")\n  .replace(/[ \\t]+/g, ' ')\n  .replace(/\\n\\s*\\n\\s*\\n+/g, '\\n\\n')\n  .trim();\n\nif (!text) {\n  throw new Error('No readable text extracted from the URL -- the page may be JS-rendered, blocked this request, or returned no HTML.');\n}\n\nreturn [{ json: { text } }];"
+      },
+      "id": "c0336456-7600-4f59-a30d-f7a3e81306f5",
+      "name": "Extract Website Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1244,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Both the website branch (Extract Website Text) and the pasted-text branch\n// (Is Website? false output, still carrying Validate Input's original body)\n// converge here into one consistent shape. tenant_id/title/source_type/url\n// always come from Merge Tenant specifically -- not from whichever node\n// happens to be $json at this point -- same reasoning as every other place\n// in this codebase that reads a named upstream node instead of trusting\n// $json after a branch: a Postgres RETURNING clause isn't the only thing\n// that can leave $json holding the wrong shape, a branch merge can too.\nconst ctx = $('Merge Tenant').first().json;\nreturn [{ json: {\n  tenant_id: ctx.tenant_id,\n  title: ctx.title,\n  source_type: ctx.source_type,\n  source_url: ctx.source_type === 'website' ? ctx.url : null,\n  text: $json.text,\n}}];"
+      },
+      "id": "accca6e4-810f-41b0-98cc-a33e7e900daa",
+      "name": "Resolve Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1468,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into documents (tenant_id, title, source_type, source_url, status) values ($1, $2, $3, $4, 'processing') returning id as document_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.tenant_id, $json.title, $json.source_type, $json.source_url] }}"
         }
       },
       "id": "85490261-64bd-441d-bac3-0560ae05cadd",
@@ -80,7 +170,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        880,
+        1692,
         0
       ],
       "credentials": {
@@ -92,14 +182,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// Simple chunking: split on double-newlines (paragraphs), then merge small\n// paragraphs together up to a target size, so chunks aren't too tiny or too huge.\n// This is intentionally simple for Phase 3 -- a real implementation would use\n// sentence-aware splitting and overlap; flagged as a later improvement, not built now.\nconst ctx = $('Merge Tenant').first().json;\nconst doc = $('Create Document Row').first().json;\nconst TARGET_CHARS = 1000;\n\nconst paragraphs = ctx.text.split(/\\n\\s*\\n/).map(p => p.trim()).filter(Boolean);\nconst chunks = [];\nlet current = '';\nfor (const p of paragraphs) {\n  if ((current + '\\n\\n' + p).length > TARGET_CHARS && current) {\n    chunks.push(current);\n    current = p;\n  } else {\n    current = current ? current + '\\n\\n' + p : p;\n  }\n}\nif (current) chunks.push(current);\nif (!chunks.length) { throw new Error('No content to chunk -- text was empty after trimming'); }\n\nreturn chunks.map((content, i) => ({ json: {\n  tenant_id: ctx.tenant_id, document_id: doc.document_id, chunk_index: i, content\n}}));"
+        "jsCode": "// Simple chunking: split on double-newlines (paragraphs), then merge small\n// paragraphs together up to a target size, so chunks aren't too tiny or too huge.\n// This is intentionally simple for Phase 3 -- a real implementation would use\n// sentence-aware splitting and overlap; flagged as a later improvement, not built now.\nconst ctx = $('Resolve Content').first().json;\nconst doc = $('Create Document Row').first().json;\nconst TARGET_CHARS = 1000;\n\nconst paragraphs = ctx.text.split(/\\n\\s*\\n/).map(p => p.trim()).filter(Boolean);\nconst chunks = [];\nlet current = '';\nfor (const p of paragraphs) {\n  if ((current + '\\n\\n' + p).length > TARGET_CHARS && current) {\n    chunks.push(current);\n    current = p;\n  } else {\n    current = current ? current + '\\n\\n' + p : p;\n  }\n}\nif (current) chunks.push(current);\nif (!chunks.length) { throw new Error('No content to chunk -- text was empty after trimming'); }\n\nreturn chunks.map((content, i) => ({ json: {\n  tenant_id: ctx.tenant_id, document_id: doc.document_id, chunk_index: i, content\n}}));"
       },
       "id": "c154bc02-d8c0-4fb0-893c-b5210dbed290",
       "name": "Chunk Text",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1104,
+        1916,
         0
       ]
     },
@@ -274,7 +364,7 @@
       "main": [
         [
           {
-            "node": "Create Document Row",
+            "node": "Is Website?",
             "type": "main",
             "index": 0
           }
@@ -341,6 +431,57 @@
         [
           {
             "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Website?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Website",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolve Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Website": {
+      "main": [
+        [
+          {
+            "node": "Extract Website Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Website Text": {
+      "main": [
+        [
+          {
+            "node": "Resolve Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Content": {
+      "main": [
+        [
+          {
+            "node": "Create Document Row",
             "type": "main",
             "index": 0
           }

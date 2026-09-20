@@ -35,9 +35,10 @@ export default async function KnowledgePage() {
       <h1 className="mb-1 text-xl font-medium">Knowledge base</h1>
       <p className="mb-1 text-sm text-gray-500">Content Elliot draws on when answering FAQ / RAG questions.</p>
       <p className="mb-6 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        Plain text only for now -- paste content in directly. There&apos;s no PDF or website parsing yet
-        (08-knowledge-ingestion.json&apos;s own validation comment confirms this is Phase 3 scope). The source
-        type below is for your own categorization only; it doesn&apos;t change how the text is processed.
+        PDFs are parsed in your browser before upload; websites are fetched and extracted server-side.
+        Neither handles everything -- scanned/image-only PDFs need OCR (not built), and heavily
+        JavaScript-rendered websites won&apos;t extract cleanly (needs a headless browser, not built). See
+        each option&apos;s own note below for what to expect.
       </p>
       <KnowledgeForm tenantSlug={tenant.slug} />
     </div>
