@@ -4,7 +4,8 @@
 `follow_up_sequences`/`follow_up_runs` have existed in the schema since Phase 1 with nothing driving them. The sweep engine (20) processes runs that already exist — but nothing created a `follow_up_runs` row either, so on its own the sweep would have nothing to ever act on. Workflow 21 is the missing piece: it's how a sequence actually gets started for a specific lead.
 
 ## What this does NOT solve
-- **`follow_up_sequences` themselves are still hand-authored via SQL.** No UI or endpoint creates them — same "not truly self-serve" limitation as workflow 19, for the same reason (out of scope to build a full authoring UI right now). Steps look like:
+- **Nothing enrolls leads into a sequence automatically.** Workflow 21 is only reachable by calling its webhook by hand, so a sequence sends nothing until a run has been started for a lead. This is the main remaining gap in the follow-up feature.
+- **Sequences are authored in the dashboard (`/dashboard/follow-ups`).** It reads and writes `follow_up_sequences` directly under RLS, with no n8n webhook involved. Hand-authoring via SQL still works. Steps look like:
   ```json
   [
     { "day_offset": 0, "channel": "email", "subject": "Great speaking with you", "body": "Hi {{contact_name}}, ..." },
@@ -12,6 +13,9 @@
   ]
   ```
   Note: this is a literal `subject`/`body`-per-step shape, not the `template` key name shown in migration `0005`'s original comment — a deliberate simplification (see "Design decisions" below).
+  What the dashboard enforces before saving, because of how the sweep reads `steps`: steps are saved sorted by `day_offset` (runs track progress by array position, so order is load-bearing); each step needs its own day (0 to 365); `subject` and `body` are required; and only `{{contact_name}}` is allowed as a placeholder, since anything else would be sent to the contact as written. `channel` is always saved as `"email"`; the sweep doesn't read it. `day_offset` counts from when the run started, not from the previous step.
+- **Deactivating a sequence only blocks new runs.** Workflow 21 checks `is_active`, but the sweep's due-runs query doesn't, so runs already in progress finish (or stop when the contact replies). The dashboard says so on the card.
+- **Editing steps under in-flight runs can skip or repeat a message.** Runs store `current_step_index`, so inserting or removing a step ahead of that index shifts what "next" means. Appending steps at the end is safe. The editor warns when a sequence has runs in progress.
 - **Advancing the sequence doesn't wait for actual approval/send.** If a step lands in `email_drafts` as `pending` (approval-required mode) and a human hasn't approved it yet, the *next* step still gets scheduled on time regardless. Drafts can pile up in the approvals queue while the sequence keeps marching forward. Documented, not silently hidden — fixing it properly would mean editing workflow `15` (already live in production) to report back when a send actually happens, which is out of scope here.
 - **Autonomous send has the same single-shared-Gmail-credential limitation as everywhere else** in this codebase (15/16/18) — one workflow-level credential, not dynamic per-tenant resolution.
 
