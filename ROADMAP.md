@@ -61,10 +61,20 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   `ADMIN_EMAILS` (`lib/admin.ts`), nav link hidden for everyone else.
   Remaining gap: the underlying n8n webhook itself still has no auth of
   its own -- see `KNOWN_ISSUES.md`.
-- 🟡 **Knowledge base upload** (`/dashboard/knowledge`) -- form wrapping
-  workflow 08 exists and works, but it's plain-text paste only. No real
-  PDF, brochure, or website ingestion yet, regardless of which source
-  type you pick in the form.
+- 🟡 **Knowledge base upload** (`/dashboard/knowledge`) -- PDF and website
+  ingestion are now built (PR #32). PDFs are parsed client-side in the
+  browser via `pdfjs-dist` and submitted through the same pasted-text
+  contract as before; website ingestion sends a `url` and workflow 08
+  fetches and extracts readable text server-side (new `Is Website?` /
+  `Fetch Website` / `Extract Website Text` / `Resolve Content` nodes,
+  `documents.source_url` now populated). Verified so far: production
+  build passes and all workflow JSONs re-validated -- **not yet tested
+  live** with a real PDF or a real URL end to end, so this stays 🟡 until
+  it is. Known gaps, documented in
+  `docs/workflow-specs/08-knowledge-ingestion.md`: scanned/image-only PDFs
+  fail (no OCR); website extraction is regex-based and breaks on
+  JS-rendered pages (would need a headless browser); no de-duplication, so
+  re-ingesting the same content creates duplicate documents and chunks.
 - ✅ **AI Revenue / ROI dashboard.** `tenants.avg_deal_value` (tenant-set,
   Settings page) drives `get_revenue_dashboard_stats()`
   (`0024_revenue_dashboard_stats.sql`), showing estimated pipeline
