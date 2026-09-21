@@ -61,20 +61,26 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   `ADMIN_EMAILS` (`lib/admin.ts`), nav link hidden for everyone else.
   Remaining gap: the underlying n8n webhook itself still has no auth of
   its own -- see `KNOWN_ISSUES.md`.
-- 🟡 **Knowledge base upload** (`/dashboard/knowledge`) -- PDF and website
-  ingestion are now built (PR #32). PDFs are parsed client-side in the
+- ✅ **Knowledge base upload** (`/dashboard/knowledge`) -- pasted text, PDF,
+  and website ingestion (PR #32). PDFs are parsed client-side in the
   browser via `pdfjs-dist` and submitted through the same pasted-text
   contract as before; website ingestion sends a `url` and workflow 08
   fetches and extracts readable text server-side (new `Is Website?` /
   `Fetch Website` / `Extract Website Text` / `Resolve Content` nodes,
-  `documents.source_url` now populated). Verified so far: production
-  build passes and all workflow JSONs re-validated -- **not yet tested
-  live** with a real PDF or a real URL end to end, so this stays 🟡 until
-  it is. Known gaps, documented in
-  `docs/workflow-specs/08-knowledge-ingestion.md`: scanned/image-only PDFs
-  fail (no OCR); website extraction is regex-based and breaks on
-  JS-rendered pages (would need a headless browser); no de-duplication, so
-  re-ingesting the same content creates duplicate documents and chunks.
+  `documents.source_url` populated). Tested live 2026-09-21 end to end
+  against the real stack (dashboard, n8n, Voyage, Supabase): a real PDF and
+  a real URL were ingested, chunks were stored with embeddings, and the
+  chat assistant answered from the ingested content. The extraction,
+  chunking, and website-stripping logic was also checked ahead of that
+  against purpose-built test files (multi-page PDF with Polish characters,
+  an image-only PDF, and an HTML page with script/style/comment markers).
+  Known gaps, documented in `docs/workflow-specs/08-knowledge-ingestion.md`:
+  scanned/image-only PDFs fail (no OCR); website extraction is regex-based
+  and breaks on JS-rendered pages (would need a headless browser); no
+  de-duplication, so re-ingesting the same content creates duplicate
+  documents and chunks; and a run that fails partway (for example n8n's
+  execution limit or a Voyage error) leaves the document stuck in
+  `processing` rather than marking it `failed`.
 - ✅ **AI Revenue / ROI dashboard.** `tenants.avg_deal_value` (tenant-set,
   Settings page) drives `get_revenue_dashboard_stats()`
   (`0024_revenue_dashboard_stats.sql`), showing estimated pipeline
@@ -86,25 +92,30 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   (assumed to match whatever the tenant is thinking in) -- fine for a
   single-currency pilot, would need a real currency field before this
   means anything with multiple tenants in different countries.
-- 🟡 **Follow-up sequence configuration UI** (`/dashboard/follow-ups`) --
+- ✅ **Follow-up sequence configuration UI** (`/dashboard/follow-ups`) --
   create, edit, activate/deactivate, and delete sequences without SQL. Each
   step is a day, subject, and message, saved in the same `steps` shape
   workflow 20 reads. Only `{{contact_name}}` is substituted by the sweep, so
   any other placeholder is rejected before saving (it would otherwise be sent
   to the contact literally), and steps are saved sorted by day because the
   sweep indexes them by position. Validation is unit-tested (`npm test` in
-  `apps/elliot-dashboard`, 14 cases) and the UI was exercised in a browser
-  with the Supabase calls intercepted (payload shapes, validation,
-  edit/toggle/delete) -- **not yet tested live** against the real database
-  with RLS, so this stays 🟡 until it is. Remaining gaps: nothing enrolls a
-  lead into a sequence automatically -- workflow 21 is still only reachable
-  by calling its webhook by hand, so a sequence created here sends nothing
-  until then; deactivating only blocks new enrolments, since the sweep
-  doesn't filter on `is_active` and in-flight runs finish; a run can still
-  advance on schedule even if a pending draft wasn't approved yet (unchanged,
-  see `docs/workflow-specs/20-follow-up-sweep.md`); and editing steps under
-  in-flight runs can skip or repeat a message, because runs track progress by
-  step position (the editor warns about this).
+  `apps/elliot-dashboard`, 14 cases), the UI was exercised in a browser with
+  the Supabase calls intercepted, and it was tested live 2026-09-21 end to
+  end against the real database with RLS: a sequence created and edited in
+  the dashboard, a test lead enrolled through workflow 21, and the sweep run
+  against it. Known behaviours, all documented in
+  `docs/workflow-specs/20-follow-up-sweep.md`: deactivating only blocks new
+  enrolments, since the sweep doesn't filter on `is_active` and in-flight
+  runs finish; a run can still advance on schedule even if a pending draft
+  wasn't approved yet; and editing steps under in-flight runs can skip or
+  repeat a message, because runs track progress by step position (the
+  editor warns about this).
+- ⬜ **Automatic follow-up enrolment.** Nothing starts a follow-up run for a
+  lead: workflow 21 is only reachable by calling its webhook by hand, so the
+  sequences configured at `/dashboard/follow-ups` send nothing until a lead
+  is enrolled. Candidate approaches: a "Start follow-up" action on the lead
+  card, and/or enrolling a lead automatically when it reaches a chosen
+  stage. Not started.
 
 ## Reliability (tracked in detail in `KNOWN_ISSUES.md`)
 
