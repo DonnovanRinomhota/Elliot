@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const PUBLIC_AUTH_ROUTES = ["/login", "/forgot-password", "/reset-password"];
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } });
 
@@ -32,6 +34,9 @@ export async function middleware(request: NextRequest) {
   if (isDashboardRoute && !user) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
+  // Only /login bounces a signed-in user away. /reset-password stays
+  // reachable even when signed in -- someone can land there from an emailed
+  // recovery link while already having an active session.
   if (isLoginRoute && user) {
     return NextResponse.redirect(new URL("/dashboard/approvals", request.url));
   }
@@ -39,6 +44,10 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
+// NOTE: Next.js statically analyzes `matcher` at build time -- it must be a
+// literal array, not built from PUBLIC_AUTH_ROUTES via spread/map (that
+// silently falls back to matching every route instead of erroring, so this
+// is worth getting right rather than "cleaning up" later).
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"],
+  matcher: ["/dashboard/:path*", "/login", "/forgot-password", "/reset-password"],
 };
