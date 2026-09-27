@@ -1,0 +1,149 @@
+{
+  "name": "28 - Manual Send WhatsApp Draft",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-approved-whatsapp-draft",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2d4af539-1c51-4753-aac9-66f8ef33497b",
+      "name": "Send WhatsApp Draft Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        0
+      ],
+      "notes": "Mirrors workflow 17 exactly (same bare pass-through, same lack of tenant-ownership check on the draft -- see 17's spec for why that's an acceptable scope given who's expected to call it: the dashboard's own Approve button)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.draft_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5a5de1cd-2849-445c-9dda-1077b59f5c98",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "171fa894c0614981",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/171fa894c0614981"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "draft_id": "={{ $json.body.draft_id }}",
+            "auto": false
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "7d4f9226-c402-4c3d-9484-56a3d54264f8",
+      "name": "Execute: Send Approved WhatsApp",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -280,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, draft_id: $('Validate Input').first().json.body.draft_id }) }}",
+        "options": {}
+      },
+      "id": "ba58d929-f07c-4f0b-9e12-593841ef6ee0",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -20,
+        -100
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Send WhatsApp Draft Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Execute: Send Approved WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Send Approved WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "fd5e320f-b9cf-49d9-a93a-9721d41f4c5c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "PLACEHOLDER_SET_ON_IMPORT"
+  },
+  "nodeGroups": [],
+  "id": "71ce908aa80a468d",
+  "tags": []
+}

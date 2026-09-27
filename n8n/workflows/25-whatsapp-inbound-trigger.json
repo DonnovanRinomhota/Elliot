@@ -1,0 +1,597 @@
+{
+  "name": "25 - WhatsApp Inbound Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "44250d65-c9c9-484a-bd9e-547a96116266",
+      "name": "WhatsApp Verify (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1400,
+        -200
+      ],
+      "notes": "Meta calls this once when you register the webhook URL in the Meta App dashboard, and again any time you re-verify. Must echo back hub.challenge as plain text if hub.verify_token matches WHATSAPP_VERIFY_TOKEN."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta's verification handshake: GET ?hub.mode=subscribe&hub.verify_token=...&hub.challenge=...\n// Query params with dots arrive as literal keys (not nested objects) on n8n's webhook node.\nconst q = $json.query || {};\nconst expected = $env.WHATSAPP_VERIFY_TOKEN || '';\nconst ok = q['hub.mode'] === 'subscribe' && expected && q['hub.verify_token'] === expected;\nreturn [{ json: { ok, challenge: q['hub.challenge'] || '' } }];"
+      },
+      "id": "d6763df3-c5f0-4582-9330-c521b5f3d67d",
+      "name": "Check Verify Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -1140,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d1ca8c3c-0787-4353-b7df-63046b0e1a08",
+      "name": "Verify OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {}
+      },
+      "id": "adab97eb-f41f-4bc7-9501-2d17d9f60165",
+      "name": "Respond Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -620,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Verification failed",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "56e7ca37-7b2f-484c-92d6-f9e3c8052a0e",
+      "name": "Respond Verify Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -620,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7e9a6e72-d746-4062-a6bd-9f42d20fd0ff",
+      "name": "WhatsApp Webhook (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1400,
+        200
+      ],
+      "notes": "Same path as the GET verify node above -- n8n registers them as separate routes because the HTTP method differs. NOT SIGNATURE-VERIFIED YET: Meta signs this body with X-Hub-Signature-256 (HMAC-SHA256 using the Meta App Secret); this workflow doesn't check it, so anyone who discovers this URL could POST a forged message. Same class of gap as the tenant-onboarding webhook -- see KNOWN_ISSUES.md. Add signature verification before relying on this beyond a sandbox test number."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'received' }) }}",
+        "options": {}
+      },
+      "id": "853e46ad-fa4a-4256-8dfb-441e85edfef1",
+      "name": "Respond Ack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -1140,
+        80
+      ],
+      "notes": "Meta expects a fast 200 regardless of what's inside -- retries aggressively (and eventually disables the webhook) if it doesn't get one quickly. Responds immediately; processing continues on the other output."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta's Cloud API webhook shape:\n// { entry: [{ changes: [{ value: { metadata: { phone_number_id }, contacts: [{ profile: { name }, wa_id }], messages: [{ from, id, timestamp, type, text: { body } }] } }] }] }\n// The SAME path also receives delivery/read \"statuses\" updates with no \"messages\" key at all --\n// those aren't a customer message and must be skipped, not treated as an empty one.\n// Non-text messages (image/audio/location/etc.) are also not handled yet -- flagged skip so a caller\n// isn't shown a blank reply. Building real media support (download from Meta's media URL, store it,\n// let Claude look at it) is future work, not done here.\nconst body = $json.body || $json;\nconst value = body?.entry?.[0]?.changes?.[0]?.value;\nconst message = value?.messages?.[0];\n\nif (!value || !message) {\n  return [{ json: { skip: true, reason: !value ? 'no_value' : 'no_message_key_(status_update)' } }];\n}\nif (message.type !== 'text') {\n  return [{ json: { skip: true, reason: 'unsupported_message_type', message_type: message.type,\n                     phone_number_id: value.metadata?.phone_number_id, from: message.from } }];\n}\n\nreturn [{ json: {\n  skip: false,\n  phone_number_id: value.metadata?.phone_number_id || '',\n  from_wa_id: message.from || '',\n  contact_name: value.contacts?.[0]?.profile?.name || null,\n  wa_message_id: message.id || '',\n  message_timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),\n  body: message.text?.body || ''\n} }];"
+      },
+      "id": "29b1e9ff-d74e-4c09-9813-aea51cd49520",
+      "name": "Extract WhatsApp Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -1140,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "58ea220d-5e59-4e1e-a358-2c3995a726b5",
+      "name": "Should Process?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": "ai_config",
+        "where": {
+          "values": [
+            {
+              "column": "whatsapp_phone_number_id",
+              "value": "={{ $json.phone_number_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "af56d21c-6aa1-4d7d-954c-904e3728eb24",
+      "name": "Lookup Tenant by Phone Number Id",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -620,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tenant_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d481da57-687d-41e9-b910-45bfd2d76b7d",
+      "name": "If Tenant Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "audit_log",
+          "mode": "list",
+          "cachedResultName": "audit_log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": null,
+            "actor_type": "system",
+            "event_type": "whatsapp_unmatched_phone_number_id",
+            "details": "={{ JSON.stringify({ phone_number_id: $('Extract WhatsApp Fields').first().json.phone_number_id, from_wa_id: $('Extract WhatsApp Fields').first().json.from_wa_id }) }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "edebe6c2-0784-4641-9192-333dc9f77c10",
+      "name": "Log Unmatched Number",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -100,
+        420
+      ],
+      "notes": "Improves on 16's known gap (a misconfigured connected_gmail_address silently drops the email with no trace). Here a message for a phone_number_id no tenant has configured is at least logged, not just dropped."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into contacts (tenant_id, phone, name, source)\nvalues ($1, $2, $3, 'whatsapp')\non conflict (tenant_id, phone)\ndo update set phone = excluded.phone,\n              name = coalesce(contacts.name, excluded.name)\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [ $('Lookup Tenant by Phone Number Id').first().json.tenant_id, $('Extract WhatsApp Fields').first().json.from_wa_id, $('Extract WhatsApp Fields').first().json.contact_name ] }}"
+        }
+      },
+      "id": "5bf8f29e-2bf4-472b-b78b-1060e61472c5",
+      "name": "Upsert Contact",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -100,
+        220
+      ],
+      "notes": "Keeps an existing name rather than overwriting it with WhatsApp's profile name on every message -- a contact who already gave a fuller name via email/chat shouldn't have it clobbered by whatever they set as their WhatsApp display name."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Same pattern as 16's \"Get or Create Conversation (Email)\": one conversation per\n-- (tenant, contact, channel), reused forever, not split by status or thread.\n-- WhatsApp has no thread id to match on the way email has gmail_thread_id --\n-- a contact's phone number IS the thread, so matching on contact_id is enough.\nwith existing as (\n  select id from conversations\n  where tenant_id = $1 and contact_id = $2 and channel = 'whatsapp'\n  limit 1\n),\ninserted as (\n  insert into conversations (tenant_id, contact_id, channel)\n  select $1, $2, 'whatsapp'\n  where not exists (select 1 from existing)\n  returning id\n)\nselect id from existing\nunion all\nselect id from inserted;",
+        "options": {
+          "queryReplacement": "={{ [ $('Lookup Tenant by Phone Number Id').first().json.tenant_id, $json.id ] }}"
+        }
+      },
+      "id": "edf0af83-57d8-40aa-a970-1599b5877886",
+      "name": "Get or Create Conversation (WhatsApp)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        160,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "messages",
+          "mode": "list",
+          "cachedResultName": "messages"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Lookup Tenant by Phone Number Id').first().json.tenant_id }}",
+            "conversation_id": "={{ $json.id }}",
+            "role": "user",
+            "content": "={{ $('Extract WhatsApp Fields').first().json.body }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "55ccc918-1675-46cd-8f4a-5c2781b33002",
+      "name": "Insert Inbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        420,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "d8BdZ5LChDnL52Bg",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/d8BdZ5LChDnL52Bg"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Lookup Tenant by Phone Number Id').first().json.tenant_id }}",
+            "from_email": "={{ $('Extract WhatsApp Fields').first().json.from_wa_id }}",
+            "subject": "",
+            "body": "={{ $('Extract WhatsApp Fields').first().json.body }}",
+            "gmail_thread_id": "",
+            "gmail_message_id": ""
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "a0fa7d1b-5574-4d68-bfe9-65f07af48a5f",
+      "name": "Execute: Classify (reused)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        220
+      ],
+      "notes": "Workflow 13 is reused as-is (no WhatsApp-specific classifier) -- its 6 categories and prompt are channel-agnostic in substance, it just calls its input parameter 'from_email' and 'subject'/'gmail_*' regardless of what channel actually sent the message. Passing from_wa_id as from_email and empty strings for the email-only fields works because 13 never uses gmail_thread_id/gmail_message_id itself -- it only classifies subject+body. Cosmetic, not a functional risk."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "10bd75f4382a4938",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/10bd75f4382a4938"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Lookup Tenant by Phone Number Id').first().json.tenant_id }}",
+            "conversation_id": "={{ $('Get or Create Conversation (WhatsApp)').first()?.json?.id || null }}",
+            "contact_id": "={{ $('Upsert Contact').first()?.json?.id || null }}",
+            "to_wa_id": "={{ $('Extract WhatsApp Fields').first().json.from_wa_id }}",
+            "phone_number_id": "={{ $('Lookup Tenant by Phone Number Id').first().json.whatsapp_phone_number_id }}",
+            "wa_message_id": "={{ $('Extract WhatsApp Fields').first().json.wa_message_id }}",
+            "last_inbound_at": "={{ $('Extract WhatsApp Fields').first().json.message_timestamp }}",
+            "body": "={{ $('Extract WhatsApp Fields').first().json.body }}",
+            "category": "={{ $json.category }}",
+            "confidence": "={{ $json.confidence }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "71a02ca8-8880-4f78-a8d5-7e5509b061a6",
+      "name": "Execute: Draft WhatsApp Reply",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        940,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Verify (GET)": {
+      "main": [
+        [
+          {
+            "node": "Check Verify Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Verify Token": {
+      "main": [
+        [
+          {
+            "node": "Verify OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify OK?": {
+      "main": [
+        [
+          {
+            "node": "Respond Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Verify Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Webhook (POST)": {
+      "main": [
+        [
+          {
+            "node": "Respond Ack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract WhatsApp Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract WhatsApp Fields": {
+      "main": [
+        [
+          {
+            "node": "Should Process?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Process?": {
+      "main": [
+        [
+          {
+            "node": "Lookup Tenant by Phone Number Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Tenant by Phone Number Id": {
+      "main": [
+        [
+          {
+            "node": "If Tenant Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Tenant Found": {
+      "main": [
+        [
+          {
+            "node": "Upsert Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Unmatched Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Contact": {
+      "main": [
+        [
+          {
+            "node": "Get or Create Conversation (WhatsApp)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get or Create Conversation (WhatsApp)": {
+      "main": [
+        [
+          {
+            "node": "Insert Inbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Inbound Message": {
+      "main": [
+        [
+          {
+            "node": "Execute: Classify (reused)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Classify (reused)": {
+      "main": [
+        [
+          {
+            "node": "Execute: Draft WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "dffb60b7-28e7-4efc-a469-0c4091ee431a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "PLACEHOLDER_SET_ON_IMPORT"
+  },
+  "nodeGroups": [],
+  "id": "c717b861ba05425f",
+  "tags": []
+}

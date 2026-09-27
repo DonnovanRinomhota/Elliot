@@ -1,0 +1,472 @@
+{
+  "name": "27 - Send Approved WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "draft_id"
+            },
+            {
+              "name": "auto",
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "id": "a05afcd8-365c-4f37-8f44-b6079e783971",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": "whatsapp_drafts",
+        "where": {
+          "values": [
+            {
+              "column": "id",
+              "value": "={{ $json.draft_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b2170774-4988-472a-a550-ef940ce64c99",
+      "name": "Load Draft",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1340,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "sent",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9b270483-a4ee-4ae2-bd2f-1f6a6bab647e",
+      "name": "If Not Already Sent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// WhatsApp's free-form messaging window: Meta only allows a business to send a plain-text reply\n// within 24 hours of the customer's last message. Outside that window Meta rejects the send\n// (error 131047) unless it's a pre-approved template message -- which isn't built yet (see this\n// workflow's spec). Checked here at SEND time, not draft time, because a human can sit on an\n// approval for longer than 24 hours -- the window may have already closed by the time they click Approve.\nconst d = $json;\nconst hoursSince = (Date.now() - new Date(d.last_inbound_at).getTime()) / 36e5;\nreturn [{ json: { ...d, within_window: hoursSince < 24, hours_since_last_inbound: hoursSince } }];"
+      },
+      "id": "d707f53f-0de8-48a9-9109-ad0d8072e557",
+      "name": "Check 24h Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -820,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.within_window }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cc6e7536-7966-47f2-a547-def01638e2c5",
+      "name": "Within 24h Window?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update whatsapp_drafts set status = 'blocked_needs_template' where id = $1 returning *;",
+        "options": {
+          "queryReplacement": "={{ [ $('Load Draft').first().json.id ] }}"
+        }
+      },
+      "id": "e1c94215-ff2d-4950-9401-65a9ce7863d1",
+      "name": "Update Draft Status (Blocked)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -300,
+        160
+      ],
+      "notes": "Template-message sending (the only legal way to message someone outside the 24h window) isn't built. This just marks the draft so it shows up distinctly in Approvals instead of silently failing or retrying forever -- see docs/workflow-specs/27-send-approved-whatsapp.md."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v20.0/' + $json.phone_number_id + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.to_wa_id, type: 'text', text: { body: $json.body } }) }}",
+        "options": {}
+      },
+      "id": "a63c769b-d198-4dc7-8ba6-bfa6524f3fe3",
+      "name": "Send via WhatsApp API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -300,
+        -140
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_CRED_ID",
+          "name": "WhatsApp Cloud API token"
+        }
+      },
+      "notes": "TODO: set the real credential -- an HTTP Header Auth credential named e.g. \"WhatsApp Cloud API token\" with header name \"Authorization\" and value \"Bearer <your Meta system-user access token>\". One credential covers every tenant's number (see migration 0025's comment on ai_config.whatsapp_phone_number_id) -- only the URL's phone_number_id needs to vary per tenant, not the token."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Same Execute Query workaround as 15's \"Update Draft Status (Sent)\" -- n8n's Postgres v2\n-- \"Update\" operation has known parameter-binding bugs. Don't \"simplify\" this back to it.\nupdate whatsapp_drafts\nset status = $2,\n    sent_at = $3\nwhere id = $1\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ [ $('Load Draft').first().json.id, $('When Executed by Another Workflow').first().json.auto ? 'auto_sent' : 'sent', $now.toISO() ] }}"
+        }
+      },
+      "id": "cf368d39-5c02-487f-9d08-da8dd38c168c",
+      "name": "Update Draft Status (Sent)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -40,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8aa9826a-fa76-4c4e-a71c-5939a4102f3a",
+              "leftValue": "={{ $('Load Draft').first().json.conversation_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "34116b7b-d55c-43a4-89f0-16b632d4e41a",
+      "name": "If Conversation Id Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        220,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "messages",
+          "mode": "list",
+          "cachedResultName": "messages"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Load Draft').first().json.tenant_id }}",
+            "conversation_id": "={{ $('Load Draft').first().json.conversation_id }}",
+            "role": "assistant",
+            "content": "={{ $('Load Draft').first().json.body }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "07b15565-30fb-4d13-875d-02d41160fb66",
+      "name": "Insert Outbound Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        480,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ba93af32-7b3e-48be-858e-1f2e6a9445f9",
+              "leftValue": "={{ $('Load Draft').first().json.proposed_appointment !== null && $('Load Draft').first().json.proposed_appointment !== undefined }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ba867467-747e-4fbc-b203-d9c6582a90ad",
+      "name": "If Proposed Appointment Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        740,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "VNROj5sGjnwdFidx",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/VNROj5sGjnwdFidx"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Load Draft').first().json.tenant_id }}",
+            "contact_id": "={{ $('Load Draft').first().json.contact_id }}",
+            "starts_at": "={{ $('Load Draft').first().json.proposed_appointment.starts_at }}",
+            "ends_at": "={{ $('Load Draft').first().json.proposed_appointment.ends_at }}",
+            "notes": "Booked via WhatsApp confirmation"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "0eca6e2c-9d9c-4627-9038-956c3218b18a",
+      "name": "Execute: Book Appointment",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1000,
+        -140
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Draft": {
+      "main": [
+        [
+          {
+            "node": "If Not Already Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Not Already Sent": {
+      "main": [
+        [
+          {
+            "node": "Check 24h Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check 24h Window": {
+      "main": [
+        [
+          {
+            "node": "Within 24h Window?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Within 24h Window?": {
+      "main": [
+        [
+          {
+            "node": "Send via WhatsApp API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Draft Status (Blocked)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via WhatsApp API": {
+      "main": [
+        [
+          {
+            "node": "Update Draft Status (Sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Draft Status (Sent)": {
+      "main": [
+        [
+          {
+            "node": "If Conversation Id Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Conversation Id Exists": {
+      "main": [
+        [
+          {
+            "node": "Insert Outbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Outbound Message": {
+      "main": [
+        [
+          {
+            "node": "If Proposed Appointment Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Proposed Appointment Exists": {
+      "main": [
+        [
+          {
+            "node": "Execute: Book Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "49bce046-ee97-4868-be34-b9d935c7be25",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "PLACEHOLDER_SET_ON_IMPORT"
+  },
+  "nodeGroups": [],
+  "id": "171fa894c0614981",
+  "tags": []
+}
