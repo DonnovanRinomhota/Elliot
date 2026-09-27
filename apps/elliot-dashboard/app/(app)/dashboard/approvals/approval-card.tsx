@@ -4,10 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+// channel decides which table/RPC/send-webhook this card talks to --
+// email_drafts + approve_email_draft() + NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL,
+// or whatsapp_drafts + approve_whatsapp_draft() +
+// NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL. Two sibling tables, not one --
+// see migration 0025's header comment for why.
 type Draft = {
   id: string;
-  to_email: string;
-  subject: string | null;
+  channel: "email" | "whatsapp";
+  to_email?: string; // email only
+  to_wa_id?: string; // whatsapp only
+  subject?: string | null; // email only -- whatsapp has no subject line
   body: string;
   category: string;
   confidence: string | number;
@@ -20,6 +27,9 @@ const STATUS_BADGE: Record<string, string> = {
   auto_sent: "bg-violet-50 text-violet-600",
   approved: "bg-pulse-soft text-pulse-dark",
   rejected: "bg-coral-soft text-coral-dark",
+  // Only ever set on a whatsapp_drafts row -- see
+  // docs/workflow-specs/27-send-approved-whatsapp.md ("the 24-hour window").
+  blocked_needs_template: "bg-coral-soft text-coral-dark",
 };
 
 export default function ApprovalCard({ draft }: { draft: Draft }) {
@@ -47,16 +57,24 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
     return tenantUser?.id ?? null;
   }
 
+  const isWhatsapp = draft.channel === "whatsapp";
+  const approveRpc = isWhatsapp ? "approve_whatsapp_draft" : "approve_email_draft";
+  const rejectRpc = isWhatsapp ? "reject_whatsapp_draft" : "reject_email_draft";
+  const sendWebhookUrl = isWhatsapp
+    ? process.env.NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL
+    : process.env.NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL;
+
   async function handleApprove() {
     setBusy(true);
     setError(null);
 
     const reviewedBy = await getTenantUserId();
 
-    // approve_email_draft() marks the row approved and optionally overwrites the
-    // body with an edited version. It does NOT send the email itself -- that's
-    // workflow 15's job, triggered next via the n8n webhook below.
-    const { error: rpcError } = await supabase.rpc("approve_email_draft", {
+    // approve_*_draft() marks the row approved and optionally overwrites the
+    // body with an edited version. It does NOT send anything itself -- that's
+    // workflow 27 (WhatsApp) or 15 (email)'s job, triggered next via the
+    // matching n8n webhook below.
+    const { error: rpcError } = await supabase.rpc(approveRpc, {
       p_draft_id: draft.id,
       p_reviewed_by: reviewedBy,
       p_edited_body: isEditing ? editedBody : null,
@@ -68,8 +86,18 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
       return;
     }
 
+    if (!sendWebhookUrl) {
+      setError(
+        isWhatsapp
+          ? "Approved, but NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL isn't set -- see apps/elliot-dashboard/README.md."
+          : "Approved, but NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL isn't set -- see apps/elliot-dashboard/README.md."
+      );
+      setBusy(false);
+      return;
+    }
+
     try {
-      const res = await fetch(process.env.NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL!, {
+      const res = await fetch(sendWebhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ draft_id: draft.id }),
@@ -91,7 +119,7 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
 
     const reviewedBy = await getTenantUserId();
 
-    const { error: rpcError } = await supabase.rpc("reject_email_draft", {
+    const { error: rpcError } = await supabase.rpc(rejectRpc, {
       p_draft_id: draft.id,
       p_reviewed_by: reviewedBy,
     });
@@ -108,7 +136,21 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
     <div style={{ background: "white", border: "1px solid #eee", borderRadius: 10, padding: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
         <div>
-          <strong>{draft.to_email}</strong>
+          <span
+            style={{
+              display: "inline-block",
+              marginRight: 8,
+              padding: "1px 6px",
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 600,
+              background: isWhatsapp ? "#dcfce7" : "#e0e7ff",
+              color: isWhatsapp ? "#166534" : "#4338ca",
+            }}
+          >
+            {isWhatsapp ? "WhatsApp" : "Email"}
+          </span>
+          <strong>{isWhatsapp ? draft.to_wa_id : draft.to_email}</strong>
           <span style={{ marginLeft: 8, fontSize: 12, color: "#999" }}>
             {draft.category} · confidence {draft.confidence}
           </span>
@@ -125,7 +167,7 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{draft.subject}</div>
+      {!isWhatsapp && <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{draft.subject}</div>}
 
       {isEditing ? (
         <textarea
@@ -139,6 +181,14 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
       )}
 
       {error && <p style={{ color: "crimson", fontSize: 13, marginTop: 8 }}>{error}</p>}
+
+      {draft.status === "blocked_needs_template" && (
+        <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 12 }}>
+          Blocked -- more than 24 hours have passed since this contact's last WhatsApp message, so a free-form
+          reply can no longer be sent (Meta's rule, not ours). Sending this now needs a pre-approved WhatsApp
+          template message, which isn't set up yet. See docs/workflow-specs/27-send-approved-whatsapp.md.
+        </p>
+      )}
 
       {draft.status === "pending" ? (
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -166,7 +216,11 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
         </div>
       ) : (
         <p style={{ fontSize: 12, color: "#999", marginTop: 12 }}>
-          {draft.status === "auto_sent" ? "Sent automatically -- no review needed." : `Already ${draft.status}. No further action.`}
+          {draft.status === "auto_sent"
+            ? "Sent automatically -- no review needed."
+            : draft.status === "blocked_needs_template"
+              ? null
+              : `Already ${draft.status}. No further action.`}
         </p>
       )}
     </div>

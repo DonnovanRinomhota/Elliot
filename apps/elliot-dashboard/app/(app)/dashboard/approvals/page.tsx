@@ -2,15 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import ApprovalCard from "./approval-card";
 import FolderTabs, { FolderTab } from "../folder-tabs";
 
-// Real statuses this table uses: "pending" until reviewed, then either
-// approve_email_draft() -> "approved" or reject_email_draft() -> "rejected"
-// (see approval-card.tsx), plus "auto_sent" for drafts the agent sent
-// without needing a human review at all.
+// Real statuses these tables use: "pending" until reviewed, then either
+// approve_*_draft() -> "approved" or reject_*_draft() -> "rejected" (see
+// approval-card.tsx), plus "auto_sent" for drafts the agent sent without
+// needing a human review at all. "blocked_needs_template" only ever comes
+// from whatsapp_drafts -- see docs/workflow-specs/27-send-approved-whatsapp.md.
 const STATUS_TABS: FolderTab[] = [
   { key: "pending", label: "Pending", count: 0, tone: "warning" },
   { key: "auto_sent", label: "Auto-resolved", count: 0, tone: "violet" },
   { key: "approved", label: "Approved", count: 0, tone: "success" },
   { key: "rejected", label: "Rejected", count: 0, tone: "danger" },
+  { key: "blocked_needs_template", label: "Blocked (WhatsApp)", count: 0, tone: "danger" },
 ];
 
 export default async function ApprovalsPage({
@@ -20,21 +22,39 @@ export default async function ApprovalsPage({
 }) {
   const supabase = createClient();
 
-  // RLS scopes this to the logged-in user's tenant automatically -- no manual
-  // tenant_id filter needed here as long as email_drafts' RLS policy checks
-  // tenant_users via auth_user_id = auth.uid().
-  const { data: drafts, error } = await supabase
-    .from("email_drafts")
-    .select("id, to_email, subject, body, category, confidence, status, created_at")
-    .order("created_at", { ascending: false });
+  // RLS scopes both to the logged-in user's tenant automatically -- no
+  // manual tenant_id filter needed here as long as each table's RLS policy
+  // checks tenant_users via auth_user_id = auth.uid(). Two separate tables
+  // (not one), per the decision to keep whatsapp_drafts a sibling of
+  // email_drafts rather than merging them -- see migration 0025's header
+  // comment. Merged into one list here, in application code, tagged by
+  // channel so the card knows which table/RPC/send-webhook to use.
+  const [emailResult, whatsappResult] = await Promise.all([
+    supabase
+      .from("email_drafts")
+      .select("id, to_email, subject, body, category, confidence, status, created_at")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("whatsapp_drafts")
+      .select("id, to_wa_id, body, category, confidence, status, created_at")
+      .order("created_at", { ascending: false }),
+  ]);
 
-  if (error) {
-    return <p className="text-sm text-red-700">Failed to load approvals: {error.message}</p>;
+  if (emailResult.error) {
+    return <p className="text-sm text-red-700">Failed to load email approvals: {emailResult.error.message}</p>;
   }
+  if (whatsappResult.error) {
+    return <p className="text-sm text-red-700">Failed to load WhatsApp approvals: {whatsappResult.error.message}</p>;
+  }
+
+  const drafts = [
+    ...(emailResult.data ?? []).map((d: any) => ({ ...d, channel: "email" as const })),
+    ...(whatsappResult.data ?? []).map((d: any) => ({ ...d, channel: "whatsapp" as const })),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const days = searchParams.days ? Number(searchParams.days) : null;
   const cutoff = days ? Date.now() - days * 24 * 60 * 60 * 1000 : null;
-  const scoped = cutoff ? (drafts ?? []).filter((d: any) => new Date(d.created_at).getTime() >= cutoff) : drafts ?? [];
+  const scoped = cutoff ? drafts.filter((d: any) => new Date(d.created_at).getTime() >= cutoff) : drafts;
 
   const tabs: FolderTab[] = [
     { key: "all", label: "All", count: scoped.length, tone: "neutral" },

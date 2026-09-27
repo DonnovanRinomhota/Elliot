@@ -1,0 +1,647 @@
+{
+  "name": "26 - Draft WhatsApp Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tenant_id"
+            },
+            {
+              "name": "conversation_id"
+            },
+            {
+              "name": "contact_id"
+            },
+            {
+              "name": "to_wa_id"
+            },
+            {
+              "name": "phone_number_id"
+            },
+            {
+              "name": "wa_message_id"
+            },
+            {
+              "name": "last_inbound_at"
+            },
+            {
+              "name": "body"
+            },
+            {
+              "name": "category"
+            },
+            {
+              "name": "confidence",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "4579672d-828f-4a09-98ab-466bb710bdc8",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "faq_answerable",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "81151bc5-abb8-4b99-8308-793581c3b0be"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "FAQ"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "scheduling",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e538a771-1571-4b69-8db7-4de7441297b9"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "scheduling"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "8c264b21-99c3-4480-98e0-3b1ef1017d66",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1340,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "q3Q23QZ4329lF5Uk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $json.tenant_id }}",
+            "query": "={{ $json.body }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "eab5be1d-02fc-4465-91ac-ae6114ba9943",
+      "name": "Execute: Knowledge Retrieval",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -1080,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Same grounding rule as 14's FAQ branch, worded for a WhatsApp reply (no subject line, shorter/plainer tone --\n// WhatsApp messages read as texts, not emails).\nconst retrieval = $json.retrieval || $json;\nconst found = retrieval.found;\nconst results = retrieval.results || [];\nconst context = found ? results.map(r => r.content || r.text).join('\\n\\n') : 'No matching knowledge base content was found.';\nconst trigger = $('When Executed by Another Workflow').first().json;\n\nconst prompt = `Draft a short, friendly WhatsApp reply on behalf of a real estate agency.\nAnswer the customer's question ONLY using the knowledge base context below -- do not invent facts.\nIf the context doesn't actually answer the question, say a team member will follow up rather than guessing.\nKeep it conversational and brief, the way a person texts -- no email-style greeting or sign-off, no subject line.\n\nCustomer's WhatsApp message:\n${trigger.body}\n\nKnowledge base context:\n${context}\n\nRespond with ONLY the message text, no JSON, no markdown.`;\n\nreturn [{ json: { ...trigger, prompt } }];"
+      },
+      "id": "00611deb-7820-45cd-a6d5-962da9353398",
+      "name": "Build FAQ Draft Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -820,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "messages",
+          "mode": "name"
+        },
+        "limit": 10,
+        "where": {
+          "values": [
+            {
+              "column": "conversation_id",
+              "value": "={{ $('When Executed by Another Workflow').first().json.conversation_id }}"
+            }
+          ]
+        },
+        "sort": {
+          "values": [
+            {
+              "column": "created_at",
+              "direction": "DESC"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e91ca74f-ff7c-43ae-8c28-ae8ea280cd5c",
+      "name": "Get Recent Messages",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -1080,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "D94fGN3AjCPhGzCb",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('When Executed by Another Workflow').first().json.tenant_id }}",
+            "date_range_start": "={{ $now.toISODate() }}",
+            "date_range_end": "={{ $now.plus({ days: 6 }).toISODate() }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "9e6db39d-2f57-4b1e-9c8a-f4cb6585176f",
+      "name": "Execute: Check Availability",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -820,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Same decision structure as 14's scheduling branch (propose / confirm / clarify), reworded for text messages.\nconst trigger = $('When Executed by Another Workflow').first().json;\nconst availability = $('Execute: Check Availability').first().json;\nconst slots = availability.available_slots || [];\n\nlet history = '';\ntry {\n  const messages = $('Get Recent Messages').all().map(item => item.json);\n  if (messages.length > 0) history = messages.map(m => `${m.role}: ${m.content}`).join('\\n\\n');\n} catch (e) { /* first message in the conversation */ }\n\nconst slotsText = slots.length > 0\n  ? slots.slice(0, 8).map(s => `- ${s.starts_at} to ${s.ends_at}`).join('\\n')\n  : 'No open slots found in the checked date range.';\n\nconst prompt = `You are handling a scheduling request that arrived over WhatsApp for a real estate agency.\n\n${history ? `Recent conversation history:\\n${history}\\n\\n` : 'This is the first message in the conversation.\\n\\n'}New WhatsApp message:\n${trigger.body}\n\nCurrently available viewing slots (UTC):\n${slotsText}\n\nDecide one of three things:\n1. \"propose\" -- the customer is asking about availability but hasn't confirmed a specific time yet. Draft a short reply listing 3-4 of the available slots above in a natural, readable way, asking them to pick one.\n2. \"confirm\" -- the customer's message clearly confirms one specific time that was previously offered AND that time is still in the available slots list above. Draft a reply confirming it's noted and the team will finalize it shortly. Extract the exact starts_at and ends_at (ISO 8601 UTC) for the confirmed slot.\n3. \"clarify\" -- ambiguous, or they referenced a time NOT in the available slots list. Draft a reply asking them to confirm which listed time works, or to pick a different one.\n\nRespond with ONLY strict JSON: { \"action\": \"propose\"|\"confirm\"|\"clarify\", \"draft_body\": \"...\", \"confirmed_slot\": { \"starts_at\": \"...\", \"ends_at\": \"...\" } | null }`;\n\nreturn [{ json: { ...trigger, prompt } }];"
+      },
+      "id": "378cfdd9-96be-46dc-8d86-bf75e5351363",
+      "name": "Build Scheduling Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"claude-sonnet-4-6\", max_tokens: 600, messages: [ { role: \"user\", content: $json.prompt } ] }) }}",
+        "options": {}
+      },
+      "id": "eb8050b8-4604-4f53-81ef-571f997fc692",
+      "name": "Call Claude (Scheduling)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Identical logic to 14's \"Parse Scheduling Result\" -- only trust confirmed_slot when action === 'confirm'.\nlet raw = '';\ntry { raw = $json.content[0].text; } catch (e) { throw new Error('Unexpected Claude scheduling response shape: ' + JSON.stringify($json)); }\nconst cleaned = raw.replace(/```json|```/g, '').trim();\nlet parsed;\ntry { parsed = JSON.parse(cleaned); } catch (e) { throw new Error('Failed to parse scheduling JSON: ' + cleaned); }\nconst ALLOWED_ACTIONS = ['propose', 'confirm', 'clarify'];\nif (!ALLOWED_ACTIONS.includes(parsed.action)) parsed.action = 'clarify';\nconst proposedAppointment = parsed.action === 'confirm' && parsed.confirmed_slot\n  ? { starts_at: parsed.confirmed_slot.starts_at, ends_at: parsed.confirmed_slot.ends_at } : null;\nreturn [{ json: { content: [{ type: 'text', text: parsed.draft_body || '' }], proposed_appointment: proposedAppointment } }];"
+      },
+      "id": "9296884c-c377-4355-80e3-449b2eb7fa32",
+      "name": "Parse Scheduling Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Same as 14's generic branch: always goes to human review, so placeholders are fine.\nconst d = $('When Executed by Another Workflow').first().json;\nconst prompt = `Draft a short, friendly WhatsApp reply on behalf of a real estate agency to the message below.\nThis draft will be reviewed by a human before sending, so it's OK to leave placeholders like [confirm availability] if specifics are unknown.\nKeep it conversational -- no email-style greeting or sign-off, no subject line.\nCategory: ${d.category}\n\nCustomer's WhatsApp message:\n${d.body}\n\nRespond with ONLY the message text, no JSON, no markdown.`;\nreturn [{ json: { ...d, prompt } }];"
+      },
+      "id": "3e9e47d7-11f2-4941-969a-289886ac0aa9",
+      "name": "Build Generic Draft Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -1080,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"claude-sonnet-4-6\", max_tokens: 600, messages: [ { role: \"user\", content: $json.prompt } ] }) }}",
+        "options": {}
+      },
+      "id": "03f8ec6c-4c6d-46b2-a8db-441cecf77154",
+      "name": "Call Claude (Draft)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -560,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Same auto-send rule as 14 (FAQ + confidence >= 0.85 only). Everything else always needs a human.\nconst AUTO_SEND_THRESHOLD = 0.85;\nconst input = $('When Executed by Another Workflow').first().json;\n\nlet draftBody = '';\ntry { draftBody = $json.content[0].text.trim(); } catch (e) { throw new Error('Unexpected Claude draft response shape: ' + JSON.stringify($json)); }\n\nconst category = input.category;\nconst confidence = Number(input.confidence) || 0;\nconst autoSendEligible = category === 'faq_answerable' && confidence >= AUTO_SEND_THRESHOLD;\nconst proposedAppointment = $json.proposed_appointment || null;\n\nreturn [{ json: {\n  tenant_id: input.tenant_id,\n  conversation_id: input.conversation_id,\n  contact_id: input.contact_id,\n  to_wa_id: input.to_wa_id,\n  phone_number_id: input.phone_number_id,\n  wa_message_id: input.wa_message_id,\n  last_inbound_at: input.last_inbound_at,\n  body: draftBody,\n  category,\n  confidence,\n  auto_send_eligible: autoSendEligible,\n  status: 'pending',\n  proposed_appointment: proposedAppointment\n} }];"
+      },
+      "id": "6b940ceb-4514-4031-bbb1-f2d11cb71459",
+      "name": "Shape Draft Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "whatsapp_drafts",
+          "mode": "list",
+          "cachedResultName": "whatsapp_drafts"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "auto_send_eligible": "={{ $json.auto_send_eligible }}",
+            "tenant_id": "={{ $json.tenant_id }}",
+            "to_wa_id": "={{ $json.to_wa_id }}",
+            "phone_number_id": "={{ $json.phone_number_id }}",
+            "wa_message_id": "={{ $json.wa_message_id }}",
+            "last_inbound_at": "={{ $json.last_inbound_at }}",
+            "body": "={{ $json.body }}",
+            "category": "={{ $json.category }}",
+            "status": "={{ $json.status }}",
+            "confidence": "={{ $json.confidence }}",
+            "conversation_id": "={{ $json.conversation_id }}",
+            "contact_id": "={{ $json.contact_id }}",
+            "proposed_appointment": "={{ $json.proposed_appointment ? JSON.stringify($json.proposed_appointment) : null }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "6d6a7168-6ca8-436b-8628-2889f05cc727",
+      "name": "Insert whatsapp_drafts Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1340,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.auto_send_eligible }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f4ebcf15-5ed2-4b44-92b2-87cf8b9dfa79",
+      "name": "If Auto-Send Eligible",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "171fa894c0614981",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/171fa894c0614981"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "draft_id": "={{ $json.id }}",
+            "auto": true
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "0611708f-30be-4ea8-99aa-2c38349e6271",
+      "name": "Execute: Send Approved WhatsApp",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -820,
+        -560
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Execute: Knowledge Retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Recent Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Generic Draft Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Knowledge Retrieval": {
+      "main": [
+        [
+          {
+            "node": "Build FAQ Draft Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Messages": {
+      "main": [
+        [
+          {
+            "node": "Execute: Check Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Check Availability": {
+      "main": [
+        [
+          {
+            "node": "Build Scheduling Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Scheduling Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call Claude (Scheduling)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude (Scheduling)": {
+      "main": [
+        [
+          {
+            "node": "Parse Scheduling Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build FAQ Draft Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call Claude (Draft)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Generic Draft Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call Claude (Draft)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude (Draft)": {
+      "main": [
+        [
+          {
+            "node": "Shape Draft Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Scheduling Result": {
+      "main": [
+        [
+          {
+            "node": "Shape Draft Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Draft Record": {
+      "main": [
+        [
+          {
+            "node": "Insert whatsapp_drafts Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert whatsapp_drafts Row": {
+      "main": [
+        [
+          {
+            "node": "If Auto-Send Eligible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Auto-Send Eligible": {
+      "main": [
+        [
+          {
+            "node": "Execute: Send Approved WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d8ae447f-449c-41f3-be8e-82555841b4e6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "PLACEHOLDER_SET_ON_IMPORT"
+  },
+  "nodeGroups": [],
+  "id": "10bd75f4382a4938",
+  "tags": []
+}

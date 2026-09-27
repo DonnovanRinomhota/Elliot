@@ -40,8 +40,44 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
 - ⬜ **Voice** (e.g. Retell or similar usage-based voice agent
   infrastructure). Not started. Depends on having a real always-on
   channel first, same underlying gap as the widget.
-- ⬜ **WhatsApp.** Not started. High-value for the real-estate/Europe
-  niche specifically.
+- 🟡 **WhatsApp** (workflows `25`–`28`, migration `0025`) -- inbound
+  messages, classify/draft/approve/send, and dashboard Approvals support,
+  built against Meta's WhatsApp Cloud API. High-value for the real-estate/
+  Europe niche specifically. Mirrors the email agent's shape (13-17)
+  rather than the widget's, since WhatsApp's webhook -- like email's --
+  doesn't wait around for a reply in the same request: `25` (inbound
+  trigger, routes tenants by `phone_number_id` -- genuinely multi-tenant
+  from one shared credential, unlike Gmail's single-mailbox limitation,
+  see that workflow's spec) → `13` (classify, reused as-is) → `26` (draft,
+  a mirror of `14`) → approve in the dashboard, or auto-send for
+  high-confidence FAQ answers → `27` (send) / `28` (manual send trigger).
+  Drafts live in a new `whatsapp_drafts` table, a sibling of
+  `email_drafts` rather than a merge of it -- kept separate on purpose so
+  WhatsApp being new and unproven can't put email's working path at risk.
+  The database side is real-verified: all 25 migrations run clean end to
+  end (tested locally with Postgres 16 + pgvector, not just read for
+  syntax), and RLS tenant isolation plus both approve/reject RPCs were
+  tested as an actual non-superuser role, not the table-owning role that
+  bypasses RLS by default. The dashboard side (Approvals merging both
+  draft tables with the right RPC/webhook per row, the Settings field for
+  `whatsapp_phone_number_id`) passed `tsc`, a production build, and a
+  browser-driven check of the approve/reject/blocked states with the
+  Supabase calls intercepted. **None of this has been tested against a
+  real Meta WhatsApp number or run inside n8n itself** -- the four
+  workflow JSON files are valid and structurally checked (every
+  connection resolves, every node reachable from a trigger, no orphaned
+  nodes) but have never actually executed. Needs, before this can go to
+  🟢: a Meta Business Account + WhatsApp Cloud API sandbox number, the
+  `WHATSAPP_VERIFY_TOKEN` env var and an HTTP Header Auth credential set
+  in n8n (currently a placeholder on workflow 27's send node), and
+  `NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL` set in the dashboard's env.
+  Known gaps, all documented in the relevant workflow specs and
+  `KNOWN_ISSUES.md`: the inbound webhook doesn't verify Meta's request
+  signature; no template-message support, so any reply more than 24 hours
+  after the contact's last message gets blocked rather than sent
+  (`blocked_needs_template`); non-text messages (images, audio, location)
+  aren't handled at all; and human takeover doesn't work on WhatsApp
+  conversations, same as it doesn't yet on the chat widget.
 
 ## Dashboard / operator experience
 

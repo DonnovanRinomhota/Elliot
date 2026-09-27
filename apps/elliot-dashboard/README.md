@@ -9,14 +9,19 @@ except onboarding is scoped to the logged-in user's own tenant via RLS.
 2. Create `.env.local` with:
    - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase project settings → API)
    - `NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL` (workflow 17's webhook, Production URL, after importing and activating it)
+   - `NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL` (workflow 28's webhook -- the WhatsApp equivalent of the above)
    - `NEXT_PUBLIC_N8N_ONBOARD_WEBHOOK_URL` (workflow 19's webhook)
    - `NEXT_PUBLIC_N8N_INGEST_WEBHOOK_URL` (workflow 08's webhook)
    - `ADMIN_EMAILS` (comma-separated, no `NEXT_PUBLIC_` prefix -- gates `/dashboard/onboarding`; see `lib/admin.ts`)
 3. `npm run dev` and open http://localhost:3000
 
-Same four env vars need to be set in Vercel (Settings → Environment
-Variables) for the production/preview deployments, each enabled for
-Production, Preview, and Development.
+Same env vars need to be set in Vercel (Settings → Environment Variables)
+for the production/preview deployments, each enabled for Production,
+Preview, and Development. If `NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL`
+is left unset, the Approvals page still shows WhatsApp drafts and the
+approve/reject RPC calls still work -- only the final "actually send it"
+step fails, with an error saying which env var is missing (see
+`approval-card.tsx`).
 
 ## Screens
 
@@ -26,7 +31,12 @@ Production, Preview, and Development.
 - **`/dashboard/escalations`** — Open escalations with acknowledge/resolve
   actions and a link into the conversation.
 - **`/dashboard/approvals`** — Review/approve/reject Elliot's AI-drafted
-  emails before they send.
+  emails and WhatsApp messages before they send (two sibling tables,
+  `email_drafts` and `whatsapp_drafts`, merged into one list here -- see
+  `docs/workflow-specs/25-whatsapp-inbound-trigger.md` for why WhatsApp
+  isn't just folded into `email_drafts`). A WhatsApp draft can also land in
+  a `blocked_needs_template` state the email side never sees -- see
+  `docs/workflow-specs/27-send-approved-whatsapp.md`.
 - **`/dashboard/leads`** — Leads with status, score, and a structured
   breakdown of *why* they scored that way (mirrors `10-lead-capture.json`'s
   scoring logic exactly). Status can be updated inline.
@@ -50,7 +60,8 @@ Production, Preview, and Development.
   Gated to admins listed in `ADMIN_EMAILS`. The n8n webhook underneath
   still has no auth of its own -- see `KNOWN_ISSUES.md`.
 - **`/dashboard/settings`** — Tenant profile, autonomy rules per action,
-  integration config (Gmail/Calendar/CRM/escalation email).
+  integration config (Gmail/Calendar/CRM/escalation email/WhatsApp
+  `phone_number_id`).
 
 ## Known gaps
 

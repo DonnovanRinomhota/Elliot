@@ -21,6 +21,7 @@ type AiConfig = {
   google_calendar_id: string | null;
   crm_webhook_url: string | null;
   escalation_notify_email: string | null;
+  whatsapp_phone_number_id: string | null;
 } | null;
 
 // Matches the actions this codebase actually checks a mode for (main agent's
@@ -88,6 +89,7 @@ export default function SettingsForm({
     connected_gmail_address: aiConfig?.connected_gmail_address ?? "",
     google_calendar_id: aiConfig?.google_calendar_id ?? "primary",
     crm_webhook_url: aiConfig?.crm_webhook_url ?? "",
+    whatsapp_phone_number_id: aiConfig?.whatsapp_phone_number_id ?? "",
   });
   const [notifyEmail, setNotifyEmail] = useState(aiConfig?.escalation_notify_email ?? "");
 
@@ -138,6 +140,7 @@ export default function SettingsForm({
         connected_gmail_address: integrations.connected_gmail_address || null,
         google_calendar_id: integrations.google_calendar_id || "primary",
         crm_webhook_url: integrations.crm_webhook_url || null,
+        whatsapp_phone_number_id: integrations.whatsapp_phone_number_id || null,
       })
       .eq("tenant_id", tenant.id);
     setSaving(null);
@@ -256,6 +259,20 @@ export default function SettingsForm({
             placeholder="https://..."
           />
           <p className="mt-1 text-xs text-gray-400">Where CRM sync sends lead/contact/appointment updates. Leave blank to disable sync.</p>
+        </div>
+        <div className="mb-4">
+          <label className={labelClass}>WhatsApp phone_number_id</label>
+          <input
+            className={inputClass}
+            value={integrations.whatsapp_phone_number_id}
+            onChange={(e) => setIntegrations({ ...integrations, whatsapp_phone_number_id: e.target.value })}
+            placeholder="e.g. 109876543212345"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            From the Meta App dashboard (WhatsApp → API Setup), not the phone number itself. This is how an
+            inbound WhatsApp message gets routed to your tenant -- see docs/workflow-specs/25-whatsapp-inbound-trigger.md.
+            Sending still needs the shared WhatsApp access token configured once in n8n, not here.
+          </p>
         </div>
         {errors.integrations && <p className="mb-2 text-xs text-red-700">{errors.integrations}</p>}
         <SaveButton saving={saving === "integrations"} saved={saved === "integrations"} onClick={saveIntegrations} />

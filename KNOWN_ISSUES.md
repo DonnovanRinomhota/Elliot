@@ -171,4 +171,38 @@ same HTTP call, and nothing is left listening afterward for a human reply
 to interrupt. Supporting takeover on chat_widget conversations needs some
 kind of persistent connection on the widget side (polling or Supabase
 Realtime) so it can receive a message that didn't come from its own
-request. Not started.
+request. Not started. Human takeover doesn't work for `whatsapp`-channel
+conversations either, for a related but different reason: nothing in
+workflow 28 or the dashboard sends an outbound WhatsApp message except
+through an approved `whatsapp_drafts` row -- there's no "reply as a
+human" path analogous to email's `reply-form.tsx` yet.
+
+## OPEN — WhatsApp webhook (25) doesn't verify Meta's request signature
+Meta signs every webhook POST body with `X-Hub-Signature-256`
+(HMAC-SHA256 using the Meta App Secret). `25-whatsapp-inbound-trigger.json`
+doesn't check it -- anyone who discovers the webhook URL could POST a
+forged payload that gets processed as a real customer message (a fake
+lead, a fake scheduling confirmation, etc.). Same category of gap as the
+tenant-onboarding webhook above. Fine for a sandbox test number during
+development; needs fixing (verify the signature in a Code node before
+`Extract WhatsApp Fields` runs) before relying on this for a real client's
+number. See `docs/workflow-specs/25-whatsapp-inbound-trigger.md`.
+
+## OPEN — WhatsApp: no template-message support (24-hour window)
+WhatsApp only allows a free-form reply within 24 hours of the customer's
+last message; anything later legally requires a pre-approved template
+message. `27-send-approved-whatsapp.json` detects a late draft and marks
+it `blocked_needs_template` rather than attempting (and failing) the send,
+but nothing builds, submits, or sends an actual template message.
+Practical impact: any WhatsApp reply drafted more than 24 hours after the
+customer's last message -- including, eventually, any WhatsApp follow-up
+sequence step beyond day 0 -- will sit blocked rather than send. See
+`docs/workflow-specs/27-send-approved-whatsapp.md`.
+
+## OPEN — WhatsApp: only text messages are handled
+`25-whatsapp-inbound-trigger.json` skips anything that isn't
+`type: "text"` (images, audio, location, documents, etc.) -- the customer
+gets no reply at all for these today, not even a generic acknowledgement.
+Real support needs downloading the media from Meta's authenticated media
+URL and giving Claude something to work with (vision for images, at
+minimum). Not started.
