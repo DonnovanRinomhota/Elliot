@@ -4,7 +4,7 @@
 `crm_sync_log` has existed since Phase 1 with `crm_provider` as a free-text column and nothing built against it. No real tenant/CRM target exists yet to justify hardcoding a specific integration (HubSpot's API, Pipedrive's API, etc.) — building toward one specific CRM nobody's actually using would be guesswork. Instead: each tenant configures `ai_config.crm_webhook_url`, and the sweep POSTs a normalized JSON payload there. This works with anything that accepts an incoming webhook — a CRM's native webhook trigger, or a Zapier/Make step in front of a CRM that doesn't take webhooks directly. `crm_provider` stays a purely descriptive label (defaults to `'generic_webhook'`); nothing in either workflow branches on its value.
 
 ## What this does NOT solve
-- **Nothing queues a sync automatically yet.** Workflow 22 is a manual/internal entry point — wiring it into `10` (lead capture) or `12` (book appointment) so syncs queue themselves on every creation would mean editing already-live production workflows. Same tradeoff already made once for the follow-up engine's run-advancement limitation — deliberately out of scope here too.
+- ~~Nothing queues a sync automatically yet.~~ Fixed in migration `0026`: database triggers on `contacts`, `leads` and `appointments` queue a sync on insert and on meaningful changes (contact details; lead status/score/answers; appointment status/time). Doing it in the database rather than in `10`/`12` means dashboard edits (e.g. "Mark CONVERTED", Cancel) sync too, and no live workflow had to change. Syncs only queue for tenants with a `crm_webhook_url`, and at most one pending row per entity (the sweep sends current state, so bursts collapse). Workflow 22 is still there for manual re-syncs and now requires the `x-elliot-webhook-secret` header (see `internal-webhook-auth.md`).
 - **No response-shape assumptions.** A truly generic receiver could return anything (or nothing) on success, so `crm_record_id` is left `null` on a successful sync rather than guessed at. If your specific receiver does return a stable external ID, that's a small, receiver-specific addition to make later — not something a generic version can assume.
 
 ## Workflow 22 — Queue CRM Sync
@@ -32,7 +32,7 @@
   "data": { "status": "HOT", "score": 85, "qualification_answers": {...} }
 }
 ```
-`data`'s shape depends on `entity_type` — `contact` gives name/email/phone/source, `lead` gives status/score/qualification_answers, `appointment` gives starts_at/ends_at/status/notes.
+`data`'s shape depends on `entity_type` — `contact` gives name/email/phone/company/source; `lead` gives status/score/qualification_answers plus `contact_id` and a `contact` object (name/email/phone/company); `appointment` gives starts_at/ends_at/timezone/status/notes plus `contact_id` and a `contact` object (name/email/phone). The contact is embedded so a receiver can match a lead or appointment to a CRM record without a second lookup.
 
 ## Design decisions worth knowing
 - **Both the queue query and the sweep query are single round trips**, same lesson as workflows 20/21: `Verify Entity Belongs To Tenant` uses scalar subqueries (always exactly one row, `NULL` rather than a vanished item on no match); `Query Pending Syncs` uses three `LEFT JOIN`s gated by `entity_type`, so exactly one contributes to the `CASE`-built payload per row — no chained Postgres node to strip fields via a narrow `RETURNING` or lose the item on zero rows.

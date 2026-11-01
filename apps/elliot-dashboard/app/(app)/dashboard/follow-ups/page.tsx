@@ -25,7 +25,7 @@ export default async function FollowUpsPage() {
   const [{ data: sequences, error }, { data: runs }, { data: aiConfig }] = await Promise.all([
     supabase
       .from("follow_up_sequences")
-      .select("id, name, is_active, steps")
+      .select("id, name, is_active, steps, auto_enrol, auto_enrol_after_hours")
       .order("created_at", { ascending: true }),
     // Aggregated in JS: a pilot tenant has far fewer than PostgREST's default
     // 1000-row cap. If that ever stops being true, move this to an RPC like
@@ -54,7 +54,7 @@ export default async function FollowUpsPage() {
       <h1 className="mb-1 text-xl font-bold text-ink">Follow-ups</h1>
       <p className="mb-4 max-w-2xl text-sm text-gray-500">
         Emails Elliot sends on a schedule after a lead is added to a sequence. A sequence stops for a lead as soon as
-        they reply.
+        they reply. Follow-ups are sent by email, so leads without an email address are skipped.
       </p>
 
       <div className="mb-6 flex max-w-2xl flex-col gap-2">
@@ -68,10 +68,13 @@ export default async function FollowUpsPage() {
           </a>
           , in Automation rules.
         </p>
-        <p className="rounded-md bg-amber-soft px-3 py-2 text-xs text-amber-dark">
-          Adding a lead to a sequence isn&apos;t automatic yet. It&apos;s still a manual step, so a sequence you create
-          here won&apos;t send anything until a lead is added to it. Sequences that have been used can be deactivated
-          but not deleted, so their history stays intact.
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          Leads join a sequence in two ways: automatically, if you turn on auto-enrol for one sequence below, or by
+          hand with &ldquo;Start follow-up&rdquo; on a lead in{" "}
+          <a href="/dashboard/leads" className="text-ink underline">
+            Leads
+          </a>
+          . Sequences that have been used can be deactivated but not deleted, so their history stays intact.
         </p>
       </div>
 

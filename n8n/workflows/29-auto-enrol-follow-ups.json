@@ -1,0 +1,69 @@
+{
+  "name": "29 - Auto-Enrol Follow-Ups",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "5aa24cc7-e256-4273-9765-17b672c91236",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "notes": "Same cadence as the follow-up sweep (20). Enrolment only decides WHO joins a sequence; 20 still does all the sending."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- All eligibility rules live in the function (migration 0026), so they can be\n-- tested in SQL and changed without re-importing this workflow.\nselect * from enrol_quiet_leads(100);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [224, 0],
+      "id": "5a3111e2-9340-4e6a-b39b-b9d2046686dc",
+      "name": "Enrol Quiet Leads",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Returns one row per run created (run_id, tenant_id, lead_id, sequence_id, next_run_at); zero rows on a quiet sweep is normal. Capped at 100 enrolments per sweep."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Enrol Quiet Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "731c6f2a-fe6d-488a-876c-5586f6d5a546",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "38e37ce8-a306-4946-aaf6-89f1c9bf17aa",
+  "tags": []
+}

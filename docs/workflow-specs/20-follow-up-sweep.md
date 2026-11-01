@@ -4,7 +4,7 @@
 `follow_up_sequences`/`follow_up_runs` have existed in the schema since Phase 1 with nothing driving them. The sweep engine (20) processes runs that already exist — but nothing created a `follow_up_runs` row either, so on its own the sweep would have nothing to ever act on. Workflow 21 is the missing piece: it's how a sequence actually gets started for a specific lead.
 
 ## What this does NOT solve
-- **Nothing enrolls leads into a sequence automatically.** Workflow 21 is only reachable by calling its webhook by hand, so a sequence sends nothing until a run has been started for a lead. This is the main remaining gap in the follow-up feature.
+- ~~Nothing enrolls leads into a sequence automatically.~~ Fixed: workflow `29` auto-enrols quiet leads into the tenant's auto-enrol sequence (see `29-auto-enrol-follow-ups.md`), and the Leads page has Start / Stop follow-up per lead. Workflow 21 still works for manual calls and now requires the `x-elliot-webhook-secret` header.
 - **Sequences are authored in the dashboard (`/dashboard/follow-ups`).** It reads and writes `follow_up_sequences` directly under RLS, with no n8n webhook involved. Hand-authoring via SQL still works. Steps look like:
   ```json
   [
