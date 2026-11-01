@@ -35,10 +35,12 @@ None on this workflow's own nodes beyond the shared Postgres credential — no W
 ## Environment variables required
 `WHATSAPP_VERIFY_TOKEN` — a secret string you choose and enter in both n8n's environment and the Meta App dashboard's webhook configuration. Meta echoes it back on the verify `GET`; this workflow checks it matches before confirming the subscription.
 
+`META_APP_SECRET` — the App Secret from Meta App Dashboard → App settings → Basic. Used to verify each POST's `X-Hub-Signature-256`. Also needs `NODE_FUNCTION_ALLOW_BUILTIN=crypto` on n8n, and **Raw Body** on in the `WhatsApp Webhook (POST)` node (already set in this export). `WHATSAPP_SIGNATURE_CHECK=off` skips the check for local testing with hand-written payloads; never set it in production.
+
 ## Error paths
 - **Unmatched `phone_number_id` → logged to `audit_log`, not silently dropped.** This is a deliberate improvement over `16`'s documented gap (a misconfigured `connected_gmail_address` drops mail with zero trace). Still requires someone to actually look at `audit_log`; no alerting is built.
 - **Non-text messages (image, audio, location, document, etc.) are skipped, not handled.** `Extract WhatsApp Fields` flags these and the pipeline stops there — no draft, no reply, no record beyond nothing happening. Building real media support (downloading from Meta's authenticated media URL, storing it, giving Claude something to look at) is future work.
-- **The POST payload's signature is not verified.** Meta signs every webhook body with `X-Hub-Signature-256` (HMAC-SHA256 using the Meta App Secret); this workflow doesn't check it. Anyone who discovers the webhook URL could POST a forged message that would be processed as if it came from a real customer. Same class of gap as `KNOWN_ISSUES.md`'s note on the tenant-onboarding webhook having no auth of its own — acceptable for a sandbox test number, not for anything beyond that.
+- **Unsigned or forged POSTs are dropped.** `Verify Meta Signature` recomputes Meta's `X-Hub-Signature-256` (HMAC-SHA256 of the raw body with the Meta App Secret) and `Signature Valid?` stops anything that isn't `valid`. The POST still gets its 200 ack first, so Meta doesn't retry. The node's `_signature` output says why a message was dropped: `no_secret_configured`, `missing`, `invalid` or `no_raw_body`.
 - **The `WhatsApp Webhook (POST)` node has two outputs firing per event** (`Respond Ack` and `Extract WhatsApp Fields`) — this is intentional (see Trigger notes above), not a duplicate-processing bug; only one branch touches the database.
 
 ## Expected output

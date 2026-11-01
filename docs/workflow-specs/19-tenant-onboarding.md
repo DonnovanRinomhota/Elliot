@@ -5,10 +5,10 @@ Before this, creating a tenant meant hand-writing `INSERT` statements into `tena
 
 **It does NOT solve true self-serve signup.** Two real gaps remain, and this workflow is explicit about them in its response rather than pretending they're handled:
 1. **Google Calendar and Gmail connections are still manual, per-tenant, one-off n8n credential setup.** The current architecture (workflows 11/12/15/16) uses a single OAuth2 credential assigned directly to each HTTP Request node in n8n — there's no dynamic per-tenant credential resolution at runtime. Genuinely automating this would mean building a real OAuth consent flow (a public redirect URI, encrypted per-tenant token storage, token refresh logic) — a significantly bigger project than tenant provisioning, and deliberately out of scope here.
-2. **This endpoint has no auth.** It's meant to be used internally (by you, via curl/Postman), not linked anywhere public. Add a shared-secret header check before this is ever exposed more broadly than that.
+2. ~~This endpoint has no auth.~~ Fixed: it now requires the `x-elliot-webhook-secret` header (see `internal-webhook-auth.md`). The dashboard calls it through its own server route, never from the browser.
 
 ## Trigger
-Internal webhook (`POST /onboard-tenant`) — not linked from the marketing site or anywhere public.
+Internal webhook (`POST /onboard-tenant`) — not linked from the marketing site or anywhere public. Starts with **Check Webhook Secret → Authorized?** (401 without the shared secret).
 
 ## Inputs
 ```json
@@ -64,4 +64,4 @@ Only `name` and `slug` are required. Everything else has a safe default — `aut
 ```
 
 ## Connecting this to your workflow
-Import, set the Postgres credential, activate. Copy the Production URL and keep it somewhere private (a password manager note, not a shared doc) — same reasoning as the "no auth yet" caveat above.
+Import, set the Postgres credential, set `ELLIOT_WEBHOOK_SECRET` on n8n, activate. Put the Production URL in the dashboard's `N8N_ONBOARD_WEBHOOK_URL` (server-only) and the same secret in its `ELLIOT_WEBHOOK_SECRET`.

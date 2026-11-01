@@ -109,12 +109,66 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [896, 96]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Internal webhooks are only meant to be called by the Elliot dashboard's\n// server (or by you, by hand). The caller must send the shared secret in an\n// `x-elliot-webhook-secret` header; it's compared against this n8n instance's\n// ELLIOT_WEBHOOK_SECRET env var. Unset secret => every call is rejected\n// (fail closed), so a fresh n8n without the env var can't be abused either.\n// See docs/workflow-specs/internal-webhook-auth.md.\nconst item = $input.first().json;\nconst expected = String($env.ELLIOT_WEBHOOK_SECRET || '');\nconst headers = item.headers || {};\nconst provided = String(headers['x-elliot-webhook-secret'] || '');\n\n// Length check first, then a constant-time comparison of equal-length strings.\nlet authorized = expected.length >= 16 && provided.length === expected.length;\nif (authorized) {\n  let diff = 0;\n  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ provided.charCodeAt(i);\n  authorized = diff === 0;\n}\n\n// Pass the original webhook item through untouched (body, headers, query) so\n// the existing Validate Input node keeps reading $input.first().json.body.\nreturn [{ json: { ...item, _authorized: authorized } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 320],
+      "id": "9d39ed19-f03b-4b17-9ed7-d1709655820b",
+      "name": "Check Webhook Secret"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-authorized",
+              "leftValue": "={{ $json._authorized }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [224, 320],
+      "id": "7a499bd9-2b8f-4584-8c0e-26bbf333f5cf",
+      "name": "Authorized?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'unauthorized' }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [448, 416],
+      "id": "381dfb3f-beb4-43aa-82da-e2665ba8103c",
+      "name": "Respond Unauthorized"
     }
   ],
   "pinData": {},
   "connections": {
     "Queue Sync Webhook": {
-      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Check Webhook Secret", "type": "main", "index": 0 }]]
     },
     "Validate Input": {
       "main": [[{ "node": "Verify Entity Belongs To Tenant", "type": "main", "index": 0 }]]
@@ -130,6 +184,15 @@
     },
     "Insert Sync Log": {
       "main": [[{ "node": "Respond Success", "type": "main", "index": 0 }]]
+    },
+    "Check Webhook Secret": {
+      "main": [[{ "node": "Authorized?", "type": "main", "index": 0 }]]
+    },
+    "Authorized?": {
+      "main": [
+        [{ "node": "Validate Input", "type": "main", "index": 0 }],
+        [{ "node": "Respond Unauthorized", "type": "main", "index": 0 }]
+      ]
     }
   },
   "active": true,
