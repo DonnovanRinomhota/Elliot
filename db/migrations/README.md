@@ -11,7 +11,14 @@ Run in order — each file is numbered and depends on the ones before it.
 0006_escalations_crm_sync.sql
 0007_audit_and_tool_log.sql
 0008_row_level_security.sql
+...
+0026_auto_crm_sync_and_follow_up_enrolment.sql
 ```
+
+Every file in this folder runs in number order (0001 through the highest);
+the list above only shows the first eight and the latest.
+`db/seed/test_0026_auto_sync_and_enrolment.sql` is a scenario test for
+0026 -- run it on a scratch database only, it inserts test data.
 
 ## How to apply
 

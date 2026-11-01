@@ -157,12 +157,18 @@ operating surface:
   workflow 08's ingestion webhook. Plain text only; no PDF/website parsing
   yet, matching what the backend actually does.
 
-Six more workflows exist outside this original phase list — internal
+More workflows exist outside this original phase list — internal
 tooling rather than agent capabilities:
 - `18` demo request intake — wires the marketing site's form to a real lead
 - `19` tenant onboarding — replaces hand-written SQL per tenant
 - `20`/`21` follow-up engine — sweep + entry point
-- `22`/`23` CRM sync — sweep + entry point
+- `22`/`23` CRM sync — sweep + entry point (syncs now queue themselves via
+  database triggers, migration `0026`)
+- `29` auto-enrol follow-ups — puts quiet leads into the tenant's auto-enrol sequence
+- `30` cancel appointment — cancels and removes the Google Calendar event
+
+Setting up the Nov 2026 fix pack (env vars, imports, smoke test):
+`docs/client-ready-setup.md`.
 
 See their specs in `docs/workflow-specs/`.
 

@@ -1,5 +1,25 @@
 # Known Issues / Resolved-but-worth-remembering
 
+## RESOLVED (Nov 2026, pending live check) — Leads scoring 40–69 were never saved
+`10 - Lead Capture`'s `Score Lead` node set `status = 'QUALIFIED'` for
+scores 40–69, but `leads_status_check` (`0002`) only allows NEW /
+QUALIFYING / HOT / WARM / COLD / CONVERTED / LOST. `Upsert Lead` failed
+with a check-constraint violation for every mid-scoring lead, so the
+agent's `capture_lead` tool errored and the lead was lost. The dashboard
+never showed a `QUALIFIED` folder, which is why nothing looked wrong.
+
+**Root cause:** the scoring node and the schema used different names for
+the middle band. The spec (`10-lead-capture.md`) had copied the node.
+
+**Fix:** the 40–69 band now writes `WARM`, which the schema, the Leads
+folders and the revenue stats (`0024`, which counts QUALIFYING/HOT/WARM as
+pipeline) already expected.
+
+**Verified:** reproduced the constraint violation against a fresh database
+with all migrations applied; `n8n/workflows/tests/client_ready_fixes.test.js`
+runs the node's own code and asserts every status it can produce is
+allowed. Not yet re-run live.
+
 ## RESOLVED — Hot-lead escalation insert failed with a false FK violation
 `10 - Lead Capture`'s "Insert Escalation" node intermittently failed with
 `conflicting key value violates ... escalations_conversation_id_fkey` even
@@ -138,7 +158,7 @@ development and were never captured as migrations until now:
 editor during live debugging should be turned into a numbered migration
 file in the same session, not after the fact.
 
-## PARTIALLY RESOLVED — `/dashboard/onboarding` has no access control
+## RESOLVED (Nov 2026, pending live check) — `/dashboard/onboarding` has no access control
 **Fixed:** the dashboard route itself is now gated. `lib/admin.ts`'s
 `isAdminEmail()` checks the logged-in user's email against `ADMIN_EMAILS`
 (a comma-separated env var, server-only, no `NEXT_PUBLIC_` prefix). Anyone
@@ -147,12 +167,14 @@ the form, and the nav link itself is hidden for non-admins too
 (`app/(app)/layout.tsx`). Unit-verified against case-sensitivity,
 whitespace, empty-list, and multi-entry edge cases.
 
-**Still open:** this only gates the *dashboard route*. The underlying n8n
-webhook (`19-tenant-onboarding.json`) still has no authentication of its
-own -- anyone who finds that URL directly can call it and create tenants
-without ever going through the dashboard or this check at all. Real fix
-needs auth on the webhook itself (a shared-secret header, checked in the
-workflow's Validate Input node, is the smallest version of this). Nothing
+**Fixed (Nov 2026):** the webhook itself now requires a shared secret.
+Workflow 19 starts with `Check Webhook Secret → Authorized?`, which returns
+401 unless the `x-elliot-webhook-secret` header matches the n8n env var
+`ELLIOT_WEBHOOK_SECRET` (fails closed if unset). The dashboard form no
+longer calls n8n from the browser: it posts to `app/api/admin/onboard`,
+which re-checks `ADMIN_EMAILS` server-side and adds the secret. Workflows
+21, 22 and 30 got the same gate. See
+`docs/workflow-specs/internal-webhook-auth.md`. Nothing
 in the schema distinguishes "runs the platform" from "runs one tenant"
 either (`tenant_users.role` is per-tenant only) -- the env-var allow-list
 is a deliberately simple stopgap for a single operator, not a real
@@ -177,16 +199,18 @@ workflow 28 or the dashboard sends an outbound WhatsApp message except
 through an approved `whatsapp_drafts` row -- there's no "reply as a
 human" path analogous to email's `reply-form.tsx` yet.
 
-## OPEN — WhatsApp webhook (25) doesn't verify Meta's request signature
+## RESOLVED (Nov 2026, pending live check) — WhatsApp webhook (25) doesn't verify Meta's request signature
 Meta signs every webhook POST body with `X-Hub-Signature-256`
 (HMAC-SHA256 using the Meta App Secret). `25-whatsapp-inbound-trigger.json`
-doesn't check it -- anyone who discovers the webhook URL could POST a
-forged payload that gets processed as a real customer message (a fake
-lead, a fake scheduling confirmation, etc.). Same category of gap as the
-tenant-onboarding webhook above. Fine for a sandbox test number during
-development; needs fixing (verify the signature in a Code node before
-`Extract WhatsApp Fields` runs) before relying on this for a real client's
-number. See `docs/workflow-specs/25-whatsapp-inbound-trigger.md`.
+didn't check it -- anyone who discovered the webhook URL could POST a
+forged payload that got processed as a real customer message.
+
+**Fixed:** `Verify Meta Signature` (between the POST trigger and `Extract
+WhatsApp Fields`) recomputes the HMAC over the raw body (Raw Body is now on
+in the trigger) and `Signature Valid?` drops anything that isn't valid.
+Needs `META_APP_SECRET` and `NODE_FUNCTION_ALLOW_BUILTIN=crypto` on n8n.
+Unit-tested with real HMACs (valid, tampered, wrong secret, malformed,
+missing). See `docs/workflow-specs/25-whatsapp-inbound-trigger.md`.
 
 ## OPEN — WhatsApp: no template-message support (24-hour window)
 WhatsApp only allows a free-form reply within 24 hours of the customer's
@@ -206,3 +230,13 @@ gets no reply at all for these today, not even a generic acknowledgement.
 Real support needs downloading the media from Meta's authenticated media
 URL and giving Claude something to work with (vision for images, at
 minimum). Not started.
+
+## OPEN — Three webhooks are still called straight from the browser
+`08` (knowledge ingestion), `17` (manual email send) and `28` (manual
+WhatsApp send) are called from client components using `NEXT_PUBLIC_*`
+URLs, so they can't carry the shared webhook secret and remain callable by
+anyone who finds the URL. `17`/`28` can only send an existing draft by its
+id (an unguessable uuid), not arbitrary content, which limits the damage;
+`08` can add documents to any tenant's knowledge base by slug. Fix: move each call behind a server route
+using `lib/n8n-webhook.ts`, then add the same `Check Webhook Secret` gate
+(see `docs/workflow-specs/internal-webhook-auth.md`).

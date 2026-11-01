@@ -20,7 +20,7 @@ Called as a sub-workflow via n8n's "Execute Workflow" node — invoked by the Ma
 |---|---|
 | When Executed by Another Workflow | Sub-workflow trigger |
 | Upsert Contact | Inserts/updates the contact by `(tenant_id, email)`, coalescing new fields onto an existing row rather than overwriting with nulls |
-| Score Lead | Simple additive scoring (budget +25, urgent timeline +25, property_type +15, intent_signal +20, email +10, phone +5) → status `QUALIFYING` / `QUALIFIED` (≥40) / `HOT` (≥70) |
+| Score Lead | Simple additive scoring (budget +25, urgent timeline +25, property_type +15, intent_signal +20, email +10, phone +5) → status `QUALIFYING` / `WARM` (≥40) / `HOT` (≥70). Was `QUALIFIED` for the 40–69 band until Nov 2026, which `leads_status_check` rejects, so those leads failed to save |
 | Upsert Lead | Inserts/updates the lead by `(tenant_id, contact_id)`, merging `qualification_answers` (`||` jsonb merge, not overwrite) so repeated calls accumulate info rather than lose it |
 | Is Hot Lead? | Branches on `status == 'HOT'` |
 | Insert Escalation | (HOT branch only) Calls `insert_escalation($1..$5)` — see Known Issues for why this is an RPC call and not raw SQL |

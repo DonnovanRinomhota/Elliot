@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type Lead = {
   id: string;
+  tenant_id: string;
   status: string;
   score: number | string | null;
   qualification_answers: Record<string, unknown> | null;
@@ -28,6 +29,11 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 type ScoreReason = { label: string; points: number; met: boolean };
+
+/** An active sequence with at least one step -- one a lead can be started on. */
+export type StartableSequence = { id: string; name: string; firstDayOffset: number };
+/** The lead's in-progress follow-up run, if any. */
+export type RunningRun = { id: string; sequenceName: string };
 
 // Mirrors 10-lead-capture.json's "Score Lead" node exactly (n8n workflow,
 // not this app) so what's shown here always matches the real stored score.
@@ -67,12 +73,57 @@ function computeScoreReasons(lead: Lead): ScoreReason[] {
   ];
 }
 
-export default function LeadCard({ lead }: { lead: Lead }) {
+export default function LeadCard({
+  lead,
+  sequences,
+  runningRun,
+}: {
+  lead: Lead;
+  sequences: StartableSequence[];
+  runningRun: RunningRun | null;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showRaw, setShowRaw] = useState(false);
+  const [sequenceId, setSequenceId] = useState(sequences[0]?.id ?? "");
+  const hasEmail = !!lead.contact?.email?.trim();
+
+  // Same row shape workflow 21 inserts: the sweep (20) picks it up from
+  // next_run_at, and the "contact replied" stop check counts from now.
+  async function startFollowUp() {
+    const seq = sequences.find((s) => s.id === sequenceId);
+    if (!seq) return;
+    setBusy(true);
+    setError(null);
+    const nextRunAt = new Date(Date.now() + seq.firstDayOffset * 24 * 60 * 60 * 1000).toISOString();
+    const { error: insertError } = await supabase.from("follow_up_runs").insert({
+      tenant_id: lead.tenant_id,
+      lead_id: lead.id,
+      sequence_id: seq.id,
+      current_step_index: 0,
+      status: "running",
+      next_run_at: nextRunAt,
+    });
+    setBusy(false);
+    if (insertError) return setError(insertError.message);
+    router.refresh();
+  }
+
+  async function stopFollowUp() {
+    if (!runningRun) return;
+    setBusy(true);
+    setError(null);
+    const { error: updateError } = await supabase
+      .from("follow_up_runs")
+      .update({ status: "stopped", stop_reason: "manually_stopped", next_run_at: null })
+      .eq("id", runningRun.id)
+      .eq("status", "running");
+    setBusy(false);
+    if (updateError) return setError(updateError.message);
+    router.refresh();
+  }
   const isClosed = CLOSED_STATUSES.includes(lead.status);
   const reasons = computeScoreReasons(lead);
   const metReasons = reasons.filter((r) => r.met);
@@ -147,6 +198,53 @@ export default function LeadCard({ lead }: { lead: Lead }) {
             <pre className="mt-2 overflow-x-auto rounded-md bg-white p-2.5 text-xs">
               {JSON.stringify(lead.qualification_answers, null, 2)}
             </pre>
+          )}
+        </div>
+      )}
+
+      {!isClosed && (runningRun || sequences.length > 0) && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-gray-100 px-3 py-2 text-xs">
+          {runningRun ? (
+            <>
+              <span className="text-gray-600">
+                In follow-up: <span className="font-medium text-gray-800">{runningRun.sequenceName}</span>
+              </span>
+              <button
+                onClick={stopFollowUp}
+                disabled={busy}
+                className="rounded-md border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Stop follow-up
+              </button>
+            </>
+          ) : hasEmail ? (
+            <>
+              <label htmlFor={`seq-${lead.id}`} className="text-gray-600">
+                Follow-up
+              </label>
+              <select
+                id={`seq-${lead.id}`}
+                value={sequenceId}
+                onChange={(e) => setSequenceId(e.target.value)}
+                disabled={busy}
+                className="rounded-md border border-gray-300 bg-white px-2 py-1"
+              >
+                {sequences.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={startFollowUp}
+                disabled={busy || !sequenceId}
+                className="rounded-md bg-ink px-3 py-1.5 font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                Start follow-up
+              </button>
+            </>
+          ) : (
+            <span className="text-gray-400">No email address, so this lead can&apos;t get email follow-ups.</span>
           )}
         </div>
       )}

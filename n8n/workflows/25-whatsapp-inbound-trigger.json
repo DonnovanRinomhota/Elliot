@@ -101,7 +101,9 @@
         "httpMethod": "POST",
         "path": "whatsapp",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {
+          "rawBody": true
+        }
       },
       "id": "7e9a6e72-d746-4062-a6bd-9f42d20fd0ff",
       "name": "WhatsApp Webhook (POST)",
@@ -138,7 +140,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 1,
       "position": [
-        -1140,
+        -692,
         320
       ]
     },
@@ -171,7 +173,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -880,
+        -432,
         320
       ]
     },
@@ -200,7 +202,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -620,
+        -172,
         220
       ]
     },
@@ -232,7 +234,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -360,
+        88,
         220
       ]
     },
@@ -272,7 +274,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -100,
+        348,
         420
       ],
       "notes": "Improves on 16's known gap (a misconfigured connected_gmail_address silently drops the email with no trace). Here a message for a phone_number_id no tenant has configured is at least logged, not just dropped."
@@ -290,7 +292,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -100,
+        348,
         220
       ],
       "notes": "Keeps an existing name rather than overwriting it with WhatsApp's profile name on every message -- a contact who already gave a fuller name via email/chat shouldn't have it clobbered by whatever they set as their WhatsApp display name."
@@ -308,7 +310,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        160,
+        608,
         220
       ]
     },
@@ -348,7 +350,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        420,
+        868,
         220
       ]
     },
@@ -382,7 +384,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        680,
+        1128,
         220
       ],
       "notes": "Workflow 13 is reused as-is (no WhatsApp-specific classifier) -- its 6 categories and prompt are channel-agnostic in substance, it just calls its input parameter 'from_email' and 'subject'/'gmail_*' regardless of what channel actually sent the message. Passing from_wa_id as from_email and empty strings for the email-only fields works because 13 never uses gmail_thread_id/gmail_message_id itself -- it only classifies subject+body. Cosmetic, not a functional risk."
@@ -421,9 +423,55 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        940,
+        1388,
         220
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta signs every webhook POST with X-Hub-Signature-256: an HMAC-SHA256 of\n// the RAW request body, keyed with the Meta App Secret. Without this check\n// anyone who finds this URL can POST a forged \"customer message\".\n//\n// Needs, on the n8n instance:\n//   META_APP_SECRET=<App Secret from Meta App Dashboard -> App settings -> Basic>\n//   NODE_FUNCTION_ALLOW_BUILTIN=crypto   (lets Code nodes require('crypto'))\n// and \"Raw Body\" switched on in the WhatsApp Webhook (POST) node (already set\n// in this export), which is what puts the exact bytes Meta signed in binary.data.\n//\n// For local testing with hand-written payloads ONLY, set\n// WHATSAPP_SIGNATURE_CHECK=off to skip the check. Never in production.\nconst crypto = require('crypto');\nconst item = $input.first();\nconst json = item.json;\n\nif (String($env.WHATSAPP_SIGNATURE_CHECK || 'on').toLowerCase() === 'off') {\n  return [{ json: { ...json, _signature: 'skipped' } }];\n}\n\nconst secret = String($env.META_APP_SECRET || '');\nconst header = String((json.headers || {})['x-hub-signature-256'] || '');\nif (!secret) return [{ json: { ...json, _signature: 'no_secret_configured' } }];\nif (!header.startsWith('sha256=')) return [{ json: { ...json, _signature: 'missing' } }];\nif (!item.binary || !item.binary.data) return [{ json: { ...json, _signature: 'no_raw_body' } }];\n\nconst raw = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst expected = Buffer.from(crypto.createHmac('sha256', secret).update(raw).digest('hex'), 'utf8');\nconst given = Buffer.from(header.slice('sha256='.length).toLowerCase(), 'utf8');\nconst valid = given.length === expected.length && crypto.timingSafeEqual(given, expected);\n\nreturn [{ json: { ...json, _signature: valid ? 'valid' : 'invalid' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1140,
+        320
+      ],
+      "id": "42ad0946-6979-4f0c-8a49-2f9c16fb4847",
+      "name": "Verify Meta Signature"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-signature-ok",
+              "leftValue": "={{ ['valid', 'skipped'].includes($json._signature) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -916,
+        320
+      ],
+      "id": "c37f1676-52d8-4ea9-9e22-03b386be6c46",
+      "name": "Signature Valid?"
     }
   ],
   "pinData": {},
@@ -477,7 +525,7 @@
             "index": 0
           },
           {
-            "node": "Extract WhatsApp Fields",
+            "node": "Verify Meta Signature",
             "type": "main",
             "index": 0
           }
@@ -577,6 +625,29 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "Verify Meta Signature": {
+      "main": [
+        [
+          {
+            "node": "Signature Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature Valid?": {
+      "main": [
+        [
+          {
+            "node": "Extract WhatsApp Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },

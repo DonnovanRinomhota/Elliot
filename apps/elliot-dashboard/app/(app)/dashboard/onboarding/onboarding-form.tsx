@@ -39,7 +39,9 @@ export default function OnboardingForm() {
     setResult(null);
 
     try {
-      const res = await fetch(process.env.NEXT_PUBLIC_N8N_ONBOARD_WEBHOOK_URL!, {
+      // Goes through the dashboard's server, which adds the webhook secret --
+      // see app/api/admin/onboard/route.ts.
+      const res = await fetch("/api/admin/onboard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, slug, industry: industry || undefined, plan, timezone }),
