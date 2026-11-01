@@ -77,9 +77,11 @@ Run from a scratch Node project with `jsdom` installed:
   client -- if the browser console shows a CORS error, the fix is in the
   webhook node's Options (add an explicit `Allowed Origins` value), not in
   this file.
-- **No auth on the webhook**, same as every other n8n webhook in this
-  project so far (see the main repo's `KNOWN_ISSUES.md`). Anyone who finds
-  the URL and a real `tenant_slug` can call it directly.
+- **No auth on the webhook**, by design: it's called from visitors'
+  browsers on the client's public site, so there's no secret it could hold.
+  Anyone who finds the URL and a real `tenant_slug` can call it directly.
+  (The internal webhooks -- 19, 21, 22, 30 -- now require a shared secret;
+  see `docs/workflow-specs/internal-webhook-auth.md`.)
 - **Deployment is a manual copy, not automated.** `widget.js` needs to be
   copied to `apps/elliot-dashboard/public/widget.js` to actually be served
   (see the main repo's deploy notes) -- there's no build step wiring this

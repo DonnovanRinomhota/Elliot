@@ -12,6 +12,17 @@ feature -- not as a follow-up you might not get to.
 
 Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not started
 
+**Nov 2026 client-ready fix pack** (branch `fix/client-ready-pack`): automatic
+CRM sync, automatic follow-up enrolment, calendar cleanup on cancel, auth on
+internal webhooks, Meta signature check, and a lead-scoring bug fix. All of it
+is verified against a real Postgres 16 + pgvector with every migration applied
+(`db/seed/test_0026_auto_sync_and_enrolment.sql`), the Code-node logic is
+unit-tested straight from the workflow JSON
+(`n8n/workflows/tests/client_ready_fixes.test.js`), and the dashboard passes
+`tsc`, a production build and its unit tests. **None of it has run inside n8n
+or against the live stack yet**, so the items below stay 🟡 until the smoke
+test in `docs/client-ready-setup.md` passes.
+
 ## Customer-facing channels
 
 - ✅ **Web chat widget** (`apps/web-chat-widget`, in this repo). A single
@@ -29,14 +40,14 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   in the widget with no console errors. This unblocks the two items below
   it, and unblocks selling Elliot as an "AI website assistant" rather than
   just an email agent.
-- ⬜ **Marketing site** (separate repo:
+- ✅ **Marketing site** (separate repo:
   [`DonnovanRinomhota/Elliot-web`](https://github.com/DonnovanRinomhota/Elliot-web)
   -- intentionally kept out of this monorepo, not a stray duplicate). The
   public-facing site for *finding* clients -- not something a pilot
-  client's customers would ever touch. Currently one commit, README only,
-  nothing built. Doesn't block giving Elliot to a pilot client you already
-  have a relationship with; only matters for inbound/at-scale client
-  acquisition later.
+  client's customers would ever touch. Built and deployed to Vercel
+  (`elliot-web` project); the demo-request form and the chat widget are
+  wired to the real n8n webhooks (Elliot-web PRs #1–#3, Sep 2026). This
+  entry used to say "README only, nothing built" -- that was stale.
 - ⬜ **Voice** (e.g. Retell or similar usage-based voice agent
   infrastructure). Not started. Depends on having a real always-on
   channel first, same underlying gap as the widget.
@@ -72,8 +83,8 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   in n8n (currently a placeholder on workflow 27's send node), and
   `NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL` set in the dashboard's env.
   Known gaps, all documented in the relevant workflow specs and
-  `KNOWN_ISSUES.md`: the inbound webhook doesn't verify Meta's request
-  signature; no template-message support, so any reply more than 24 hours
+  `KNOWN_ISSUES.md` (Meta's request signature is now verified -- fix pack
+  above -- but needs `META_APP_SECRET` set): no template-message support, so any reply more than 24 hours
   after the contact's last message gets blocked rather than sent
   (`blocked_needs_template`); non-text messages (images, audio, location)
   aren't handled at all; and human takeover doesn't work on WhatsApp
@@ -93,10 +104,12 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   *and* has some persistent connection (polling/Realtime) to receive a
   message that didn't come from its own request. See `KNOWN_ISSUES.md`.
 - 🟡 **Tenant onboarding UI** (`/dashboard/onboarding`) -- form wrapping
-  workflow 19 exists and works. Route is now gated to admins listed in
-  `ADMIN_EMAILS` (`lib/admin.ts`), nav link hidden for everyone else.
-  Remaining gap: the underlying n8n webhook itself still has no auth of
-  its own -- see `KNOWN_ISSUES.md`.
+  workflow 19 exists and works. Route is gated to admins listed in
+  `ADMIN_EMAILS` (`lib/admin.ts`), now enforced server-side too: the form
+  posts to `app/api/admin/onboard`, which re-checks the admin list and
+  calls workflow 19 with the shared webhook secret. Workflow 19 rejects
+  calls without it. Remaining: live check after setting
+  `ELLIOT_WEBHOOK_SECRET` on both sides.
 - ✅ **Knowledge base upload** (`/dashboard/knowledge`) -- pasted text, PDF,
   and website ingestion (PR #32). PDFs are parsed client-side in the
   browser via `pdfjs-dist` and submitted through the same pasted-text
@@ -146,20 +159,47 @@ Status legend: ✅ Done and verified · 🟡 Partial / has a real gap · ⬜ Not
   wasn't approved yet; and editing steps under in-flight runs can skip or
   repeat a message, because runs track progress by step position (the
   editor warns about this).
-- ⬜ **Automatic follow-up enrolment.** Nothing starts a follow-up run for a
-  lead: workflow 21 is only reachable by calling its webhook by hand, so the
-  sequences configured at `/dashboard/follow-ups` send nothing until a lead
-  is enrolled. Candidate approaches: a "Start follow-up" action on the lead
-  card, and/or enrolling a lead automatically when it reaches a chosen
-  stage. Not started.
+- 🟡 **Automatic follow-up enrolment** (migration `0026`, workflow `29`,
+  `/dashboard/follow-ups`, `/dashboard/leads`). One sequence per tenant can
+  be set to auto-enrol: leads created after it's switched on that go quiet
+  for N hours (12h–7 days) are enrolled, unless they've booked a viewing,
+  are Converted/Lost, have no email, or were in that sequence before. Staff
+  can also Start / Stop a follow-up on any lead from the Leads page. All
+  enrolment rules tested in SQL (see the fix-pack note above), including
+  "switching it on never back-fills old leads" and RLS on the dashboard's
+  writes. Remaining: run workflow 29 live. See
+  `docs/workflow-specs/29-auto-enrol-follow-ups.md`.
+- 🟡 **Automatic CRM sync** (migration `0026`, workflow `23`). Contacts,
+  leads and appointments queue a CRM sync on create and on meaningful
+  change -- including dashboard edits like "Mark CONVERTED" or Cancel --
+  for tenants with a `crm_webhook_url`. Lead and appointment payloads now
+  embed the contact. Remaining: live run against a real receiver. Still
+  one-way (CRM → Elliot changes don't come back). See
+  `docs/workflow-specs/22-crm-sync.md`.
+- 🟡 **Cancel removes the Google Calendar event** (workflow `30`,
+  `app/api/appointments/[id]/cancel`). Falls back to an Elliot-only cancel
+  with a visible warning when the webhook isn't configured. Remaining: live
+  run against Google Calendar. No reschedule flow and no cancellation email
+  to the contact. See `docs/workflow-specs/30-cancel-appointment.md`.
+- 🟡 **Self-serve signup + forgot/reset password** (PR #35, Sep 2026).
+  "Create Business" on the login page creates the tenant, its `ai_config`
+  and the first admin user. Built and merged; a live test isn't recorded
+  here yet.
 
 ## Reliability (tracked in detail in `KNOWN_ISSUES.md`)
 
 - ✅ Orphaned Google Calendar event on a booking collision -- fixed with a
   compensating delete, tested live against a real double-booking.
-- 🟡 Onboarding page access control -- dashboard route gated (see above);
-  the n8n webhook underneath still has no auth of its own, so this isn't
-  fully closed out yet.
+- 🟡 Onboarding page access control -- closed in code: route gated, server
+  route re-checks, n8n webhook requires the shared secret (19, and also 21,
+  22, 30; see `docs/workflow-specs/internal-webhook-auth.md`). Pending a
+  live check.
+- 🟡 Lead scoring wrote `QUALIFIED` for scores 40–69, which
+  `leads_status_check` rejects, so those leads never saved. Workflow 10 now
+  writes `WARM`. Unit-tested from the workflow JSON; pending live check.
+- 🟡 WhatsApp inbound (25) now verifies Meta's `X-Hub-Signature-256`.
+  Unit-tested with real HMACs; pending a live Meta number (same as the rest
+  of WhatsApp).
 
 ## Business / non-code
 
