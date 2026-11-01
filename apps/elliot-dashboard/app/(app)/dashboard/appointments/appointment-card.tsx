@@ -27,10 +27,42 @@ export default function AppointmentCard({ appointment }: { appointment: Appointm
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const isPast = new Date(appointment.starts_at).getTime() <= Date.now();
   const isCancelled = appointment.status === "cancelled";
   const isFinal = ["cancelled", "completed", "no_show"].includes(appointment.status);
+
+  // Cancelling goes through the server (workflow 30) so the Google Calendar
+  // event is removed too -- see app/api/appointments/[id]/cancel/route.ts.
+  async function cancel() {
+    if (!window.confirm("Cancel this appointment? It will also be removed from the calendar.")) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+
+    let data: { success: boolean; error?: string; calendar?: string } | null = null;
+    try {
+      const res = await fetch(`/api/appointments/${appointment.id}/cancel`, { method: "POST" });
+      data = await res.json();
+    } catch (e) {
+      setBusy(false);
+      setError((e as Error).message);
+      return;
+    }
+
+    setBusy(false);
+    if (!data?.success) {
+      setError(data?.error || "Couldn't cancel this appointment.");
+      return;
+    }
+    if (data.calendar === "failed") {
+      setNotice("Cancelled, but the Google Calendar event couldn't be removed. Please delete it from the calendar by hand.");
+    } else if (data.calendar === "not_configured") {
+      setNotice("Cancelled in Elliot only. Calendar removal isn't set up yet, so please delete the event from the calendar by hand.");
+    }
+    router.refresh();
+  }
 
   async function setStatus(status: string) {
     setBusy(true);
@@ -75,11 +107,12 @@ export default function AppointmentCard({ appointment }: { appointment: Appointm
       {appointment.notes && <p className="mb-3 text-sm text-gray-500">{appointment.notes}</p>}
 
       {error && <p className="mb-2 text-xs text-red-700">{error}</p>}
+      {notice && <p className="mb-2 rounded-md bg-amber-soft px-2.5 py-1.5 text-xs text-amber-dark">{notice}</p>}
 
       <div className="flex flex-wrap gap-2">
         {!isFinal && !isPast && (
           <button
-            onClick={() => setStatus("cancelled")}
+            onClick={cancel}
             disabled={busy}
             className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
           >

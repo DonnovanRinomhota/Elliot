@@ -1,0 +1,434 @@
+{
+  "name": "30 - Cancel Appointment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cancel-appointment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "27c01d1b-5b97-40d6-89a7-4c5b25556d35",
+      "name": "Cancel Appointment Webhook",
+      "webhookId": "cancel-appointment"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Internal webhooks are only meant to be called by the Elliot dashboard's\n// server (or by you, by hand). The caller must send the shared secret in an\n// `x-elliot-webhook-secret` header; it's compared against this n8n instance's\n// ELLIOT_WEBHOOK_SECRET env var. Unset secret => every call is rejected\n// (fail closed), so a fresh n8n without the env var can't be abused either.\n// See docs/workflow-specs/internal-webhook-auth.md.\nconst item = $input.first().json;\nconst expected = String($env.ELLIOT_WEBHOOK_SECRET || '');\nconst headers = item.headers || {};\nconst provided = String(headers['x-elliot-webhook-secret'] || '');\n\n// Length check first, then a constant-time comparison of equal-length strings.\nlet authorized = expected.length >= 16 && provided.length === expected.length;\nif (authorized) {\n  let diff = 0;\n  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ provided.charCodeAt(i);\n  authorized = diff === 0;\n}\n\n// Pass the original webhook item through untouched (body, headers, query) so\n// the existing Validate Input node keeps reading $input.first().json.body.\nreturn [{ json: { ...item, _authorized: authorized } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0],
+      "id": "0cdf1122-0d8b-4964-9e21-09aa5078da54",
+      "name": "Check Webhook Secret"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-authorized",
+              "leftValue": "={{ $json._authorized }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [448, 0],
+      "id": "98a28fa2-b825-4e0d-ab47-e6be13bca618",
+      "name": "Authorized?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'unauthorized' }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [672, 160],
+      "id": "52bacd74-148b-400c-8b0c-72df94a70238",
+      "name": "Respond Unauthorized"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nfor (const f of ['appointment_id', 'tenant_id']) {\n  if (!body[f] || !uuid.test(String(body[f]))) throw new Error(`${f} is required and must be a uuid`);\n}\nreturn [{ json: { appointment_id: String(body.appointment_id), tenant_id: String(body.tenant_id) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, -96],
+      "id": "018525df-8c52-47b0-a1e4-26a5d2b0a78e",
+      "name": "Validate Input"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  (select id from appointments where id = $1::uuid and tenant_id = $2::uuid) as appointment_id,\n  (select status from appointments where id = $1::uuid and tenant_id = $2::uuid) as status,\n  (select external_calendar_id from appointments where id = $1::uuid and tenant_id = $2::uuid) as external_calendar_id,\n  (select google_calendar_id from ai_config where tenant_id = $2::uuid) as google_calendar_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.appointment_id, $json.tenant_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [896, -96],
+      "id": "dcc5605f-3927-4fa8-9527-31b96f8dde14",
+      "name": "Load Appointment",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One row always comes back from Load Appointment (scalar subqueries), with\n// NULLs when the appointment doesn't exist for this tenant.\nconst r = $input.first().json;\nconst input = $('Validate Input').first().json;\n\nif (!r.appointment_id) {\n  return [{ json: { ok: false, code: 404, error: 'appointment not found for this tenant' } }];\n}\nif (['cancelled', 'completed', 'no_show'].includes(r.status)) {\n  return [{ json: { ok: false, code: 409, error: `appointment is already ${r.status.replace('_', ' ')}` } }];\n}\n\nreturn [{\n  json: {\n    ok: true,\n    appointment_id: input.appointment_id,\n    tenant_id: input.tenant_id,\n    google_calendar_id: r.google_calendar_id || null,\n    external_calendar_id: r.external_calendar_id || null,\n    has_event: !!(r.google_calendar_id && r.external_calendar_id),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, -96],
+      "id": "17c45aeb-8fb8-4a48-b2c2-2845b66fafe8",
+      "name": "Check Appointment"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-can-cancel",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1344, -96],
+      "id": "75a700e8-eaae-4db6-9627-2bea3befb31e",
+      "name": "Can Cancel?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1568, 96],
+      "id": "a6fff3d5-f36c-4952-86a7-f330fa19f76f",
+      "name": "Respond Error"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-has-event",
+              "leftValue": "={{ $json.has_event }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1568, -192],
+      "id": "c827d06a-7a5b-443f-97e5-88f9af9d0d03",
+      "name": "Has Calendar Event?"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.google_calendar_id) }}/events/{{ encodeURIComponent($json.external_calendar_id) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [1792, -288],
+      "id": "182fe649-f511-4d0f-82f3-276d02a483df",
+      "name": "Delete Calendar Event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      },
+      "continueOnFail": true,
+      "notes": "Same credential and HTTP-node pattern as 12's Delete Orphaned Calendar Event (the native Google Calendar node is unreliable with expressions -- see KNOWN_ISSUES.md)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Delete Calendar Event runs with continueOnFail. Google answers 204 on\n// success, and 410 Gone / 404 if the event was already deleted (e.g. someone\n// removed it straight from Google Calendar) -- that still counts as done.\n// Anything else (expired credential, no access to that calendar) is reported\n// back so the dashboard can tell the user to remove the event by hand.\nconst err = $input.first().json.error;\nlet calendar = 'deleted';\nif (err) {\n  const text = JSON.stringify(err);\n  calendar = /\\b(404|410)\\b|not ?found|has been deleted/i.test(text) ? 'already_gone' : 'failed';\n}\nreturn [{ json: { ...$('Check Appointment').first().json, calendar } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2016, -288],
+      "id": "6753c212-b607-4312-b8d1-6281c6e1ff0f",
+      "name": "Calendar Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "// No Google event to remove: either the tenant has no google_calendar_id, or\n// the appointment was created without one (e.g. inserted by hand).\nreturn [{ json: { ...$input.first().json, calendar: 'no_event' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1792, -96],
+      "id": "6d87eb8e-f9eb-4e5a-9dc9-18d7d47c8efc",
+      "name": "No Calendar Event"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update appointments\nset status = 'cancelled'\nwhere id = $1::uuid\n  and tenant_id = $2::uuid\n  and status not in ('cancelled', 'completed', 'no_show')\nreturning id, status, $3::text as calendar;",
+        "options": {
+          "queryReplacement": "={{ [$json.appointment_id, $json.tenant_id, $json.calendar] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2240, -192],
+      "id": "1e16be1a-3a24-4b82-9035-d4cd98f7c477",
+      "name": "Mark Cancelled",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "alwaysOutputData": true,
+      "notes": "alwaysOutputData: if the row changed between Load Appointment and here, zero rows come back and Respond Result still answers (409) instead of leaving the webhook hanging. The status change fires the CRM-sync trigger from migration 0026."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.id ? { success: true, appointment_id: $json.id, status: $json.status, calendar: $json.calendar } : { success: false, error: 'the appointment changed while cancelling -- refresh and try again' }) }}",
+        "options": {
+          "responseCode": "={{ $json.id ? 200 : 409 }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2464, -192],
+      "id": "3e021c34-5047-4446-a007-583bd674f347",
+      "name": "Respond Result"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cancel Appointment Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check Webhook Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Webhook Secret": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Load Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Appointment": {
+      "main": [
+        [
+          {
+            "node": "Check Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Appointment": {
+      "main": [
+        [
+          {
+            "node": "Can Cancel?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Cancel?": {
+      "main": [
+        [
+          {
+            "node": "Has Calendar Event?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Calendar Event?": {
+      "main": [
+        [
+          {
+            "node": "Delete Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Calendar Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Result": {
+      "main": [
+        [
+          {
+            "node": "Mark Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Mark Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Cancelled": {
+      "main": [
+        [
+          {
+            "node": "Respond Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0fc7ee73-3f5e-4371-bc8f-69ab36d3abd8",
+  "meta": {
+    "instanceId": "36177d9f39e3fbadc619b09e17534862ace538a3346430144aa13259526ba5c0"
+  },
+  "nodeGroups": [],
+  "id": "267d2f3f-0324-4b60-8c96-6fe440323191",
+  "tags": []
+}
