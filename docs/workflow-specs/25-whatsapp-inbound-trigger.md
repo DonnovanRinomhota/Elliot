@@ -10,7 +10,7 @@ Two webhook nodes sharing the same path (`/webhook/whatsapp`), distinguished by 
 | Node | What it does |
 |---|---|
 | WhatsApp Verify (GET) | Receives Meta's one-time (or repeated, if you re-verify) handshake request |
-| Check Verify Token | Compares `hub.verify_token` against the `WHATSAPP_VERIFY_TOKEN` environment variable; `hub.mode` must be `subscribe` |
+| Check Verify Token | Compares `hub.verify_token` against the verify token pasted into this node (or a `WHATSAPP_VERIFY_TOKEN` variable, where available); `hub.mode` must be `subscribe` |
 | Verify OK? | Branches on the result |
 | Respond Challenge / Respond Verify Failed | Echoes `hub.challenge` back as plain text (200) if valid, else a 403 |
 | WhatsApp Webhook (POST) | Receives every inbound message and delivery/read status update Meta sends |
@@ -32,10 +32,30 @@ Classification is genuinely channel-agnostic — it only ever looks at subject+b
 ## Credentials required
 None on this workflow's own nodes beyond the shared Postgres credential — no WhatsApp credential is needed to *receive* messages, only to send them (see workflow `27`).
 
-## Environment variables required
-`WHATSAPP_VERIFY_TOKEN` — a secret string you choose and enter in both n8n's environment and the Meta App dashboard's webhook configuration. Meta echoes it back on the verify `GET`; this workflow checks it matches before confirming the subscription.
+## Secrets required
+n8n Cloud Starter has no Variables and blocks `$env`, so both secrets are
+**pasted into their Code node after import**, replacing a placeholder. The
+repo only ever holds the placeholders; don't export the workflow back with
+real values. On plans with Variables, or self-hosted with `$env` allowed, a
+variable of the same name takes priority over the pasted value.
 
-`META_APP_SECRET` — the App Secret from Meta App Dashboard → App settings → Basic. Used to verify each POST's `X-Hub-Signature-256`. Also needs `NODE_FUNCTION_ALLOW_BUILTIN=crypto` on n8n, and **Raw Body** on in the `WhatsApp Webhook (POST)` node (already set in this export). `WHATSAPP_SIGNATURE_CHECK=off` skips the check for local testing with hand-written payloads; never set it in production.
+- **Verify token** (`Check Verify Token`, placeholder
+  `PASTE_WHATSAPP_VERIFY_TOKEN_HERE`; variable `WHATSAPP_VERIFY_TOKEN`) — a
+  secret string you choose and also enter in the Meta App dashboard's
+  webhook configuration. Meta echoes it back on the verify `GET`; the
+  workflow checks it matches before confirming the subscription. Left as
+  the placeholder, every handshake is refused.
+- **Meta App Secret** (`Verify Meta Signature`, placeholder
+  `PASTE_META_APP_SECRET_HERE`; variable `META_APP_SECRET`) — from Meta App
+  Dashboard → App settings → Basic. Used to verify each POST's
+  `X-Hub-Signature-256` over the raw body (**Raw Body** is on in the
+  `WhatsApp Webhook (POST)` node in this export). Left as the placeholder,
+  every message is dropped (`no_secret_configured`).
+
+`require('crypto')` works on n8n Cloud; self-hosted needs
+`NODE_FUNCTION_ALLOW_BUILTIN=crypto`. A `WHATSAPP_SIGNATURE_CHECK` variable
+set to `off` skips the signature check for local testing with hand-written
+payloads; never in production.
 
 ## Error paths
 - **Unmatched `phone_number_id` → logged to `audit_log`, not silently dropped.** This is a deliberate improvement over `16`'s documented gap (a misconfigured `connected_gmail_address` drops mail with zero trace). Still requires someone to actually look at `audit_log`; no alerting is built.

@@ -15,7 +15,8 @@ except onboarding is scoped to the logged-in user's own tenant via RLS.
    - `SUPABASE_SERVICE_ROLE_KEY` (server-only; used once, by self-serve signup -- see `lib/supabase/admin.ts`)
    - Server-only, for the internal n8n webhooks (see `lib/n8n-webhook.ts` and
      `docs/workflow-specs/internal-webhook-auth.md`):
-     - `ELLIOT_WEBHOOK_SECRET` (same value as on the n8n instance, 16+ chars)
+     - `ELLIOT_WEBHOOK_SECRET` (same value as the n8n credential `Elliot
+       Internal Webhook Secret`; generate with `openssl rand -hex 32`)
      - `N8N_ONBOARD_WEBHOOK_URL` (workflow 19's webhook; replaces
        `NEXT_PUBLIC_N8N_ONBOARD_WEBHOOK_URL`, which still works as a fallback)
      - `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` (workflow 30's webhook; without

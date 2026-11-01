@@ -8,7 +8,7 @@ Before this, creating a tenant meant hand-writing `INSERT` statements into `tena
 2. ~~This endpoint has no auth.~~ Fixed: it now requires the `x-elliot-webhook-secret` header (see `internal-webhook-auth.md`). The dashboard calls it through its own server route, never from the browser.
 
 ## Trigger
-Internal webhook (`POST /onboard-tenant`) — not linked from the marketing site or anywhere public. Starts with **Check Webhook Secret → Authorized?** (401 without the shared secret).
+Internal webhook (`POST /onboard-tenant`) — not linked from the marketing site or anywhere public. The Webhook node uses n8n Header Auth with the `Elliot Internal Webhook Secret` credential, so n8n refuses calls without the shared secret.
 
 ## Inputs
 ```json
@@ -64,4 +64,4 @@ Only `name` and `slug` are required. Everything else has a safe default — `aut
 ```
 
 ## Connecting this to your workflow
-Import, set the Postgres credential, set `ELLIOT_WEBHOOK_SECRET` on n8n, activate. Put the Production URL in the dashboard's `N8N_ONBOARD_WEBHOOK_URL` (server-only) and the same secret in its `ELLIOT_WEBHOOK_SECRET`.
+Import (or edit in place), set the Postgres credential, set the Webhook node's Authentication to Header Auth with the `Elliot Internal Webhook Secret` credential, activate. Put the Production URL in the dashboard's `N8N_ONBOARD_WEBHOOK_URL` (server-only) and the same secret in its `ELLIOT_WEBHOOK_SECRET`.

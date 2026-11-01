@@ -168,12 +168,14 @@ the form, and the nav link itself is hidden for non-admins too
 whitespace, empty-list, and multi-entry edge cases.
 
 **Fixed (Nov 2026):** the webhook itself now requires a shared secret.
-Workflow 19 starts with `Check Webhook Secret → Authorized?`, which returns
-401 unless the `x-elliot-webhook-secret` header matches the n8n env var
-`ELLIOT_WEBHOOK_SECRET` (fails closed if unset). The dashboard form no
-longer calls n8n from the browser: it posts to `app/api/admin/onboard`,
-which re-checks `ADMIN_EMAILS` server-side and adds the secret. Workflows
-21, 22 and 30 got the same gate. See
+Workflow 19's Webhook node uses n8n's built-in Header Auth with the
+`Elliot Internal Webhook Secret` credential, so n8n refuses any call
+without a matching `x-elliot-webhook-secret` header before the workflow
+runs. (A first version checked an `$env` variable in a Code node; n8n Cloud
+blocks `$env`, so it was switched to Header Auth, which works on every
+plan.) The dashboard form no longer calls n8n from the browser: it posts to
+`app/api/admin/onboard`, which re-checks `ADMIN_EMAILS` server-side and
+adds the secret. Workflows 21, 22 and 30 got the same protection. See
 `docs/workflow-specs/internal-webhook-auth.md`. Nothing
 in the schema distinguishes "runs the platform" from "runs one tenant"
 either (`tenant_users.role` is per-tenant only) -- the env-var allow-list
@@ -208,7 +210,9 @@ forged payload that got processed as a real customer message.
 **Fixed:** `Verify Meta Signature` (between the POST trigger and `Extract
 WhatsApp Fields`) recomputes the HMAC over the raw body (Raw Body is now on
 in the trigger) and `Signature Valid?` drops anything that isn't valid.
-Needs `META_APP_SECRET` and `NODE_FUNCTION_ALLOW_BUILTIN=crypto` on n8n.
+Needs the Meta App Secret pasted into that node after import (n8n Cloud
+Starter has no Variables and blocks `$env`; a `META_APP_SECRET` variable
+takes priority where available). The repo keeps the placeholder.
 Unit-tested with real HMACs (valid, tampered, wrong secret, malformed,
 missing). See `docs/workflow-specs/25-whatsapp-inbound-trigger.md`.
 
@@ -237,6 +241,7 @@ WhatsApp send) are called from client components using `NEXT_PUBLIC_*`
 URLs, so they can't carry the shared webhook secret and remain callable by
 anyone who finds the URL. `17`/`28` can only send an existing draft by its
 id (an unguessable uuid), not arbitrary content, which limits the damage;
-`08` can add documents to any tenant's knowledge base by slug. Fix: move each call behind a server route
-using `lib/n8n-webhook.ts`, then add the same `Check Webhook Secret` gate
-(see `docs/workflow-specs/internal-webhook-auth.md`).
+`08` can add documents to any tenant's knowledge base by slug. Fix: move
+each call behind a server route using `lib/n8n-webhook.ts`, then switch on
+Header Auth with the same credential (see
+`docs/workflow-specs/internal-webhook-auth.md`).

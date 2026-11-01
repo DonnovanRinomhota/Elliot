@@ -1,10 +1,11 @@
-// Tests for the Code-node logic added in the client-ready fix pack:
-// internal-webhook secret gate (19/21/22/30), Meta signature check (25),
+// Tests for the client-ready fix pack: Header Auth on the internal webhooks
+// (19/21/22/30), WhatsApp verify token + Meta signature check (25),
 // cancel-appointment decisions (30) and the lead-scoring status fix (10).
 //
 // Unlike chunking_logic.test.js, this does NOT copy the node code: it reads
 // each node's jsCode straight out of the workflow JSON and runs it with a
-// small stand-in for n8n's runtime ($input, $env, $(), this.helpers). So the
+// small stand-in for n8n's runtime ($input, $json, $env, $vars, $(),
+// this.helpers). So the
 // tests always exercise exactly what n8n will import.
 //
 // Run: node n8n/workflows/tests/client_ready_fixes.test.js
@@ -25,7 +26,12 @@ function nodeCode(file, nodeName) {
 }
 
 // Runs a Code node ("Run Once for All Items" mode) against one input item.
-async function run(code, { json = {}, binary, env = {}, nodes = {} } = {}) {
+//
+// env/vars model where secrets come from. Pass env: BLOCKED_ENV to mimic n8n
+// Cloud, where touching $env throws.
+const BLOCKED_ENV = new Proxy({}, { get() { throw new Error('access to env vars denied'); } });
+
+async function run(code, { json = {}, binary, env = {}, vars = {}, nodes = {} } = {}) {
   const item = { json, binary };
   const $input = { first: () => item, all: () => [item] };
   const $ = (name) => {
@@ -35,8 +41,8 @@ async function run(code, { json = {}, binary, env = {}, nodes = {} } = {}) {
   const helpers = {
     getBinaryDataBuffer: async (i, prop) => binary[prop].__raw,
   };
-  const fn = new AsyncFunction('$input', '$json', '$env', '$', 'require', code);
-  const out = await fn.call({ helpers }, $input, json, env, $, require);
+  const fn = new AsyncFunction('$input', '$json', '$env', '$vars', '$', 'require', code);
+  const out = await fn.call({ helpers }, $input, json, env, vars, $, require);
   return out[0].json;
 }
 
@@ -53,50 +59,65 @@ async function test(name, fn) {
 }
 
 (async () => {
-  // ───────────── Internal webhook secret gate ─────────────
-  console.log('Internal webhook secret gate (19, 21, 22, 30)');
-  const gate = nodeCode('19-tenant-onboarding.json', 'Check Webhook Secret');
-  for (const f of ['21-start-follow-up-run.json', '22-queue-crm-sync.json', '30-cancel-appointment.json']) {
-    await test(`${f} uses the identical gate`, () => assert.strictEqual(nodeCode(f, 'Check Webhook Secret'), gate));
+  // ───────────── Internal webhooks: Header Auth ─────────────
+  console.log('Internal webhooks use Header Auth (19, 21, 22, 30)');
+  const HOOKS = {
+    '19-tenant-onboarding.json': 'Onboarding Webhook',
+    '21-start-follow-up-run.json': 'Start Follow-Up Webhook',
+    '22-queue-crm-sync.json': 'Queue Sync Webhook',
+    '30-cancel-appointment.json': 'Cancel Appointment Webhook',
+  };
+  for (const [file, hookName] of Object.entries(HOOKS)) {
+    await test(`${file}: webhook requires the shared Header Auth credential`, () => {
+      const wf = JSON.parse(fs.readFileSync(path.join(WF_DIR, file), 'utf8'));
+      const hook = wf.nodes.find((n) => n.name === hookName);
+      assert.strictEqual(hook.parameters.authentication, 'headerAuth');
+      assert.strictEqual(hook.credentials.httpHeaderAuth.name, 'Elliot Internal Webhook Secret');
+      // No leftover $env gate (blocked on n8n Cloud) and nothing skips the webhook node.
+      assert.ok(!JSON.stringify(wf).includes('$env'), 'no $env use');
+      assert.ok(!wf.nodes.some((n) => n.name === 'Check Webhook Secret'), 'old Code gate removed');
+    });
   }
 
-  const SECRET = 'a'.repeat(20) + 'Z9';
-  const req = (h) => ({ headers: h, body: { name: 'Acme', slug: 'acme' } });
+  // ───────────── WhatsApp verify token ─────────────
+  console.log('WhatsApp verify token (25)');
+  const verifyCode = nodeCode('25-whatsapp-inbound-trigger.json', 'Check Verify Token');
+  const TOKEN = 'my-verify-token';
+  const pastedVerify = verifyCode.replace('PASTE_WHATSAPP_VERIFY_TOKEN_HERE', TOKEN);
+  const handshake = (token) => ({ query: { 'hub.mode': 'subscribe', 'hub.verify_token': token, 'hub.challenge': 'ch-1' } });
 
-  await test('correct secret is authorized and body passes through', async () => {
-    const out = await run(gate, { json: req({ 'x-elliot-webhook-secret': SECRET }), env: { ELLIOT_WEBHOOK_SECRET: SECRET } });
-    assert.strictEqual(out._authorized, true);
-    assert.deepStrictEqual(out.body, { name: 'Acme', slug: 'acme' });
+  await test('pasted token answers the handshake on n8n Cloud ($env blocked)', async () => {
+    const out = await run(pastedVerify, { json: handshake(TOKEN), env: BLOCKED_ENV });
+    assert.deepStrictEqual(out, { ok: true, challenge: 'ch-1' });
   });
-  await test('wrong secret of the same length is rejected', async () => {
-    const wrong = SECRET.slice(0, -1) + 'X';
-    const out = await run(gate, { json: req({ 'x-elliot-webhook-secret': wrong }), env: { ELLIOT_WEBHOOK_SECRET: SECRET } });
-    assert.strictEqual(out._authorized, false);
+  await test('wrong token is refused', async () => {
+    const out = await run(pastedVerify, { json: handshake('nope'), env: BLOCKED_ENV });
+    assert.strictEqual(out.ok, false);
   });
-  await test('missing header is rejected', async () => {
-    const out = await run(gate, { json: req({}), env: { ELLIOT_WEBHOOK_SECRET: SECRET } });
-    assert.strictEqual(out._authorized, false);
+  await test('placeholder left in place refuses every handshake', async () => {
+    const out = await run(verifyCode, { json: handshake('PASTE_WHATSAPP_VERIFY_TOKEN_HERE'), env: BLOCKED_ENV });
+    assert.strictEqual(out.ok, false);
   });
-  await test('unset env var fails closed, even with an empty header', async () => {
-    const out = await run(gate, { json: req({ 'x-elliot-webhook-secret': '' }), env: {} });
-    assert.strictEqual(out._authorized, false);
-  });
-  await test('a too-short configured secret fails closed', async () => {
-    const out = await run(gate, { json: req({ 'x-elliot-webhook-secret': 'short' }), env: { ELLIOT_WEBHOOK_SECRET: 'short' } });
-    assert.strictEqual(out._authorized, false);
+  await test('a WHATSAPP_VERIFY_TOKEN variable still works (Pro / self-hosted)', async () => {
+    const viaVars = await run(verifyCode, { json: handshake(TOKEN), env: BLOCKED_ENV, vars: { WHATSAPP_VERIFY_TOKEN: TOKEN } });
+    const viaEnv = await run(verifyCode, { json: handshake(TOKEN), env: { WHATSAPP_VERIFY_TOKEN: TOKEN } });
+    assert.strictEqual(viaVars.ok, true);
+    assert.strictEqual(viaEnv.ok, true);
   });
 
   // ───────────── Meta signature check ─────────────
   console.log('WhatsApp Meta signature check (25)');
-  const sig = nodeCode('25-whatsapp-inbound-trigger.json', 'Verify Meta Signature');
+  const sigRaw = nodeCode('25-whatsapp-inbound-trigger.json', 'Verify Meta Signature');
   const APP_SECRET = 'meta-app-secret-123';
+  // As set up on n8n Cloud Starter: secret pasted into the node, $env blocked.
+  const sig = sigRaw.replace('PASTE_META_APP_SECRET_HERE', APP_SECRET);
   const rawBody = Buffer.from(JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ type: 'text' }] } }] }] }));
   const sign = (buf, secret = APP_SECRET) => 'sha256=' + crypto.createHmac('sha256', secret).update(buf).digest('hex');
   const metaReq = (header, raw = rawBody) => ({
     json: { headers: header === undefined ? {} : { 'x-hub-signature-256': header }, body: JSON.parse(raw.toString()) },
     binary: { data: { __raw: raw } },
   });
-  const env = { META_APP_SECRET: APP_SECRET };
+  const env = BLOCKED_ENV;
 
   await test('genuine Meta signature is valid and the body passes through', async () => {
     const out = await run(sig, { ...metaReq(sign(rawBody)), env });
@@ -120,13 +141,23 @@ async function test(name, fn) {
     const out = await run(sig, { ...metaReq(undefined), env });
     assert.strictEqual(out._signature, 'missing');
   });
-  await test('no META_APP_SECRET configured fails closed', async () => {
-    const out = await run(sig, { ...metaReq(sign(rawBody)), env: {} });
+  await test('placeholder left in place fails closed', async () => {
+    const out = await run(sigRaw, { ...metaReq(sign(rawBody)), env: BLOCKED_ENV });
     assert.strictEqual(out._signature, 'no_secret_configured');
+  });
+  await test('a META_APP_SECRET variable works without pasting (Pro / self-hosted)', async () => {
+    const viaVars = await run(sigRaw, { ...metaReq(sign(rawBody)), env: BLOCKED_ENV, vars: { META_APP_SECRET: APP_SECRET } });
+    const viaEnv = await run(sigRaw, { ...metaReq(sign(rawBody)), env: { META_APP_SECRET: APP_SECRET } });
+    assert.strictEqual(viaVars._signature, 'valid');
+    assert.strictEqual(viaEnv._signature, 'valid');
   });
   await test('WHATSAPP_SIGNATURE_CHECK=off skips the check (local testing only)', async () => {
     const out = await run(sig, { ...metaReq(undefined), env: { WHATSAPP_SIGNATURE_CHECK: 'off' } });
     assert.strictEqual(out._signature, 'skipped');
+  });
+  await test('the repo never contains a real secret (placeholders only)', () => {
+    assert.ok(sigRaw.includes("const META_APP_SECRET = 'PASTE_META_APP_SECRET_HERE';"));
+    assert.ok(verifyCode.includes("const WHATSAPP_VERIFY_TOKEN = 'PASTE_WHATSAPP_VERIFY_TOKEN_HERE';"));
   });
   await test('Signature Valid? only lets valid/skipped through', () => {
     const wf = JSON.parse(fs.readFileSync(path.join(WF_DIR, '25-whatsapp-inbound-trigger.json'), 'utf8'));
