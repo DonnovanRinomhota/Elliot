@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "ingest-document",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -16,7 +17,13 @@
         0,
         0
       ],
-      "webhookId": "elliot-knowledge-ingest"
+      "webhookId": "elliot-knowledge-ingest",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Elliot Internal Webhook Secret"
+        }
+      }
     },
     {
       "parameters": {

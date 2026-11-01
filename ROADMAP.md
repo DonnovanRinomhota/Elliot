@@ -19,9 +19,14 @@ is verified against a real Postgres 16 + pgvector with every migration applied
 (`db/seed/test_0026_auto_sync_and_enrolment.sql`), the Code-node logic is
 unit-tested straight from the workflow JSON
 (`n8n/workflows/tests/client_ready_fixes.test.js`), and the dashboard passes
-`tsc`, a production build and its unit tests. **None of it has run inside n8n
-or against the live stack yet**, so the items below stay 🟡 until the smoke
-test in `docs/client-ready-setup.md` passes.
+`tsc`, a production build and its unit tests. **The live smoke test in
+`docs/client-ready-setup.md` passed on 2026-11-01** on the real stack (n8n
+Cloud, Vercel, Supabase, Google Calendar): webhook auth refusing calls
+without the secret, onboarding, lead capture with CRM sync, booking and
+cancel (calendar event removed, CRM updated), and a manually started
+follow-up. Two pieces couldn't be covered by a 15-minute test and stay 🟡:
+auto-enrol (needs a lead to go quiet for hours) and anything WhatsApp.
+Production showed no runtime errors over the deploys and tests.
 
 ## Customer-facing channels
 
@@ -105,14 +110,13 @@ test in `docs/client-ready-setup.md` passes.
   for `chat_widget` conversations and can't until the widget above exists
   *and* has some persistent connection (polling/Realtime) to receive a
   message that didn't come from its own request. See `KNOWN_ISSUES.md`.
-- 🟡 **Tenant onboarding UI** (`/dashboard/onboarding`) -- form wrapping
+- ✅ **Tenant onboarding UI** (`/dashboard/onboarding`) -- form wrapping
   workflow 19 exists and works. Route is gated to admins listed in
   `ADMIN_EMAILS` (`lib/admin.ts`), now enforced server-side too: the form
   posts to `app/api/admin/onboard`, which re-checks the admin list and
   calls workflow 19 with the shared webhook secret. Workflow 19 rejects
-  calls without it (n8n Header Auth). Remaining: live check after setting
-  the secret in Vercel and in n8n's `Elliot Internal Webhook Secret`
-  credential.
+  calls without it (n8n Header Auth). Tested live 2026-11-01: a test
+  tenant created from the page, and a call without the secret refused.
 - ✅ **Knowledge base upload** (`/dashboard/knowledge`) -- pasted text, PDF,
   and website ingestion (PR #32). PDFs are parsed client-side in the
   browser via `pdfjs-dist` and submitted through the same pasted-text
@@ -170,19 +174,21 @@ test in `docs/client-ready-setup.md` passes.
   can also Start / Stop a follow-up on any lead from the Leads page. All
   enrolment rules tested in SQL (see the fix-pack note above), including
   "switching it on never back-fills old leads" and RLS on the dashboard's
-  writes. Remaining: run workflow 29 live. See
+  writes. Start / Stop follow-up tested live 2026-11-01. Remaining: the
+  first real auto-enrolment by workflow 29 (needs a lead to stay quiet for
+  the configured hours). See
   `docs/workflow-specs/29-auto-enrol-follow-ups.md`.
-- 🟡 **Automatic CRM sync** (migration `0026`, workflow `23`). Contacts,
+- ✅ **Automatic CRM sync** (migration `0026`, workflow `23`). Contacts,
   leads and appointments queue a CRM sync on create and on meaningful
   change -- including dashboard edits like "Mark CONVERTED" or Cancel --
   for tenants with a `crm_webhook_url`. Lead and appointment payloads now
-  embed the contact. Remaining: live run against a real receiver. Still
-  one-way (CRM → Elliot changes don't come back). See
+  embed the contact. Tested live 2026-11-01: contact, lead and cancelled
+  appointment payloads all arrived at the receiver. Still one-way (CRM → Elliot changes don't come back). See
   `docs/workflow-specs/22-crm-sync.md`.
-- 🟡 **Cancel removes the Google Calendar event** (workflow `30`,
+- ✅ **Cancel removes the Google Calendar event** (workflow `30`,
   `app/api/appointments/[id]/cancel`). Falls back to an Elliot-only cancel
-  with a visible warning when the webhook isn't configured. Remaining: live
-  run against Google Calendar. No reschedule flow and no cancellation email
+  with a visible warning when the webhook isn't configured. Tested live
+  2026-11-01 against Google Calendar. No reschedule flow and no cancellation email
   to the contact. See `docs/workflow-specs/30-cancel-appointment.md`.
 - 🟡 **Self-serve signup + forgot/reset password** (PR #35, Sep 2026).
   "Create Business" on the login page creates the tenant, its `ai_config`
@@ -193,13 +199,15 @@ test in `docs/client-ready-setup.md` passes.
 
 - ✅ Orphaned Google Calendar event on a booking collision -- fixed with a
   compensating delete, tested live against a real double-booking.
-- 🟡 Onboarding page access control -- closed in code: route gated, server
-  route re-checks, n8n webhook requires the shared secret (19, and also 21,
-  22, 30; see `docs/workflow-specs/internal-webhook-auth.md`). Pending a
-  live check.
-- 🟡 Lead scoring wrote `QUALIFIED` for scores 40–69, which
+- ✅ Onboarding page access control -- route gated, server route
+  re-checks, n8n webhook requires the shared secret. Tested live
+  2026-11-01. All internal webhooks (08, 17, 19, 21, 22, 28, 30) now use
+  the same Header Auth and are only called from the dashboard's server;
+  see `docs/workflow-specs/internal-webhook-auth.md`.
+- ✅ Lead scoring wrote `QUALIFIED` for scores 40–69, which
   `leads_status_check` rejects, so those leads never saved. Workflow 10 now
-  writes `WARM`. Unit-tested from the workflow JSON; pending live check.
+  writes `WARM`. Unit-tested from the workflow JSON; leads saved live in
+  the 2026-11-01 smoke test.
 - 🟡 WhatsApp inbound (25) now verifies Meta's `X-Hub-Signature-256`.
   Unit-tested with real HMACs; pending a live Meta number (same as the rest
   of WhatsApp).

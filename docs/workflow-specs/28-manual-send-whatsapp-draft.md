@@ -1,7 +1,7 @@
 # Workflow Spec: 28 - Manual Send WhatsApp Draft
 
 ## Trigger
-Public-ish webhook (`POST /send-approved-whatsapp-draft`) — the thin trigger the dashboard's Approvals "Approve & Send" button hits for a WhatsApp draft. Exact mirror of `17 - Manual Send Draft`, against `27` instead of `15`.
+Internal webhook (`POST /send-approved-whatsapp-draft`) with n8n Header Auth (`Elliot Internal Webhook Secret` credential) — the thin trigger the dashboard's Approvals "Approve & Send" button reaches, through the server route `app/api/drafts/[id]/send` (which checks tenant and `approved` status first), for a WhatsApp draft. Exact mirror of `17 - Manual Send Draft`, against `27` instead of `15`.
 
 ## Inputs
 ```json

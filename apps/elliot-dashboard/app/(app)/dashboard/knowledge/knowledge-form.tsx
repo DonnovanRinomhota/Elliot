@@ -39,7 +39,9 @@ async function extractPdfText(file: File): Promise<string> {
   return text;
 }
 
-export default function KnowledgeForm({ tenantSlug }: { tenantSlug: string }) {
+// tenantSlug is no longer sent anywhere: the server route takes the tenant
+// from the session. The prop stays so page.tsx doesn't need to change.
+export default function KnowledgeForm({ tenantSlug: _tenantSlug }: { tenantSlug: string }) {
   const [title, setTitle] = useState("");
   const [sourceType, setSourceType] = useState("faq");
   const [text, setText] = useState("");
@@ -65,18 +67,21 @@ export default function KnowledgeForm({ tenantSlug }: { tenantSlug: string }) {
     try {
       let body: Record<string, string>;
 
+      // No tenant_slug here: the server route takes the tenant from the
+      // signed-in user's session, so nobody can add to another tenant's
+      // knowledge base -- see app/api/knowledge/ingest/route.ts.
       if (isWebsite) {
-        body = { tenant_slug: tenantSlug, title, source_type: "website", url: url.trim() };
+        body = { title, source_type: "website", url: url.trim() };
       } else if (isPdf) {
         setExtracting(true);
         const extractedText = await extractPdfText(pdfFile!);
         setExtracting(false);
-        body = { tenant_slug: tenantSlug, title, source_type: "pdf", text: extractedText };
+        body = { title, source_type: "pdf", text: extractedText };
       } else {
-        body = { tenant_slug: tenantSlug, title, source_type: sourceType, text };
+        body = { title, source_type: sourceType, text };
       }
 
-      const res = await fetch(process.env.NEXT_PUBLIC_N8N_INGEST_WEBHOOK_URL!, {
+      const res = await fetch("/api/knowledge/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

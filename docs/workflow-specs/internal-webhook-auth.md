@@ -1,13 +1,16 @@
 # Internal webhook auth (shared secret)
 
-Applies to: `19` tenant onboarding, `21` start follow-up run, `22` queue
-CRM sync, `30` cancel appointment.
+Applies to: `08` knowledge ingestion, `17` manual email send, `19` tenant
+onboarding, `21` start follow-up run, `22` queue CRM sync, `28` manual
+WhatsApp send, `30` cancel appointment.
 
 ## Why
 These webhooks create tenants, start email sequences, queue CRM writes and
 cancel bookings. Before this, anyone who found a URL could call them.
-Workflow 19 was the one flagged in `KNOWN_ISSUES.md`; 21, 22 and 30 got the
-same protection because they're the same kind of endpoint.
+Workflow 19 was the one flagged first; the rest got the same protection
+because they're the same kind of endpoint. 08 mattered most after that: it
+let anyone add documents to any tenant's knowledge base, which the AI then
+answers customers from.
 
 ## How it works
 Each workflow's Webhook node has **Authentication: Header Auth**, using one
@@ -23,15 +26,22 @@ shared n8n credential named **`Elliot Internal Webhook Secret`**
   (`PLACEHOLDER_SET_ON_IMPORT`). On import, n8n asks you to pick the
   credential; the secret never appears in the repo.
 
-`n8n/workflows/tests/client_ready_fixes.test.js` checks all four Webhook
+`n8n/workflows/tests/client_ready_fixes.test.js` checks all seven Webhook
 nodes use Header Auth with that credential and that none of them reads
 `$env`.
 
 ## Callers
-- The dashboard calls 19 and 30 from server route handlers
-  (`app/api/admin/onboard`, `app/api/appointments/[id]/cancel`) through
+- The dashboard calls them only from server route handlers, through
   `lib/n8n-webhook.ts`, which sends Vercel's `ELLIOT_WEBHOOK_SECRET` as the
-  header. That value must match the credential's Value. The secret is a
+  header:
+
+  | Route | Workflow | What the route checks first |
+  |---|---|---|
+  | `app/api/admin/onboard` | 19 | caller is in `ADMIN_EMAILS` |
+  | `app/api/appointments/[id]/cancel` | 30 | appointment is the user's tenant's (RLS); tenant id taken from the row |
+  | `app/api/drafts/[id]/send` | 17 / 28 | draft is the user's tenant's (RLS) and `approved` |
+  | `app/api/knowledge/ingest` | 08 | tenant slug taken from the session, never from the browser |
+ That value must match the credential's Value. The secret is a
   server-only env var and never reaches the browser. A 401/403 from n8n is
   reported as "n8n rejected the webhook secret".
 - 21 and 22 have no automatic callers any more: CRM sync queues from
@@ -53,9 +63,5 @@ moment.
 ## Not covered
 - Not per-tenant: one secret for the whole platform. Fine while one
   operator runs everything.
-- `08` knowledge ingestion, `17` and `28` (manual sends) are still called
-  from the dashboard's browser code, so they can't hold the secret. See
-  `KNOWN_ISSUES.md`; the fix is moving each behind a server route, then
-  switching on Header Auth the same way.
 - The public `chat` webhook (01) and `demo-request` (18) are public by
   design.

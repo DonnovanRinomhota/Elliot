@@ -1,7 +1,7 @@
 # Workflow Spec: 08 - Knowledge Ingestion
 
 ## Trigger
-`POST /webhook/ingest-document` — called manually (via curl/Postman) for Phase 3. A dashboard upload UI is a later phase.
+`POST /webhook/ingest-document`, with n8n Header Auth (`Elliot Internal Webhook Secret` credential; see `internal-webhook-auth.md`). Called by the dashboard's server route `app/api/knowledge/ingest`, which takes `tenant_slug` from the signed-in user's session rather than from the browser. Manual calls (curl/Postman) need the `x-elliot-webhook-secret` header.
 
 ## Inputs (JSON body)
 Two shapes, depending on `source_type`:

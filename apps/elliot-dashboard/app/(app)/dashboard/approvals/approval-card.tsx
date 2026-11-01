@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// channel decides which table/RPC/send-webhook this card talks to --
-// email_drafts + approve_email_draft() + NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL,
-// or whatsapp_drafts + approve_whatsapp_draft() +
-// NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL. Two sibling tables, not one --
-// see migration 0025's header comment for why.
+// channel decides which table/RPC/send workflow this card talks to --
+// email_drafts + approve_email_draft() + workflow 17, or whatsapp_drafts +
+// approve_whatsapp_draft() + workflow 28 (both reached through
+// /api/drafts/[id]/send). Two sibling tables, not one -- see migration
+// 0025's header comment for why.
 type Draft = {
   id: string;
   channel: "email" | "whatsapp";
@@ -60,9 +60,6 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
   const isWhatsapp = draft.channel === "whatsapp";
   const approveRpc = isWhatsapp ? "approve_whatsapp_draft" : "approve_email_draft";
   const rejectRpc = isWhatsapp ? "reject_whatsapp_draft" : "reject_email_draft";
-  const sendWebhookUrl = isWhatsapp
-    ? process.env.NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL
-    : process.env.NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL;
 
   async function handleApprove() {
     setBusy(true);
@@ -86,23 +83,17 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
       return;
     }
 
-    if (!sendWebhookUrl) {
-      setError(
-        isWhatsapp
-          ? "Approved, but NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL isn't set -- see apps/elliot-dashboard/README.md."
-          : "Approved, but NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL isn't set -- see apps/elliot-dashboard/README.md."
-      );
-      setBusy(false);
-      return;
-    }
-
+    // Sent via the dashboard's server, which checks the draft is this
+    // tenant's and approved, then calls n8n with the webhook secret -- see
+    // app/api/drafts/[id]/send/route.ts.
     try {
-      const res = await fetch(sendWebhookUrl, {
+      const res = await fetch(`/api/drafts/${draft.id}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft_id: draft.id }),
+        body: JSON.stringify({ channel: isWhatsapp ? "whatsapp" : "email" }),
       });
-      if (!res.ok) throw new Error(`Send webhook returned ${res.status}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) throw new Error(data?.error || `Send returned ${res.status}`);
     } catch (e) {
       setError("Approved, but sending failed -- check n8n. " + (e as Error).message);
       setBusy(false);

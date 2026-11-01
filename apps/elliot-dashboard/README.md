@@ -8,9 +8,6 @@ except onboarding is scoped to the logged-in user's own tenant via RLS.
 1. `npm install`
 2. Create `.env.local` with:
    - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase project settings → API)
-   - `NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL` (workflow 17's webhook, Production URL, after importing and activating it)
-   - `NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL` (workflow 28's webhook -- the WhatsApp equivalent of the above)
-   - `NEXT_PUBLIC_N8N_INGEST_WEBHOOK_URL` (workflow 08's webhook)
    - `ADMIN_EMAILS` (comma-separated, no `NEXT_PUBLIC_` prefix -- gates `/dashboard/onboarding`; see `lib/admin.ts`)
    - `SUPABASE_SERVICE_ROLE_KEY` (server-only; used once, by self-serve signup -- see `lib/supabase/admin.ts`)
    - Server-only, for the internal n8n webhooks (see `lib/n8n-webhook.ts` and
@@ -22,15 +19,18 @@ except onboarding is scoped to the logged-in user's own tenant via RLS.
      - `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` (workflow 30's webhook; without
        it, Cancel only updates Elliot and asks the user to remove the
        calendar event by hand)
+     - `N8N_SEND_WEBHOOK_URL` (workflow 17), `N8N_SEND_WHATSAPP_WEBHOOK_URL`
+       (workflow 28) and `N8N_INGEST_WEBHOOK_URL` (workflow 08). Each falls
+       back to its old `NEXT_PUBLIC_*` name, so existing setups keep
+       working. None of these is called from the browser any more.
 3. `npm run dev` and open http://localhost:3000
 
 Same env vars need to be set in Vercel (Settings → Environment Variables)
 for the production/preview deployments, each enabled for Production,
-Preview, and Development. If `NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL`
-is left unset, the Approvals page still shows WhatsApp drafts and the
-approve/reject RPC calls still work -- only the final "actually send it"
-step fails, with an error saying which env var is missing (see
-`approval-card.tsx`).
+Preview, and Development. If the WhatsApp send URL is left unset, the
+Approvals page still shows WhatsApp drafts and the approve/reject RPC calls
+still work -- only the final "actually send it" step fails, with an error
+saying which env var is missing (see `app/api/drafts/[id]/send/route.ts`).
 
 ## Screens
 

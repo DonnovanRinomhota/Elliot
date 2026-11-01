@@ -63,13 +63,16 @@ export default function ReplyForm({
       return;
     }
 
+    // Sent via the dashboard's server, which adds the n8n webhook secret --
+    // see app/api/drafts/[id]/send/route.ts.
     try {
-      const res = await fetch(process.env.NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL!, {
+      const res = await fetch(`/api/drafts/${draft.id}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft_id: draft.id }),
+        body: JSON.stringify({ channel: "email" }),
       });
-      if (!res.ok) throw new Error(`Send webhook returned ${res.status}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) throw new Error(data?.error || `Send returned ${res.status}`);
     } catch (e) {
       setError("Saved, but sending failed -- check n8n. " + (e as Error).message);
       setBusy(false);
