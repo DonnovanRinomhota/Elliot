@@ -35,9 +35,8 @@ const STARTER_STEPS: Omit<DraftStep, "key">[] = [
   },
 ];
 
-const inputClass =
-  "w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink";
-const labelClass = "mb-1 block text-xs font-medium text-gray-600";
+const inputClass = "w-full px-3 py-2";
+const labelClass = "mb-1 block text-[12.5px] font-medium text-gray-700";
 
 export default function SequenceEditor({
   tenantId,
@@ -148,14 +147,14 @@ export default function SequenceEditor({
   const errorCount = (errors.name ? 1 : 0) + (errors.steps ? 1 : 0) + Object.keys(errors.stepErrors).length;
 
   return (
-    <div className="mb-6 rounded-xl border border-gray-300 bg-white p-5">
+    <div className="mb-6 rounded-lg border border-gray-300 bg-white p-5">
       <div className="mb-4">
         <div className="text-sm font-medium">{isNew ? "New sequence" : "Edit sequence"}</div>
-        <div className="text-xs text-gray-500">Each step is sent to the lead as an email.</div>
+        <div className="text-[12.5px] text-gray-500">Each step is sent to the lead as an email.</div>
       </div>
 
       {!isNew && runningCount > 0 && (
-        <p className="mb-4 rounded-md bg-amber-soft px-3 py-2 text-xs text-amber-dark" role="note">
+        <p className="mb-4 rounded-md bg-amber-soft px-3 py-2 text-[12.5px] text-amber-dark" role="note">
           {runningCount} {runningCount === 1 ? "lead is" : "leads are"} partway through this sequence. They keep their
           current schedule and pick up your changes from their next step. Adding steps at the end is safe. Removing
           or inserting steps earlier in the sequence can make those leads skip or repeat a message.
@@ -174,10 +173,10 @@ export default function SequenceEditor({
           placeholder="e.g. New lead follow-up"
           aria-invalid={Boolean(errors.name)}
         />
-        {errors.name && <p className="mt-1 text-xs text-red-700">{errors.name}</p>}
+        {errors.name && <p className="mt-1 text-[12.5px] text-alert">{errors.name}</p>}
       </div>
 
-      <p className="mb-3 text-xs text-gray-500">
+      <p className="mb-3 text-[12.5px] text-gray-500">
         Days are counted from when the sequence starts for a lead. Day 0 goes out at the next check, which runs every
         15 minutes. In your messages, {SUPPORTED_PLACEHOLDER} becomes the lead&apos;s name, or &ldquo;there&rdquo; if
         we don&apos;t have one.
@@ -187,21 +186,21 @@ export default function SequenceEditor({
         {steps.map((step, i) => {
           const stepError = errors.stepErrors[step.key];
           return (
-            <li key={step.key} className={`rounded-lg border p-4 ${stepError ? "border-red-300" : "border-gray-200"}`}>
+            <li key={step.key} className={`rounded-lg border p-4 ${stepError ? "border-alert/40" : "border-gray-200"}`}>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="text-xs font-medium text-gray-700">Step {i + 1}</div>
+                <div className="text-[12.5px] font-medium text-gray-700">Step {i + 1}</div>
                 <button
                   type="button"
                   onClick={() => removeStep(step.key)}
                   disabled={steps.length === 1}
-                  className="text-xs text-coral-dark hover:underline disabled:cursor-not-allowed disabled:text-gray-300 disabled:no-underline"
+                  className="text-[12.5px] text-coral-dark hover:underline disabled:cursor-not-allowed disabled:text-gray-300 disabled:no-underline"
                 >
                   Remove step
                 </button>
               </div>
 
               <div className="mb-3 flex items-center gap-2">
-                <label htmlFor={`${step.key}-day`} className="text-xs font-medium text-gray-600">
+                <label htmlFor={`${step.key}-day`} className="text-[12.5px] font-medium text-gray-600">
                   Send on day
                 </label>
                 <input
@@ -228,13 +227,13 @@ export default function SequenceEditor({
 
               <div>
                 <div className="mb-1 flex items-center justify-between">
-                  <label htmlFor={`${step.key}-body`} className="text-xs font-medium text-gray-600">
+                  <label htmlFor={`${step.key}-body`} className="text-[12.5px] font-medium text-gray-600">
                     Message
                   </label>
                   <button
                     type="button"
                     onClick={() => insertPlaceholder(step.key)}
-                    className="text-xs text-gray-500 hover:text-ink hover:underline"
+                    className="text-[12.5px] text-gray-500 hover:text-ink hover:underline"
                   >
                     Insert lead&apos;s name
                   </button>
@@ -252,7 +251,7 @@ export default function SequenceEditor({
               </div>
 
               {stepError && (
-                <p className="mt-2 text-xs text-red-700" role="alert">
+                <p className="mt-2 text-[12.5px] text-alert" role="alert">
                   {stepError}
                 </p>
               )}
@@ -261,24 +260,24 @@ export default function SequenceEditor({
         })}
       </ol>
 
-      {errors.steps && <p className="mb-3 text-xs text-red-700">{errors.steps}</p>}
+      {errors.steps && <p className="mb-3 text-[12.5px] text-alert">{errors.steps}</p>}
 
       <button
         type="button"
         onClick={addStep}
         disabled={steps.length >= MAX_STEPS}
-        className="mb-5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mb-5 rounded-md border border-gray-200 px-3 py-1.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {steps.length >= MAX_STEPS ? `Limit of ${MAX_STEPS} steps reached` : "Add step"}
       </button>
 
       {errorCount > 0 && (
-        <p className="mb-3 text-xs text-red-700" role="alert">
+        <p className="mb-3 text-[12.5px] text-alert" role="alert">
           Fix {errorCount} {errorCount === 1 ? "problem" : "problems"} above before saving.
         </p>
       )}
       {saveError && (
-        <p className="mb-3 text-xs text-red-700" role="alert">
+        <p className="mb-3 text-[12.5px] text-alert" role="alert">
           Couldn&apos;t save: {saveError}
         </p>
       )}
@@ -288,7 +287,7 @@ export default function SequenceEditor({
           type="button"
           onClick={save}
           disabled={saving}
-          className="rounded-md bg-ink px-4 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save sequence"}
         </button>
@@ -296,7 +295,7 @@ export default function SequenceEditor({
           type="button"
           onClick={onClose}
           disabled={saving}
-          className="rounded-md px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          className="rounded-md px-3 py-2 text-[12.5px] text-gray-600 hover:bg-gray-50 disabled:opacity-50"
         >
           Cancel
         </button>

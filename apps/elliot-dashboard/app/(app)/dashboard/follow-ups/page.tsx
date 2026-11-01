@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SequencesManager, { type RunCounts, type SequenceRow } from "./sequences-manager";
+import { PageHeader } from "../../../_ui/ui";
 
 export default async function FollowUpsPage() {
   const supabase = createClient();
@@ -17,7 +18,7 @@ export default async function FollowUpsPage() {
     .single();
 
   if (!tenantUser) {
-    return <p className="text-sm text-red-700">No tenant found for this account.</p>;
+    return <p className="text-[13px] text-alert">No tenant found for this account.</p>;
   }
 
   // RLS scopes all three to the logged-in user's tenant, same assumption the
@@ -35,7 +36,7 @@ export default async function FollowUpsPage() {
   ]);
 
   if (error) {
-    return <p className="text-sm text-red-700">Failed to load follow-up sequences: {error.message}</p>;
+    return <p className="text-[13px] text-alert">Failed to load follow-up sequences: {error.message}</p>;
   }
 
   const runCounts: Record<string, RunCounts> = {};
@@ -51,30 +52,26 @@ export default async function FollowUpsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-ink">Follow-ups</h1>
-      <p className="mb-4 max-w-2xl text-sm text-gray-500">
-        Emails Elliot sends on a schedule after a lead is added to a sequence. A sequence stops for a lead as soon as
-        they reply. Follow-ups are sent by email, so leads without an email address are skipped.
-      </p>
+      <PageHeader
+        title="Follow-ups"
+        description="Email sequences Elliot sends after a conversation goes quiet. A sequence stops as soon as the lead replies."
+      />
 
-      <div className="mb-6 flex max-w-2xl flex-col gap-2">
-        <p className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
-          {autonomous
-            ? "Each step is sent automatically, with no review. "
-            : "Each step waits in Approvals for you to review before it sends. "}
-          You can change this under{" "}
+      <div className="mb-6 grid max-w-3xl gap-1 text-[13px] text-gray-600">
+        <p className="m-0">
+          {autonomous ? "Each step sends automatically, without review." : "Each step waits in Approvals until you approve it."}{" "}
+          Change this in{" "}
           <a href="/dashboard/settings" className="text-ink underline">
             Settings
           </a>
-          , in Automation rules.
+          .
         </p>
-        <p className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
-          Leads join a sequence in two ways: automatically, if you turn on auto-enrol for one sequence below, or by
-          hand with &ldquo;Start follow-up&rdquo; on a lead in{" "}
+        <p className="m-0">
+          Leads join a sequence automatically if auto-enrol is on, or when you press Start follow-up on a lead in{" "}
           <a href="/dashboard/leads" className="text-ink underline">
             Leads
           </a>
-          . Sequences that have been used can be deactivated but not deleted, so their history stays intact.
+          . Leads without an email address are skipped.
         </p>
       </div>
 

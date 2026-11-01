@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { displaySteps } from "@/lib/follow-up-steps";
 import SequenceEditor from "./sequence-editor";
+import { Badge, EmptyState, btn } from "../../../_ui/ui";
 
 export type SequenceRow = {
   id: string;
@@ -131,55 +132,68 @@ function SequenceCard({
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
-      <div className="mb-1 flex flex-wrap items-center gap-2">
-        <div className="text-sm font-medium">{sequence.name}</div>
-        <span
-          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-            sequence.is_active ? "bg-pulse-soft text-pulse-dark" : "bg-gray-100 text-gray-500"
-          }`}
-        >
-          {sequence.is_active ? "Active" : "Inactive"}
-        </span>
-        {sequence.auto_enrol && (
-          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">Auto-enrol</span>
+    <article className="rounded-lg border border-gray-200 bg-white">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="m-0 text-[15px] font-semibold text-ink">{sequence.name}</h2>
+            <Badge tone={sequence.is_active ? "ink" : "muted"}>{sequence.is_active ? "Active" : "Inactive"}</Badge>
+            {sequence.auto_enrol && <Badge tone="brass">Auto-enrol</Badge>}
+          </div>
+          <p className="m-0 mt-0.5 text-[12.5px] text-gray-500">{runSummary(counts)}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onEdit} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
+            Edit
+          </button>
+          <button type="button" onClick={toggleActive} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
+            {sequence.is_active ? "Deactivate" : "Activate"}
+          </button>
+          {totalRuns === 0 && (
+            <button type="button" onClick={remove} disabled={busy} className={`${btn.dangerGhost} ${btn.small}`}>
+              Delete
+            </button>
+          )}
+        </div>
+      </header>
+
+      <div className="px-5 py-4">
+        {steps.length === 0 ? (
+          <p className="m-0 text-[13px] text-gray-500">No emails yet. Edit this sequence to add some.</p>
+        ) : (
+          <ol className="m-0 grid list-none gap-2 p-0">
+            {steps.map((s, i) => (
+              <li key={i} className="grid grid-cols-[64px_minmax(0,1fr)] items-baseline gap-3">
+                <span className="tabular text-[12.5px] text-gray-500">Day {s.day}</span>
+                <span className="truncate text-[13.5px] text-ink">{s.subject}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {!sequence.is_active && (
+          <p className="mb-0 mt-3 text-[13px] text-gray-500">
+            New leads can&apos;t be added while this is inactive.
+            {counts.running > 0 && ` The ${counts.running} already in progress will finish or stop when the lead replies.`}
+          </p>
         )}
       </div>
-      <p className="mb-4 text-xs text-gray-500">{runSummary(counts)}</p>
 
-      {steps.length === 0 ? (
-        <p className="mb-4 text-xs text-gray-400">No steps yet. Edit this sequence to add some.</p>
-      ) : (
-        <ol className="mb-4 flex flex-col gap-1.5">
-          {steps.map((s, i) => (
-            <li key={i} className="flex gap-3 text-sm">
-              <span className="w-14 shrink-0 text-xs text-gray-400">Day {s.day}</span>
-              <span className="min-w-0 truncate text-gray-700">{s.subject}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-
-      <div className="mb-4 rounded-md bg-gray-50 px-3 py-2.5">
+      <div className="border-t border-gray-100 bg-gray-50 px-5 py-3">
         {sequence.auto_enrol ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="max-w-md text-xs text-gray-600">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 max-w-xl text-[13px] text-gray-600">
               New leads that go quiet for {quietLabel(sequence.auto_enrol_after_hours)} are added automatically, unless
-              they&apos;ve booked a viewing, are marked Converted or Lost, or have no email address.
+              they&apos;ve booked a viewing, are converted or lost, or have no email address.
               {!sequence.is_active && " Paused while this sequence is inactive."}
             </p>
-            <button
-              type="button"
-              onClick={() => setAutoEnrol(false)}
-              disabled={busy}
-              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
+            <button type="button" onClick={() => setAutoEnrol(false)} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
               Turn off auto-enrol
             </button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor={`quiet-${sequence.id}`} className="text-xs text-gray-600">
+            <label htmlFor={`quiet-${sequence.id}`} className="text-[13px] text-gray-600">
               Auto-enrol new leads that go quiet for
             </label>
             <select
@@ -187,7 +201,7 @@ function SequenceCard({
               value={quietHours}
               onChange={(e) => setQuietHours(Number(e.target.value))}
               disabled={busy}
-              className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
+              className="h-8 px-2 text-[13px]"
             >
               {QUIET_HOUR_OPTIONS.map((h) => (
                 <option key={h} value={h}>
@@ -195,61 +209,19 @@ function SequenceCard({
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={() => setAutoEnrol(true)}
-              disabled={busy || steps.length === 0}
-              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
+            <button type="button" onClick={() => setAutoEnrol(true)} disabled={busy || steps.length === 0} className={`${btn.secondary} ${btn.small}`}>
               Turn on
             </button>
           </div>
         )}
       </div>
 
-      {!sequence.is_active && (
-        <p className="mb-3 text-xs text-gray-500">
-          New leads can&apos;t be added while this is inactive.
-          {counts.running > 0 &&
-            ` The ${counts.running} already in progress will keep sending until they finish or the lead replies.`}
-        </p>
-      )}
-
       {error && (
-        <p className="mb-3 text-xs text-red-700" role="alert">
+        <p className="m-0 px-5 pb-3 pt-2 text-[13px] text-alert" role="alert">
           {error}
         </p>
       )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={onEdit}
-          disabled={busy}
-          className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={toggleActive}
-          disabled={busy}
-          className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        >
-          {sequence.is_active ? "Deactivate" : "Activate"}
-        </button>
-        {totalRuns === 0 && (
-          <button
-            type="button"
-            onClick={remove}
-            disabled={busy}
-            className="rounded-md px-3 py-1.5 text-xs text-coral-dark hover:underline disabled:opacity-50"
-          >
-            Delete
-          </button>
-        )}
-      </div>
-    </div>
+    </article>
   );
 }
 
@@ -269,41 +241,31 @@ export default function SequencesManager({
   const autoSequence = sequences.find((s) => s.auto_enrol) ?? null;
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl">
       {editing !== "new" && sequences.length > 0 && (
         <div className="mb-4">
-          <button
-            type="button"
-            onClick={() => setEditing("new")}
-            className="rounded-md bg-ink px-4 py-2 text-xs font-medium text-white hover:opacity-90"
-          >
+          <button type="button" onClick={() => setEditing("new")} className={btn.primary}>
             New sequence
           </button>
         </div>
       )}
 
       {editing === "new" && (
-        <SequenceEditor tenantId={tenantId} sequence={null} runningCount={0} onClose={() => setEditing(null)} />
-      )}
-
-      {showEmpty && (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
-          <div className="mb-1 text-sm font-medium">No sequences yet</div>
-          <p className="mx-auto mb-4 max-w-sm text-xs text-gray-500">
-            A sequence is a set of emails sent on a schedule after a lead is added to it, stopping as soon as the lead
-            replies.
-          </p>
-          <button
-            type="button"
-            onClick={() => setEditing("new")}
-            className="rounded-md bg-ink px-4 py-2 text-xs font-medium text-white hover:opacity-90"
-          >
-            Create your first sequence
-          </button>
+        <div className="mb-4">
+          <SequenceEditor tenantId={tenantId} sequence={null} runningCount={0} onClose={() => setEditing(null)} />
         </div>
       )}
 
-      <div className="flex flex-col gap-4">
+      {showEmpty && (
+        <EmptyState title="No sequences yet">
+          <p className="m-0 mb-4">A sequence is a short series of emails sent after a lead goes quiet. It stops as soon as they reply.</p>
+          <button type="button" onClick={() => setEditing("new")} className={btn.primary}>
+            Create your first sequence
+          </button>
+        </EmptyState>
+      )}
+
+      <div className="grid gap-4">
         {sequences.map((seq) =>
           editing === seq.id ? (
             <SequenceEditor

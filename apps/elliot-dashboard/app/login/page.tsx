@@ -94,8 +94,8 @@ export default function LoginPage() {
   if (confirmationSent) {
     return (
       <AuthShell>
-        <h1 style={{ fontSize: 20, marginBottom: 12 }}>Check your email</h1>
-        <p style={{ fontSize: 14, color: "#555", lineHeight: 1.5 }}>
+        <h1 className="m-0 mb-3 text-[20px] font-semibold text-ink">Check your email</h1>
+        <p className="m-0 text-[14px] leading-relaxed text-gray-600">
           We sent a confirmation link to <strong>{email}</strong>. Click it, then come back and sign in.
         </p>
         <button
@@ -104,16 +104,7 @@ export default function LoginPage() {
             setMode("sign-in");
             setPassword("");
           }}
-          style={{
-            marginTop: 20,
-            width: "100%",
-            padding: 10,
-            background: "#111",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-          }}
+          className="mt-5 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-md border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Back to sign in
         </button>
@@ -123,12 +114,12 @@ export default function LoginPage() {
 
   return (
     <AuthShell>
-      <div style={{ display: "flex", marginBottom: 24, border: "1px solid #ddd", borderRadius: 8, overflow: "hidden" }}>
+      <div role="tablist" aria-label="Sign in or create a business" className="mb-6 grid grid-cols-2 gap-1 rounded-md bg-gray-100 p-1">
         <TabButton active={mode === "sign-in"} onClick={() => { setMode("sign-in"); setError(null); }}>
-          Sign In
+          Sign in
         </TabButton>
         <TabButton active={mode === "create-business"} onClick={() => { setMode("create-business"); setError(null); }}>
-          Create Business
+          Create a business
         </TabButton>
       </div>
 
@@ -140,7 +131,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={inputStyle}
+              className="h-10 w-full px-3"
             />
           </Field>
           <Field label="Password">
@@ -149,18 +140,18 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={inputStyle}
+              className="h-10 w-full px-3"
             />
           </Field>
 
-          {error && <p style={errorStyle}>{error}</p>}
+          {error && <p className="mb-3 mt-0 text-[13px] text-alert" role="alert">{error}</p>}
 
-          <button type="submit" disabled={loading} style={submitStyle}>
-            {loading ? "Signing in..." : "Sign In"}
+          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-md border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
+            {loading ? "Signing in…" : "Sign in"}
           </button>
 
-          <p style={{ textAlign: "center", marginTop: 16 }}>
-            <Link href="/forgot-password" style={{ fontSize: 13, color: "#666" }}>
+          <p className="mb-0 mt-4 text-center">
+            <Link href="/forgot-password" className="text-[13px] text-gray-500 hover:text-ink">
               Forgot password?
             </Link>
           </p>
@@ -168,10 +159,10 @@ export default function LoginPage() {
       ) : (
         <form onSubmit={handleCreateBusiness}>
           <Field label="Business name">
-            <input value={tenantName} onChange={(e) => setTenantName(e.target.value)} required style={inputStyle} />
+            <input value={tenantName} onChange={(e) => setTenantName(e.target.value)} required className="h-10 w-full px-3" />
           </Field>
           <Field label="Your name">
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} required style={inputStyle} />
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} required className="h-10 w-full px-3" />
           </Field>
           <Field label="Email">
             <input
@@ -179,7 +170,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={inputStyle}
+              className="h-10 w-full px-3"
             />
           </Field>
           <Field label="Password">
@@ -189,14 +180,14 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              style={inputStyle}
+              className="h-10 w-full px-3"
             />
           </Field>
 
-          {error && <p style={errorStyle}>{error}</p>}
+          {error && <p className="mb-3 mt-0 text-[13px] text-alert" role="alert">{error}</p>}
 
-          <button type="submit" disabled={loading} style={submitStyle}>
-            {loading ? "Creating..." : "Create Business"}
+          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-md border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
+            {loading ? "Creating…" : "Create business"}
           </button>
         </form>
       )}
@@ -206,10 +197,16 @@ export default function LoginPage() {
 
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 340, padding: 32, background: "white", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 24 }}>Elliot Dashboard</h1>
-        {children}
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-[380px]">
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-ink text-[14px] font-semibold text-white">
+            E
+          </span>
+          <span className="text-[16px] font-semibold text-ink">Elliot</span>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-7">{children}</div>
+        <p className="mt-6 text-center text-[12.5px] text-gray-400">Your AI front office for leads, viewings and client messages.</p>
       </div>
     </div>
   );
@@ -219,17 +216,10 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
-      style={{
-        flex: 1,
-        padding: "10px 0",
-        border: "none",
-        background: active ? "#111" : "white",
-        color: active ? "white" : "#333",
-        cursor: "pointer",
-        fontSize: 13,
-        fontWeight: 500,
-      }}
+      className={`h-9 cursor-pointer rounded border-0 text-[13px] font-medium ${active ? "bg-white text-ink shadow-sm" : "bg-transparent text-gray-500 hover:text-ink"}`}
     >
       {children}
     </button>
@@ -238,32 +228,9 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{label}</label>
+    <label className="mb-4 block">
+      <span className="mb-1 block text-[13px] font-medium text-gray-700">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: 8,
-  border: "1px solid #ddd",
-  borderRadius: 6,
-};
-
-const errorStyle: React.CSSProperties = {
-  color: "crimson",
-  fontSize: 13,
-  marginBottom: 12,
-};
-
-const submitStyle: React.CSSProperties = {
-  width: "100%",
-  padding: 10,
-  background: "#111",
-  color: "white",
-  border: "none",
-  borderRadius: 6,
-  cursor: "pointer",
-};

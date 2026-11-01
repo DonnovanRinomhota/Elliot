@@ -1,6 +1,74 @@
+/* IBM Plex Sans, bundled with the app (no Google Fonts request). The default
+   CSS files include Latin Extended, so Polish names render correctly. */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
 @import "tailwindcss";
 @config "../tailwind.config.ts";
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+/* In the base layer so Tailwind utility classes on a component can override
+   any of these (unlayered CSS would beat every utility). */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    margin: 0;
+    background: #f5f6f8;
+    color: #13223a;
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Figures line up in tables and stats. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  /* One visible focus style everywhere, for keyboard users. */
+  :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 2px solid #13223a;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* Form controls share one look, so every page's inputs match without each
+     file restating it. Component classes can still override. */
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+    font: inherit;
+    font-size: 14px;
+    color: #13223a;
+    background: #fff;
+    border: 1px solid #d5dae2;
+    border-radius: 6px;
+  }
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus {
+    border-color: #13223a;
+    outline: none;
+    box-shadow: 0 0 0 3px #edf0f5;
+  }
+  :where(input, select, textarea):disabled {
+    background: #f5f6f8;
+    color: #7d8ba3;
+  }
+  :where(input[type="checkbox"], input[type="radio"]) {
+    accent-color: #13223a;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }

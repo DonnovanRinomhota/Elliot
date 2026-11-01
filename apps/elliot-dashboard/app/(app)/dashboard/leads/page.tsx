@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import LeadCard, { type RunningRun, type StartableSequence } from "./lead-card";
+import { LEAD_GRID } from "./grid";
+import { EmptyState, PageHeader } from "../../../_ui/ui";
 import FolderTabs, { FolderTab } from "../folder-tabs";
 
 // Real values confirmed via leads_status_check constraint (see lead-card.tsx).
@@ -31,7 +33,7 @@ export default async function LeadsPage({
   ]);
 
   if (error) {
-    return <p className="text-sm text-red-700">Failed to load leads: {error.message}</p>;
+    return <p className="text-[13px] text-alert">Failed to load leads: {error.message}</p>;
   }
 
   const startableSequences: StartableSequence[] = (sequences ?? [])
@@ -57,34 +59,43 @@ export default async function LeadsPage({
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-ink">Leads</h1>
-      <p className="mb-4 text-sm text-gray-500">
-        {scoped.length} total this view
-        {days && (
-          <>
-            {" "}
-            · filtered to leads from the last {days} days ·{" "}
-            <a href="/dashboard/leads" className="text-indigo-600 hover:underline">
-              clear filter
-            </a>
-          </>
-        )}
-      </p>
+      <PageHeader
+        title="Leads"
+        description={
+          days ? (
+            <>
+              {scoped.length} lead{scoped.length === 1 ? "" : "s"} from the last {days} days.{" "}
+              <a href="/dashboard/leads" className="text-ink underline">
+                Show all
+              </a>
+            </>
+          ) : (
+            "Everyone Elliot has spoken to, with their stage and score. Change a stage from the list; open Details for the score breakdown and follow-ups."
+          )
+        }
+      />
 
       <FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/leads" extraParams={days ? { days: String(days) } : {}} />
 
-      {visible.length === 0 && <p className="text-sm text-gray-400">No leads in this folder.</p>}
-
-      <div className="flex flex-col gap-3">
-        {visible.map((lead: any) => (
-          <LeadCard
-            key={lead.id}
-            lead={lead}
-            sequences={startableSequences}
-            runningRun={runByLead.get(lead.id) ?? null}
-          />
-        ))}
-      </div>
+      {visible.length === 0 ? (
+        <EmptyState title="No leads here">Leads appear as soon as Elliot qualifies someone in a conversation.</EmptyState>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <div className={`hidden border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 ${LEAD_GRID}`}>
+            <span>Contact</span>
+            <span>Stage</span>
+            <span>Score</span>
+            <span>Follow-up</span>
+            <span>Added</span>
+            <span className="sr-only">Actions</span>
+          </div>
+          <ul className="m-0 list-none p-0">
+            {visible.map((lead: any) => (
+              <LeadCard key={lead.id} lead={lead} sequences={startableSequences} runningRun={runByLead.get(lead.id) ?? null} />
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

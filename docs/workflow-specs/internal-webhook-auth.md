@@ -41,7 +41,8 @@ nodes use Header Auth with that credential and that none of them reads
   | `app/api/appointments/[id]/cancel` | 30 | appointment is the user's tenant's (RLS); tenant id taken from the row |
   | `app/api/drafts/[id]/send` | 17 / 28 | draft is the user's tenant's (RLS) and `approved` |
   | `app/api/knowledge/ingest` | 08 | tenant slug taken from the session, never from the browser |
- That value must match the credential's Value. The secret is a
+
+  That value must match the credential's Value. The secret is a
   server-only env var and never reaches the browser. A 401/403 from n8n is
   reported as "n8n rejected the webhook secret".
 - 21 and 22 have no automatic callers any more: CRM sync queues from

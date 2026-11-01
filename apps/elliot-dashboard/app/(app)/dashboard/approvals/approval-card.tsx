@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { StatusBadge, btn, humanize, timeAgo } from "../../../_ui/ui";
 
 // channel decides which table/RPC/send workflow this card talks to --
 // email_drafts + approve_email_draft() + workflow 17, or whatsapp_drafts +
@@ -20,16 +21,6 @@ type Draft = {
   confidence: string | number;
   status: string;
   created_at: string;
-};
-
-const STATUS_BADGE: Record<string, string> = {
-  pending: "bg-amber-soft text-amber-dark",
-  auto_sent: "bg-violet-50 text-violet-600",
-  approved: "bg-pulse-soft text-pulse-dark",
-  rejected: "bg-coral-soft text-coral-dark",
-  // Only ever set on a whatsapp_drafts row -- see
-  // docs/workflow-specs/27-send-approved-whatsapp.md ("the 24-hour window").
-  blocked_needs_template: "bg-coral-soft text-coral-dark",
 };
 
 export default function ApprovalCard({ draft }: { draft: Draft }) {
@@ -123,97 +114,78 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
     router.refresh();
   }
 
+  const confidence = Number(draft.confidence);
+  const confidenceText = Number.isFinite(confidence) ? `${Math.round(confidence <= 1 ? confidence * 100 : confidence)}% confident` : null;
+  const recipient = isWhatsapp ? draft.to_wa_id : draft.to_email;
+  const isPending = draft.status === "pending";
+
   return (
-    <div style={{ background: "white", border: "1px solid #eee", borderRadius: 10, padding: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-        <div>
-          <span
-            style={{
-              display: "inline-block",
-              marginRight: 8,
-              padding: "1px 6px",
-              borderRadius: 4,
-              fontSize: 11,
-              fontWeight: 600,
-              background: isWhatsapp ? "#dcfce7" : "#e0e7ff",
-              color: isWhatsapp ? "#166534" : "#4338ca",
-            }}
-          >
-            {isWhatsapp ? "WhatsApp" : "Email"}
-          </span>
-          <strong>{isWhatsapp ? draft.to_wa_id : draft.to_email}</strong>
-          <span style={{ marginLeft: 8, fontSize: 12, color: "#999" }}>
-            {draft.category} · confidence {draft.confidence}
-          </span>
+    <article className={`rounded-lg border border-gray-200 bg-white ${isPending ? "" : "opacity-90"}`}>
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+        <div className="min-w-0">
+          <div className="text-[12.5px] text-gray-500">
+            {isWhatsapp ? "WhatsApp to" : "Email to"} <span className="text-ink">{recipient}</span>
+          </div>
+          {!isWhatsapp && <h2 className="m-0 mt-0.5 text-[15px] font-semibold text-ink">{draft.subject}</h2>}
+          <div className="mt-1 text-[12.5px] text-gray-500">
+            {[humanize(draft.category), confidenceText, timeAgo(draft.created_at)].filter(Boolean).join(", ")}
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span
-            className={`rounded-md px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[draft.status] || "bg-gray-100 text-gray-600"}`}
-          >
-            {draft.status.replace(/_/g, " ")}
-          </span>
-          <span style={{ fontSize: 12, color: "#999" }}>
-            {new Date(draft.created_at).toLocaleString("en-GB", { timeZone: "UTC" })}
-          </span>
-        </div>
+        <StatusBadge kind="draft" value={draft.status} />
+      </header>
+
+      <div className="px-5 py-4">
+        {isEditing ? (
+          <>
+            <label htmlFor={`body-${draft.id}`} className="mb-1.5 block text-[12.5px] font-medium text-gray-600">
+              Edit the message before sending
+            </label>
+            <textarea
+              id={`body-${draft.id}`}
+              value={editedBody}
+              onChange={(e) => setEditedBody(e.target.value)}
+              rows={9}
+              className="w-full p-3 leading-relaxed"
+            />
+          </>
+        ) : (
+          <p className="m-0 max-w-[72ch] whitespace-pre-wrap text-[14px] leading-relaxed text-gray-800">{draft.body}</p>
+        )}
+
+        {error && (
+          <p className="mb-0 mt-3 text-[13px] text-alert" role="alert">
+            {error}
+          </p>
+        )}
+
+        {draft.status === "blocked_needs_template" && (
+          <p className="mb-0 mt-3 rounded-md bg-alert-soft px-3 py-2 text-[13px] text-alert-dark">
+            Not sent: more than 24 hours have passed since this contact last wrote on WhatsApp, and Meta only allows
+            a free-form reply within 24 hours. Sending it now needs an approved WhatsApp template, which isn&apos;t set
+            up yet.
+          </p>
+        )}
       </div>
 
-      {!isWhatsapp && <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{draft.subject}</div>}
-
-      {isEditing ? (
-        <textarea
-          value={editedBody}
-          onChange={(e) => setEditedBody(e.target.value)}
-          rows={8}
-          style={{ width: "100%", padding: 10, border: "1px solid #ddd", borderRadius: 6, fontFamily: "inherit", fontSize: 14 }}
-        />
-      ) : (
-        <p style={{ whiteSpace: "pre-wrap", fontSize: 14, color: "#333" }}>{draft.body}</p>
-      )}
-
-      {error && <p style={{ color: "crimson", fontSize: 13, marginTop: 8 }}>{error}</p>}
-
-      {draft.status === "blocked_needs_template" && (
-        <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 12 }}>
-          Blocked -- more than 24 hours have passed since this contact's last WhatsApp message, so a free-form
-          reply can no longer be sent (Meta's rule, not ours). Sending this now needs a pre-approved WhatsApp
-          template message, which isn't set up yet. See docs/workflow-specs/27-send-approved-whatsapp.md.
-        </p>
-      )}
-
-      {draft.status === "pending" ? (
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button
-            onClick={handleApprove}
-            disabled={busy}
-            style={{ padding: "8px 16px", background: "#111", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
-          >
-            {isEditing ? "Save & Send" : "Approve & Send"}
+      {isPending ? (
+        <footer className="flex flex-wrap items-center gap-2 border-t border-gray-100 px-5 py-3">
+          <button type="button" onClick={handleApprove} disabled={busy} className={btn.primary}>
+            {isEditing ? "Save and send" : "Approve and send"}
           </button>
-          <button
-            onClick={() => setIsEditing((v) => !v)}
-            disabled={busy}
-            style={{ padding: "8px 16px", background: "white", border: "1px solid #ddd", borderRadius: 6, cursor: "pointer" }}
-          >
-            {isEditing ? "Cancel Edit" : "Edit"}
+          <button type="button" onClick={() => setIsEditing((v) => !v)} disabled={busy} className={btn.secondary}>
+            {isEditing ? "Discard edits" : "Edit"}
           </button>
-          <button
-            onClick={handleReject}
-            disabled={busy}
-            style={{ padding: "8px 16px", background: "white", color: "crimson", border: "1px solid #fbb", borderRadius: 6, cursor: "pointer" }}
-          >
+          <button type="button" onClick={handleReject} disabled={busy} className={`${btn.dangerGhost} ml-auto`}>
             Reject
           </button>
-        </div>
+        </footer>
       ) : (
-        <p style={{ fontSize: 12, color: "#999", marginTop: 12 }}>
-          {draft.status === "auto_sent"
-            ? "Sent automatically -- no review needed."
-            : draft.status === "blocked_needs_template"
-              ? null
-              : `Already ${draft.status}. No further action.`}
-        </p>
+        draft.status !== "blocked_needs_template" && (
+          <footer className="border-t border-gray-100 px-5 py-3 text-[12.5px] text-gray-500">
+            {draft.status === "auto_sent" ? "Sent automatically, no review needed." : `${humanize(draft.status)}. Nothing more to do.`}
+          </footer>
+        )
       )}
-    </div>
+    </article>
   );
 }

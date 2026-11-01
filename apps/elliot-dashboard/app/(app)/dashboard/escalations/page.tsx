@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import EscalationCard from "./escalation-card";
 import FolderTabs, { FolderTab } from "../folder-tabs";
+import { EmptyState, FilterDescription, PageHeader } from "../../../_ui/ui";
 
 // Matches escalation-card.tsx's updateStatus() targets exactly.
 const STATUS_TABS: FolderTab[] = [
@@ -22,7 +23,7 @@ export default async function EscalationsPage({
     .order("created_at", { ascending: false });
 
   if (error) {
-    return <p className="text-sm text-red-700">Failed to load escalations: {error.message}</p>;
+    return <p className="text-[13px] text-alert">Couldn&apos;t load escalations: {error.message}</p>;
   }
 
   const days = searchParams.days ? Number(searchParams.days) : null;
@@ -39,19 +40,14 @@ export default async function EscalationsPage({
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-ink">Escalations</h1>
-      <p className="mb-4 text-sm text-gray-500">
-        {scoped.length} total this view
-        {days && (
-          <>
-            {" "}
-            · filtered to the last {days} days ·{" "}
-            <a href="/dashboard/escalations" className="text-indigo-600 hover:underline">
-              clear filter
-            </a>
-          </>
-        )}
-      </p>
+      <PageHeader
+        title="Escalations"
+        description={
+          <FilterDescription days={days} count={scoped.length} noun={["escalation", "escalations"]} clearHref="/dashboard/escalations">
+            Conversations Elliot handed to a person. Acknowledge one when you&apos;ve picked it up, resolve it when it&apos;s done.
+          </FilterDescription>
+        }
+      />
 
       <FolderTabs
         tabs={tabs}
@@ -60,13 +56,15 @@ export default async function EscalationsPage({
         extraParams={days ? { days: String(days) } : {}}
       />
 
-      {visible.length === 0 && <p className="text-sm text-gray-400">No escalations in this folder.</p>}
-
-      <div className="flex flex-col gap-3">
-        {visible.map((escalation: any) => (
-          <EscalationCard key={escalation.id} escalation={escalation} />
-        ))}
-      </div>
+      {visible.length === 0 ? (
+        <EmptyState title="Nothing to handle">When Elliot needs a person to step in, the conversation appears here.</EmptyState>
+      ) : (
+        <ul className="m-0 grid list-none gap-3 p-0">
+          {visible.map((escalation: any) => (
+            <EscalationCard key={escalation.id} escalation={escalation} />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

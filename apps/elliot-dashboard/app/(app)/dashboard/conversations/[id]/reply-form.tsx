@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { btn } from "../../../../_ui/ui";
 
 export default function ReplyForm({
   conversationId,
@@ -86,56 +87,43 @@ export default function ReplyForm({
   }
 
   return (
-    <div style={{ marginTop: 24, borderTop: "1px solid #eee", paddingTop: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "#333" }}>Reply as human</div>
-      <input
-        value={subject}
-        onChange={(e) => setSubject(e.target.value)}
-        placeholder="Subject"
-        disabled={busy}
-        style={{
-          width: "100%",
-          padding: "8px 10px",
-          border: "1px solid #ddd",
-          borderRadius: 6,
-          fontSize: 14,
-          marginBottom: 8,
-          fontFamily: "inherit",
-        }}
-      />
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder={`Reply to ${toEmail}...`}
-        rows={5}
-        disabled={busy}
-        style={{
-          width: "100%",
-          padding: 10,
-          border: "1px solid #ddd",
-          borderRadius: 6,
-          fontFamily: "inherit",
-          fontSize: 14,
-        }}
-      />
-      {error && <p style={{ color: "crimson", fontSize: 13, marginTop: 8 }}>{error}</p>}
-      {sent && !error && <p style={{ color: "#0a7d3a", fontSize: 13, marginTop: 8 }}>Sent.</p>}
-      <div style={{ marginTop: 8 }}>
-        <button
-          onClick={handleSend}
-          disabled={busy || !body.trim()}
-          style={{
-            padding: "8px 16px",
-            background: busy || !body.trim() ? "#999" : "#111",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: busy || !body.trim() ? "default" : "pointer",
-          }}
-        >
-          {busy ? "Sending..." : "Send"}
-        </button>
+    <section className="mt-6 rounded-lg border border-gray-200 bg-white">
+      <h2 className="m-0 border-b border-gray-200 px-5 py-3.5 text-[14px] font-semibold text-ink">Reply yourself</h2>
+      <div className="grid gap-3 p-5">
+        <p className="m-0 text-[13px] text-gray-500">
+          Sends an email to <span className="text-ink">{toEmail}</span> from your connected inbox, as you rather than Elliot.
+        </p>
+        <div>
+          <label htmlFor="reply-subject" className="mb-1 block text-[12.5px] font-medium text-gray-600">
+            Subject
+          </label>
+          <input id="reply-subject" value={subject} onChange={(e) => setSubject(e.target.value)} disabled={busy} className="h-9 w-full px-3" />
+        </div>
+        <div>
+          <label htmlFor="reply-body" className="mb-1 block text-[12.5px] font-medium text-gray-600">
+            Message
+          </label>
+          <textarea
+            id="reply-body"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={6}
+            disabled={busy}
+            className="w-full p-3 leading-relaxed"
+          />
+        </div>
+        {error && (
+          <p className="m-0 text-[13px] text-alert" role="alert">
+            {error}
+          </p>
+        )}
+        {sent && !error && <p className="m-0 text-[13px] text-ink">Sent.</p>}
+        <div>
+          <button type="button" onClick={handleSend} disabled={busy || !body.trim()} className={btn.primary}>
+            {busy ? "Sending…" : "Send reply"}
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
