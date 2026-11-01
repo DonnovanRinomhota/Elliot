@@ -1,5 +1,5 @@
 // Tests for the client-ready fix pack: Header Auth on the internal webhooks
-// (19/21/22/30), WhatsApp verify token + Meta signature check (25),
+// (08/17/19/21/22/28/30), WhatsApp verify token + Meta signature check (25),
 // cancel-appointment decisions (30) and the lead-scoring status fix (10).
 //
 // Unlike chunking_logic.test.js, this does NOT copy the node code: it reads
@@ -60,8 +60,11 @@ async function test(name, fn) {
 
 (async () => {
   // ───────────── Internal webhooks: Header Auth ─────────────
-  console.log('Internal webhooks use Header Auth (19, 21, 22, 30)');
+  console.log('Internal webhooks use Header Auth (08, 17, 19, 21, 22, 28, 30)');
   const HOOKS = {
+    '08-knowledge-ingestion.json': 'Ingest Webhook',
+    '17-manual-send-draft.json': 'Send Draft Webhook',
+    '28-manual-send-whatsapp-draft.json': 'Send WhatsApp Draft Webhook',
     '19-tenant-onboarding.json': 'Onboarding Webhook',
     '21-start-follow-up-run.json': 'Start Follow-Up Webhook',
     '22-queue-crm-sync.json': 'Queue Sync Webhook',

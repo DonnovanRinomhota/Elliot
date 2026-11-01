@@ -106,6 +106,25 @@ nodes, Save, then switch it to **Active**. Both import inactive on purpose.
 | `29-auto-enrol-follow-ups.json` | Elliot Postgres (service role) | Activate |
 | `30-cancel-appointment.json` | `Elliot Internal Webhook Secret` (Webhook node), Elliot Postgres (service role), Elliot Google Calendar | Activate, copy its **Production** URL into Vercel's `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` and redeploy |
 
+### 3e. Header Auth on 08, 17 and 28 (follow-up patch)
+
+Knowledge upload (08) and the two manual-send workflows (17 email, 28
+WhatsApp) are now called only from the dashboard's server too. **Merge and
+deploy the dashboard change first**, then in n8n, for each of **08 -
+Knowledge Ingestion**, **17 - Manual Send Draft** and **28 - Manual Send
+WhatsApp Draft**: open the Webhook node → Authentication → **Header Auth**
+→ credential `Elliot Internal Webhook Secret` → Save, keep active.
+
+Doing it the other way round would break knowledge upload and sending
+until the deploy finishes: the old dashboard called these from the browser
+without the secret.
+
+Optional tidy-up in Vercel, once everything works: add `N8N_INGEST_WEBHOOK_URL`,
+`N8N_SEND_WEBHOOK_URL` and (if used) `N8N_SEND_WHATSAPP_WEBHOOK_URL` with the
+same values as their `NEXT_PUBLIC_*` versions, redeploy, then delete the
+`NEXT_PUBLIC_*` ones. The dashboard falls back to the old names until then,
+so nothing breaks if you skip this.
+
 ## 4. WhatsApp (only if the client gets it)
 
 1. Import `25-whatsapp-inbound-trigger.json` as a new workflow (as in 3d)
@@ -157,3 +176,7 @@ Signature` outputs a `_signature` field saying why (`no_secret_configured`,
 5. **Follow-up:** on a lead with an email, press "Start follow-up". A
    draft should appear in Approvals at the first step's day (day 0 means
    within 15 minutes).
+6. **Approve & send** that draft from Approvals, and upload a short text
+   document in Knowledge. Both go through the dashboard's server now; an
+   error mentioning the webhook secret means the n8n credential and Vercel's
+   `ELLIOT_WEBHOOK_SECRET` don't match.

@@ -1,7 +1,7 @@
 # Workflow Spec: 17 - Manual Send Draft
 
 ## Trigger
-Public-ish webhook (`POST /send-approved-draft`) — the thin trigger a human's "Send" click (from the dashboard, or any other approval UI) hits to actually fire off an approved draft. Simpler than 18/19/21/22's "internal" webhooks in that it doesn't verify tenant ownership of the draft itself — it's a bare pass-through to workflow 15, which loads the draft by ID and does the actual send.
+Internal webhook (`POST /send-approved-draft`) with n8n Header Auth (`Elliot Internal Webhook Secret` credential; see `internal-webhook-auth.md`) — the thin trigger a human's "Send" click hits to actually fire off an approved draft. The dashboard reaches it through its server route `app/api/drafts/[id]/send`, which first checks (under the user's RLS session) that the draft belongs to their tenant and is `approved`; this workflow itself still doesn't check either, so keep the URL internal.
 
 ## Inputs
 ```json

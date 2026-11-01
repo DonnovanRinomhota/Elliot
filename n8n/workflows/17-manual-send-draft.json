@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "send-approved-draft",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -17,7 +18,13 @@
         0
       ],
       "webhookId": "send-approved-draft",
-      "notes": "TODO: after activating, copy the real Production URL from this node and set it as NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL in the dashboard's .env.local."
+      "notes": "TODO: after activating, copy the real Production URL from this node and set it as NEXT_PUBLIC_N8N_SEND_WEBHOOK_URL in the dashboard's .env.local.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Elliot Internal Webhook Secret"
+        }
+      }
     },
     {
       "parameters": {

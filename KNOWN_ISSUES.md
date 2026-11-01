@@ -1,6 +1,6 @@
 # Known Issues / Resolved-but-worth-remembering
 
-## RESOLVED (Nov 2026, pending live check) — Leads scoring 40–69 were never saved
+## RESOLVED (Nov 2026) — Leads scoring 40–69 were never saved
 `10 - Lead Capture`'s `Score Lead` node set `status = 'QUALIFIED'` for
 scores 40–69, but `leads_status_check` (`0002`) only allows NEW /
 QUALIFYING / HOT / WARM / COLD / CONVERTED / LOST. `Upsert Lead` failed
@@ -18,7 +18,7 @@ pipeline) already expected.
 **Verified:** reproduced the constraint violation against a fresh database
 with all migrations applied; `n8n/workflows/tests/client_ready_fixes.test.js`
 runs the node's own code and asserts every status it can produce is
-allowed. Not yet re-run live.
+allowed. Leads saved live in the 2026-11-01 smoke test.
 
 ## RESOLVED — Hot-lead escalation insert failed with a false FK violation
 `10 - Lead Capture`'s "Insert Escalation" node intermittently failed with
@@ -158,7 +158,7 @@ development and were never captured as migrations until now:
 editor during live debugging should be turned into a numbered migration
 file in the same session, not after the fact.
 
-## RESOLVED (Nov 2026, pending live check) — `/dashboard/onboarding` has no access control
+## RESOLVED (Nov 2026) — `/dashboard/onboarding` has no access control
 **Fixed:** the dashboard route itself is now gated. `lib/admin.ts`'s
 `isAdminEmail()` checks the logged-in user's email against `ADMIN_EMAILS`
 (a comma-separated env var, server-only, no `NEXT_PUBLIC_` prefix). Anyone
@@ -235,13 +235,16 @@ Real support needs downloading the media from Meta's authenticated media
 URL and giving Claude something to work with (vision for images, at
 minimum). Not started.
 
-## OPEN — Three webhooks are still called straight from the browser
+## RESOLVED (Nov 2026) — Three webhooks were called straight from the browser
 `08` (knowledge ingestion), `17` (manual email send) and `28` (manual
-WhatsApp send) are called from client components using `NEXT_PUBLIC_*`
-URLs, so they can't carry the shared webhook secret and remain callable by
-anyone who finds the URL. `17`/`28` can only send an existing draft by its
-id (an unguessable uuid), not arbitrary content, which limits the damage;
-`08` can add documents to any tenant's knowledge base by slug. Fix: move
-each call behind a server route using `lib/n8n-webhook.ts`, then switch on
-Header Auth with the same credential (see
-`docs/workflow-specs/internal-webhook-auth.md`).
+WhatsApp send) were called from client components using `NEXT_PUBLIC_*`
+URLs, so they couldn't carry the shared webhook secret. `08` let anyone add
+documents to any tenant's knowledge base by slug; `17`/`28` would send any
+existing draft by id, approved or not.
+
+**Fixed:** all three now go through server routes
+(`app/api/knowledge/ingest`, `app/api/drafts/[id]/send`) and their Webhook
+nodes use the same Header Auth credential as 19/21/22/30. The ingest route
+takes the tenant from the session; the send route only sends drafts that
+belong to the user's tenant and are `approved`. See
+`docs/workflow-specs/internal-webhook-auth.md`.

@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "send-approved-whatsapp-draft",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -16,7 +17,13 @@
         -800,
         0
       ],
-      "notes": "Mirrors workflow 17 exactly (same bare pass-through, same lack of tenant-ownership check on the draft -- see 17's spec for why that's an acceptable scope given who's expected to call it: the dashboard's own Approve button)."
+      "notes": "Mirrors workflow 17 exactly (same bare pass-through, same lack of tenant-ownership check on the draft -- see 17's spec for why that's an acceptable scope given who's expected to call it: the dashboard's own Approve button).",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Elliot Internal Webhook Secret"
+        }
+      }
     },
     {
       "parameters": {

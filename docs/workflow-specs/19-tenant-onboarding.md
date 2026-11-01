@@ -57,7 +57,7 @@ Only `name` and `slug` are required. Everything else has a safe default — `aut
   "next_steps": [
     "Connect this tenant's Google Calendar: ...",
     "Connect this tenant's Gmail (if using the email agent): ...",
-    "Seed an initial knowledge base document (optional): curl -X POST .../webhook/ingest-document -d '{\"tenant_slug\": \"acme-realty\", ...}'",
+    "Seed an initial knowledge base document (optional): curl -X POST .../webhook/ingest-document -H \"x-elliot-webhook-secret: <your webhook secret>\" -d '{\"tenant_slug\": \"acme-realty\", ...}'",
     "Embed the chat widget on the tenant's site using tenant slug \"acme-realty\"."
   ]
 }

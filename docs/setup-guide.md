@@ -80,6 +80,7 @@ Two more workflows to import: `n8n/workflows/08-knowledge-ingestion.json` and `n
 ```bash
 curl -X POST https://<your-n8n-instance>/webhook/ingest-document \
   -H "Content-Type: application/json" \
+  -H "x-elliot-webhook-secret: <your webhook secret>" \
   -d '{"tenant_slug": "zebra-dev", "title": "Test FAQ", "source_type": "faq", "text": "We are open Monday through Friday, 9am to 6pm.\n\nViewings are by appointment only."}'
 ```
 Expected response: `{ "document_id": "...", "status": "ready", "chunks_created": 1 }`. Confirm in Supabase:
