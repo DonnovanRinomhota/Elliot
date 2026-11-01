@@ -3,14 +3,16 @@
  * (19 onboarding, 30 cancel appointment, ...). Never import this from a
  * "use client" component -- same rule as lib/supabase/admin.ts.
  *
- * Those webhooks now require an `x-elliot-webhook-secret` header matching the
- * n8n instance's ELLIOT_WEBHOOK_SECRET. The secret must never reach the
- * browser, so these calls go through Next.js route handlers, never straight
- * from a client component.
+ * Those webhooks use the n8n Webhook node's built-in Header Auth: the request
+ * must carry an `x-elliot-webhook-secret` header matching the value stored in
+ * n8n's "Elliot Internal Webhook Secret" credential (works on every n8n plan,
+ * including Cloud Starter). The secret must never reach the browser, so these
+ * calls go through Next.js route handlers, never straight from a client
+ * component.
  *
  * Env (server-only, no NEXT_PUBLIC_ prefix), set in Vercel for Production,
  * Preview and Development:
- *   ELLIOT_WEBHOOK_SECRET   same value as on the n8n instance (16+ chars)
+ *   ELLIOT_WEBHOOK_SECRET   same value as the n8n credential's Value
  *   N8N_<NAME>_WEBHOOK_URL  the workflow's Production webhook URL
  */
 
@@ -48,8 +50,16 @@ export async function callInternalWebhook(urlEnvName: string, body: unknown): Pr
     // n8n returns plain text / HTML for some failures (e.g. workflow inactive).
   }
 
-  if (res.status === 401) {
-    return { ok: false, status: 502, error: "n8n rejected the webhook secret. Check ELLIOT_WEBHOOK_SECRET matches on both sides." };
+  // n8n's Header Auth rejects a missing or wrong header with 401 or 403. Our
+  // workflows never return either for their own errors.
+  if (res.status === 401 || res.status === 403) {
+    return {
+      ok: false,
+      status: 502,
+      error:
+        "n8n rejected the webhook secret. Check Vercel's ELLIOT_WEBHOOK_SECRET matches the value in n8n's " +
+        "'Elliot Internal Webhook Secret' credential.",
+    };
   }
   if (!res.ok || !data || data.success === false) {
     const msg = data?.error || data?.message || text.slice(0, 200) || `n8n returned HTTP ${res.status}`;

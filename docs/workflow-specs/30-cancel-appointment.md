@@ -7,8 +7,9 @@ workflow 12 stayed in the tenant's calendar. The Google credential lives in
 n8n, so the delete has to happen here.
 
 ## Trigger
-Internal webhook, `POST /cancel-appointment`. Requires the
-`x-elliot-webhook-secret` header (see `internal-webhook-auth.md`). Called by
+Internal webhook, `POST /cancel-appointment`, with n8n Header Auth: n8n
+refuses calls without the `x-elliot-webhook-secret` header matching the
+`Elliot Internal Webhook Secret` credential (see `internal-webhook-auth.md`). Called by
 the dashboard's server route `app/api/appointments/[id]/cancel/route.ts`,
 which reads the appointment through the user's own RLS session first, so
 `tenant_id` always comes from the database, never from the browser.
@@ -19,7 +20,6 @@ which reads the appointment through the user's own RLS session first, so
 ## Nodes
 | Node | What it does |
 |---|---|
-| Check Webhook Secret → Authorized? | 401 unless the shared secret matches |
 | Validate Input | Both fields required, both uuids |
 | Load Appointment | Scalar subqueries, always one row: appointment id/status/`external_calendar_id` scoped to the tenant, plus the tenant's `google_calendar_id` |
 | Check Appointment → Can Cancel? | 404 if not found for this tenant; 409 if already cancelled / completed / no-show |
@@ -50,4 +50,5 @@ shouldn't block cancelling.
 - Rescheduling isn't built. Cancel and re-book.
 
 ## Credentials
-Shared Postgres credential (service role); Elliot Google Calendar OAuth2.
+Elliot Internal Webhook Secret (Header Auth, on the Webhook node); shared
+Postgres credential (service role); Elliot Google Calendar OAuth2.

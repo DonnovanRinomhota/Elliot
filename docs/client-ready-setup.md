@@ -1,7 +1,7 @@
 # Client-ready fix pack: setup checklist
 
 Everything in this pack is code that's already in the repo. These are the
-manual steps to switch it on, in order. Steps 1–4 are required; step 5 only
+manual steps to switch it on, in order. Steps 1–3 are required; step 4 only
 if the client is getting WhatsApp.
 
 What the pack does, in one line each:
@@ -14,8 +14,9 @@ What the pack does, in one line each:
   start or stop a follow-up on any lead from the Leads page.
 - **Cancelling removes the calendar event.** The dashboard's Cancel button
   now goes through workflow `30`, which deletes the Google Calendar event.
-- **Internal webhooks need a secret.** `19`, `21`, `22` and `30` reject any
-  call without the `x-elliot-webhook-secret` header.
+- **Internal webhooks need a secret.** `19`, `21`, `22` and `30` use n8n's
+  built-in Header Auth and reject any call without the
+  `x-elliot-webhook-secret` header.
 - **WhatsApp checks Meta's signature.** `25` drops any POST not signed with
   your Meta App Secret.
 - **Bug fix: mid-scoring leads now save.** `10` used to write status
@@ -32,77 +33,106 @@ What the pack does, in one line each:
    `db/seed/test_0026_auto_sync_and_enrolment.sql` should end with
    `ALL 0026 CHECKS PASSED`.
 
-## 2. n8n environment variables
+## 2. Vercel (dashboard) environment variables
 
-Set these on the n8n instance (Docker env / n8n Cloud variables), then
-restart n8n.
-
-| Variable | Value | Used by |
-|---|---|---|
-| `ELLIOT_WEBHOOK_SECRET` | A long random string, 16+ characters. Generate one with `openssl rand -hex 32`. | 19, 21, 22, 30 |
-| `META_APP_SECRET` | Meta App Dashboard → App settings → Basic → App Secret | 25 (WhatsApp only) |
-| `NODE_FUNCTION_ALLOW_BUILTIN` | `crypto` (or add it to your existing list) | 25 (WhatsApp only) |
-
-If your n8n has `N8N_BLOCK_ENV_ACCESS_IN_NODE=true`, Code nodes can't read
-`$env`. Workflow 25's verify-token check already depends on this, so it
-should already be `false`. If it isn't, every gated webhook will reject all
-calls (they fail closed).
-
-## 3. n8n workflows
-
-Re-import the changed workflows over the existing ones (open each in n8n →
-⋯ → Import from file), re-select credentials if n8n asks, and save.
-
-| File | Change | After import |
-|---|---|---|
-| `10-lead-capture.json` | 40–69 band saves as `WARM` | Save |
-| `19-tenant-onboarding.json` | Secret check | Save, keep active |
-| `21-start-follow-up-run.json` | Secret check | Save, keep active |
-| `22-queue-crm-sync.json` | Secret check | Save, keep active |
-| `23-crm-sync-sweep.json` | Lead and appointment payloads now include the contact | Save, keep active |
-| `25-whatsapp-inbound-trigger.json` | Meta signature check, Raw Body on | Save |
-
-Import the two new workflows:
-
-| File | Credentials to select | Then |
-|---|---|---|
-| `29-auto-enrol-follow-ups.json` | Elliot Postgres (service role) | Activate |
-| `30-cancel-appointment.json` | Elliot Postgres (service role), Elliot Google Calendar | Activate, copy its **Production** webhook URL |
-
-Both new files import **inactive** on purpose.
-
-## 4. Vercel (dashboard) environment variables
-
-Settings → Environment Variables, enabled for Production, Preview and
-Development. Then redeploy.
+Vercel → **elliot-real-estate** → Settings → Environment Variables. Tick
+Production, Preview and Development for each, then redeploy (Deployments →
+⋯ on the latest → Redeploy).
 
 | Variable | Value |
 |---|---|
-| `ELLIOT_WEBHOOK_SECRET` | The **same** value as on n8n |
-| `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` | Workflow 30's Production URL |
+| `ELLIOT_WEBHOOK_SECRET` | A random secret. Generate one with `openssl rand -hex 32` and keep it in your password manager. The same value goes into n8n in step 3. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` key (needed by self-serve signup) |
 | `N8N_ONBOARD_WEBHOOK_URL` | Workflow 19's Production URL (same value as the old `NEXT_PUBLIC_N8N_ONBOARD_WEBHOOK_URL`) |
+| `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` | Workflow 30's Production URL (after step 3) |
 
 You can delete `NEXT_PUBLIC_N8N_ONBOARD_WEBHOOK_URL` once
 `N8N_ONBOARD_WEBHOOK_URL` is set. The dashboard falls back to the old name
 until then.
 
-Until `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` and `ELLIOT_WEBHOOK_SECRET` are
-set, Cancel still works but only inside Elliot, and the card says the
-calendar event has to be removed by hand.
+Until `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` is set, Cancel still works but
+only inside Elliot, and the card says the calendar event has to be removed
+by hand.
 
-## 5. WhatsApp (only if the client gets it)
+## 3. n8n
 
-On top of steps 2–3: confirm `META_APP_SECRET` and
-`NODE_FUNCTION_ALLOW_BUILTIN=crypto` are set, then send a real message to
-the test number. If messages stop arriving after this change, look at
-workflow 25's executions: `Verify Meta Signature` outputs a `_signature`
-field saying why (`no_secret_configured`, `missing`, `invalid`,
-`no_raw_body`).
+Written for **n8n Cloud** on any plan, including Starter (no Variables, no
+environment variables). Secrets live in an n8n credential or are pasted
+into a node; nothing reads `$env`.
 
-For local testing with hand-written payloads only, set
-`WHATSAPP_SIGNATURE_CHECK=off`. Never leave that on in production.
+### 3a. Create the webhook-secret credential (once)
 
-## 6. Per-client switches (in the dashboard)
+1. n8n → **Overview** → **Credentials** → **Create credential** → search
+   **Header Auth**.
+2. Name it exactly **`Elliot Internal Webhook Secret`**.
+3. **Name:** `x-elliot-webhook-secret`
+4. **Value:** the same secret you put in Vercel's `ELLIOT_WEBHOOK_SECRET`.
+5. Save.
+
+### 3b. Switch on Header Auth in 19, 21 and 22 (no import needed)
+
+For each of **19 - Tenant Onboarding**, **21 - Start Follow-Up Run** and
+**22 - Queue CRM Sync**:
+
+1. Open the workflow and double-click its Webhook node (the first node).
+2. **Authentication** → **Header Auth**.
+3. **Credential for Header Auth** → `Elliot Internal Webhook Secret`.
+4. Close the node, **Save**, and keep the workflow active.
+
+Do 19 **after** Vercel's `ELLIOT_WEBHOOK_SECRET` is set and redeployed,
+otherwise the onboarding page will be rejected in between.
+
+The repo's JSON for these three has exactly that change, so editing in
+place and re-importing end up the same. Editing in place keeps the
+workflow IDs and webhook URLs you already have.
+
+### 3c. Edit 10 and 23 in place
+
+- **10 - Lead Capture** → `Score Lead` node: change
+  `else if (score >= 40) status = 'QUALIFIED';` to `'WARM'`. Save.
+  (Edit in place: workflow 01 calls 10 by its ID, so an imported copy
+  would never run.)
+- **23 - CRM Sync Sweep** → `Query Pending Syncs` node: replace the query
+  with the one in `n8n/workflows/23-crm-sync-sweep.json`. Save.
+
+### 3d. Import the new workflows
+
+For each file: **Overview** → **Create workflow** → ⋯ (top right) →
+**Import from File**, pick the file, select credentials on the flagged
+nodes, Save, then switch it to **Active**. Both import inactive on purpose.
+
+| File | Credentials to select | Then |
+|---|---|---|
+| `29-auto-enrol-follow-ups.json` | Elliot Postgres (service role) | Activate |
+| `30-cancel-appointment.json` | `Elliot Internal Webhook Secret` (Webhook node), Elliot Postgres (service role), Elliot Google Calendar | Activate, copy its **Production** URL into Vercel's `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` and redeploy |
+
+## 4. WhatsApp (only if the client gets it)
+
+1. Import `25-whatsapp-inbound-trigger.json` as a new workflow (as in 3d)
+   and delete the old 25. Both use the `whatsapp` webhook path, so only one
+   can be active.
+2. Open **Check Verify Token** and replace
+   `PASTE_WHATSAPP_VERIFY_TOKEN_HERE` with your verify token (the same one
+   you enter in Meta's webhook settings).
+3. Open **Verify Meta Signature** and replace
+   `PASTE_META_APP_SECRET_HERE` with your App Secret (Meta App Dashboard →
+   App settings → Basic → App Secret).
+4. Select credentials on the flagged nodes, Save, Activate.
+
+The real values live only in your n8n. **Never export this workflow back
+into the repo with them filled in**; the repo keeps the placeholders. If
+you ever move to a plan with Variables, or self-host, variables named
+`WHATSAPP_VERIFY_TOKEN` / `META_APP_SECRET` take priority over the pasted
+values.
+
+`require('crypto')` (used for the signature) works on n8n Cloud. Self-hosted
+n8n needs `NODE_FUNCTION_ALLOW_BUILTIN=crypto`.
+
+If messages stop arriving, look at workflow 25's executions: `Verify Meta
+Signature` outputs a `_signature` field saying why (`no_secret_configured`,
+`missing`, `invalid`, `no_raw_body`).
+
+## 5. Per-client switches (in the dashboard)
 
 - **CRM:** Settings → Integrations → CRM webhook URL. Syncs only queue for
   tenants that have one, so tenants without a CRM aren't affected. Changes
@@ -111,10 +141,10 @@ For local testing with hand-written payloads only, set
   go quiet for …" → Turn on. Only leads created **after** you turn it on
   are enrolled, so existing leads are never mass-emailed.
 
-## 7. Smoke test (about 15 minutes)
+## 6. Smoke test (about 15 minutes)
 
-1. **Webhook secret:** `curl -X POST <19's URL> -d '{}'` without the header
-   should return `401 {"success":false,"error":"unauthorized"}`.
+1. **Webhook secret:** `curl -i -X POST <19's URL> -d '{}'` without the
+   header should be refused by n8n (401 or 403), before the workflow runs.
 2. **Onboarding:** create a test tenant from `/dashboard/onboarding`. It
    should succeed.
 3. **Lead + CRM:** chat with the widget as a fake buyer and give a budget

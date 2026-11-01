@@ -79,12 +79,14 @@ test in `docs/client-ready-setup.md` passes.
   connection resolves, every node reachable from a trigger, no orphaned
   nodes) but have never actually executed. Needs, before this can go to
   🟢: a Meta Business Account + WhatsApp Cloud API sandbox number, the
-  `WHATSAPP_VERIFY_TOKEN` env var and an HTTP Header Auth credential set
+  verify token and Meta App Secret pasted into workflow 25's two Code
+  nodes (n8n Cloud Starter has no env vars -- see
+  `docs/client-ready-setup.md`), an HTTP Header Auth credential set
   in n8n (currently a placeholder on workflow 27's send node), and
   `NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL` set in the dashboard's env.
   Known gaps, all documented in the relevant workflow specs and
   `KNOWN_ISSUES.md` (Meta's request signature is now verified -- fix pack
-  above -- but needs `META_APP_SECRET` set): no template-message support, so any reply more than 24 hours
+  above -- but needs the Meta App Secret pasted in): no template-message support, so any reply more than 24 hours
   after the contact's last message gets blocked rather than sent
   (`blocked_needs_template`); non-text messages (images, audio, location)
   aren't handled at all; and human takeover doesn't work on WhatsApp
@@ -108,8 +110,9 @@ test in `docs/client-ready-setup.md` passes.
   `ADMIN_EMAILS` (`lib/admin.ts`), now enforced server-side too: the form
   posts to `app/api/admin/onboard`, which re-checks the admin list and
   calls workflow 19 with the shared webhook secret. Workflow 19 rejects
-  calls without it. Remaining: live check after setting
-  `ELLIOT_WEBHOOK_SECRET` on both sides.
+  calls without it (n8n Header Auth). Remaining: live check after setting
+  the secret in Vercel and in n8n's `Elliot Internal Webhook Secret`
+  credential.
 - ✅ **Knowledge base upload** (`/dashboard/knowledge`) -- pasted text, PDF,
   and website ingestion (PR #32). PDFs are parsed client-side in the
   browser via `pdfjs-dist` and submitted through the same pasted-text
