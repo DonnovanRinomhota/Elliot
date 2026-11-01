@@ -28,9 +28,9 @@ type AiConfig = {
 // tool routing, the follow-up sweep). Not every possible tool -- only the
 // ones something downstream really reads autonomy_rules for.
 const AUTONOMY_ACTIONS: { key: string; label: string; description: string }[] = [
-  { key: "send_email", label: "Send email replies", description: "High-confidence FAQ answers only ever qualify, regardless of this setting -- see workflow 14's spec." },
-  { key: "book_appointment", label: "Book appointments", description: "Confirming a specific time slot a visitor has already agreed to." },
-  { key: "send_follow_up", label: "Send follow-up sequences", description: "Each scheduled step in an active follow-up sequence." },
+  { key: "send_email", label: "Send email replies", description: "Even when automatic, only confident answers to common questions are sent without review." },
+  { key: "book_appointment", label: "Book appointments", description: "Confirming a viewing time the client has already agreed to." },
+  { key: "send_follow_up", label: "Send follow-up sequences", description: "Each scheduled email in an active follow-up sequence." },
 ];
 
 const PLAN_LABELS: Record<string, string> = {
@@ -45,22 +45,22 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
     <button
       onClick={onClick}
       disabled={saving}
-      className="rounded-md bg-ink px-4 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+      className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
+      {saving ? "Saving…" : saved ? "Saved" : "Save changes"}
     </button>
   );
 }
 
 function Card({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5">
-      <div className="mb-4">
-        <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs text-gray-500">{description}</div>
-      </div>
-      {children}
-    </div>
+    <section className="mb-6 rounded-lg border border-gray-200 bg-white">
+      <header className="border-b border-gray-100 px-5 py-4">
+        <h2 className="m-0 text-[15px] font-semibold text-ink">{title}</h2>
+        <p className="m-0 mt-0.5 text-[13px] text-gray-500">{description}</p>
+      </header>
+      <div className="p-5">{children}</div>
+    </section>
   );
 }
 
@@ -157,12 +157,12 @@ export default function SettingsForm({
     setSaved("notifications");
   }
 
-  const inputClass = "w-full rounded-md border border-gray-200 px-3 py-2 text-sm";
-  const labelClass = "mb-1 block text-xs font-medium text-gray-600";
+  const inputClass = "h-9 w-full px-3";
+  const labelClass = "mb-1 block text-[12.5px] font-medium text-gray-700";
 
   return (
     <div className="max-w-2xl">
-      <Card title="Business Profile" description="Your business details, used across the agent's prompts and reports.">
+      <Card title="Business profile" description="Used in Elliot's replies and in your reports.">
         <div className="mb-3 grid grid-cols-2 gap-3">
           <div>
             <label className={labelClass}>Business name</label>
@@ -170,7 +170,7 @@ export default function SettingsForm({
           </div>
           <div>
             <label className={labelClass}>Industry</label>
-            <input className={inputClass} value={profile.industry} onChange={(e) => setProfile({ ...profile, industry: e.target.value })} placeholder="e.g. real_estate" />
+            <input className={inputClass} value={profile.industry} onChange={(e) => setProfile({ ...profile, industry: e.target.value })} placeholder="e.g. Real estate" />
           </div>
         </div>
         <div className="mb-3">
@@ -188,12 +188,12 @@ export default function SettingsForm({
             onChange={(e) => setProfile({ ...profile, avg_deal_value: e.target.value })}
             placeholder="e.g. 8000"
           />
-          <p className="mt-1 text-xs text-gray-400">
-            Your estimated revenue or commission per converted lead. Drives the revenue estimate on the Overview
-            page -- leave blank to hide that estimate rather than show a guessed number.
+          <p className="mt-1 text-[12.5px] text-gray-400">
+            Your typical commission or revenue per closed deal. Used for the estimate on the Overview page. Leave
+            blank to hide the estimate.
           </p>
         </div>
-        <div className="mb-4 flex gap-4 text-xs text-gray-500">
+        <div className="mb-4 flex gap-4 text-[12.5px] text-gray-500">
           <span>
             Plan: <strong className="text-gray-700">{PLAN_LABELS[tenant.plan] || tenant.plan}</strong>
           </span>
@@ -201,20 +201,20 @@ export default function SettingsForm({
             Status: <strong className="text-gray-700">{tenant.status}</strong>
           </span>
         </div>
-        {errors.profile && <p className="mb-2 text-xs text-red-700">{errors.profile}</p>}
+        {errors.profile && <p className="mb-2 text-[12.5px] text-alert">{errors.profile}</p>}
         <SaveButton saving={saving === "profile"} saved={saved === "profile"} onClick={saveProfile} />
       </Card>
 
-      <Card title="Automation rules" description="What Elliot is allowed to do on its own, versus what needs your approval first.">
+      <Card title="What Elliot may do on its own" description="Anything set to Needs approval waits in Approvals until you approve it.">
         <div className="mb-4 flex flex-col gap-3">
           {AUTONOMY_ACTIONS.map((action) => (
             <div key={action.key} className="flex items-start justify-between gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0">
               <div>
                 <div className="text-sm">{action.label}</div>
-                <div className="text-xs text-gray-500">{action.description}</div>
+                <div className="text-[12.5px] text-gray-500">{action.description}</div>
               </div>
               <select
-                className="rounded-md border border-gray-200 px-2 py-1.5 text-xs"
+                className="h-8 px-2 text-[13px]"
                 value={autonomy[action.key]}
                 onChange={(e) => setAutonomy({ ...autonomy, [action.key]: e.target.value })}
               >
@@ -224,12 +224,12 @@ export default function SettingsForm({
             </div>
           ))}
         </div>
-        {errors.autonomy && <p className="mb-2 text-xs text-red-700">{errors.autonomy}</p>}
+        {errors.autonomy && <p className="mb-2 text-[12.5px] text-alert">{errors.autonomy}</p>}
         <SaveButton saving={saving === "autonomy"} saved={saved === "autonomy"} onClick={saveAutonomy} />
       </Card>
 
-      <Card title="Integrations" description="Connected inboxes, calendar, and CRM sync target.">
-        {configError && <p className="mb-3 text-xs text-red-700">Failed to load current values: {configError}</p>}
+      <Card title="Connected services" description="Your inbox, calendar, CRM and WhatsApp number.">
+        {configError && <p className="mb-3 text-[12.5px] text-alert">Couldn&apos;t load your current settings: {configError}</p>}
         <div className="mb-3">
           <label className={labelClass}>Connected Gmail address</label>
           <input
@@ -238,8 +238,9 @@ export default function SettingsForm({
             onChange={(e) => setIntegrations({ ...integrations, connected_gmail_address: e.target.value })}
             placeholder="inbox@yourbusiness.com"
           />
-          <p className="mt-1 text-xs text-gray-400">
-            This is a reference value only -- the actual Gmail connection is still a manual OAuth setup in n8n (see docs/workflow-specs/19-tenant-onboarding.md).
+          <p className="mt-1 text-[12.5px] text-gray-400">
+            The inbox Elliot reads and replies from. Changing this here doesn&apos;t reconnect the inbox; contact your
+            Elliot administrator to switch accounts.
           </p>
         </div>
         <div className="mb-3">
@@ -258,33 +259,31 @@ export default function SettingsForm({
             onChange={(e) => setIntegrations({ ...integrations, crm_webhook_url: e.target.value })}
             placeholder="https://..."
           />
-          <p className="mt-1 text-xs text-gray-400">Where CRM sync sends lead/contact/appointment updates. Leave blank to disable sync.</p>
+          <p className="mt-1 text-[12.5px] text-gray-400">New and updated contacts, leads and viewings are sent here automatically. Leave blank to turn CRM sync off.</p>
         </div>
         <div className="mb-4">
-          <label className={labelClass}>WhatsApp phone_number_id</label>
+          <label className={labelClass}>WhatsApp phone number ID</label>
           <input
             className={inputClass}
             value={integrations.whatsapp_phone_number_id}
             onChange={(e) => setIntegrations({ ...integrations, whatsapp_phone_number_id: e.target.value })}
             placeholder="e.g. 109876543212345"
           />
-          <p className="mt-1 text-xs text-gray-400">
-            From the Meta App dashboard (WhatsApp → API Setup), not the phone number itself. This is how an
-            inbound WhatsApp message gets routed to your tenant -- see docs/workflow-specs/25-whatsapp-inbound-trigger.md.
-            Sending still needs the shared WhatsApp access token configured once in n8n, not here.
+          <p className="mt-1 text-[12.5px] text-gray-400">
+            Found in Meta&apos;s WhatsApp settings under API Setup. It&apos;s an ID number, not the phone number itself.
           </p>
         </div>
-        {errors.integrations && <p className="mb-2 text-xs text-red-700">{errors.integrations}</p>}
+        {errors.integrations && <p className="mb-2 text-[12.5px] text-alert">{errors.integrations}</p>}
         <SaveButton saving={saving === "integrations"} saved={saved === "integrations"} onClick={saveIntegrations} />
       </Card>
 
-      <Card title="Notifications" description="Where to send an alert when a conversation is escalated to a human.">
+      <Card title="Notifications" description="Who gets an email when Elliot hands a conversation to a person.">
         <div className="mb-4">
           <label className={labelClass}>Escalation alert email</label>
           <input className={inputClass} value={notifyEmail} onChange={(e) => setNotifyEmail(e.target.value)} placeholder="team@yourbusiness.com" />
-          <p className="mt-1 text-xs text-gray-400">Leave blank to disable email alerts -- escalations are always recorded and visible on the Escalations page either way.</p>
+          <p className="mt-1 text-[12.5px] text-gray-400">Leave blank to turn off email alerts. Escalations always appear on the Escalations page.</p>
         </div>
-        {errors.notifications && <p className="mb-2 text-xs text-red-700">{errors.notifications}</p>}
+        {errors.notifications && <p className="mb-2 text-[12.5px] text-alert">{errors.notifications}</p>}
         <SaveButton saving={saving === "notifications"} saved={saved === "notifications"} onClick={saveNotifications} />
       </Card>
     </div>

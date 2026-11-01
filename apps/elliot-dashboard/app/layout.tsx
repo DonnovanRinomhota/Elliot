@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "Elliot",
+  description: "Your AI front office: leads, viewings and conversations in one place.",
+};
 
 // The true Next.js root layout -- wraps EVERY route including /login.
 // Deliberately minimal: no auth check, no nav. Those live in
@@ -13,9 +19,7 @@ import "./globals.css";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: "system-ui, -apple-system, sans-serif", background: "#fafafa" }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

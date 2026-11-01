@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import ApprovalCard from "./approval-card";
 import FolderTabs, { FolderTab } from "../folder-tabs";
+import { EmptyState, FilterDescription, PageHeader } from "../../../_ui/ui";
 
 // Real statuses these tables use: "pending" until reviewed, then either
 // approve_*_draft() -> "approved" or reject_*_draft() -> "rejected" (see
@@ -8,11 +9,11 @@ import FolderTabs, { FolderTab } from "../folder-tabs";
 // needing a human review at all. "blocked_needs_template" only ever comes
 // from whatsapp_drafts -- see docs/workflow-specs/27-send-approved-whatsapp.md.
 const STATUS_TABS: FolderTab[] = [
-  { key: "pending", label: "Pending", count: 0, tone: "warning" },
-  { key: "auto_sent", label: "Auto-resolved", count: 0, tone: "violet" },
+  { key: "pending", label: "Waiting", count: 0, tone: "warning" },
+  { key: "auto_sent", label: "Sent automatically", count: 0, tone: "neutral" },
   { key: "approved", label: "Approved", count: 0, tone: "success" },
   { key: "rejected", label: "Rejected", count: 0, tone: "danger" },
-  { key: "blocked_needs_template", label: "Blocked (WhatsApp)", count: 0, tone: "danger" },
+  { key: "blocked_needs_template", label: "Blocked on WhatsApp", count: 0, tone: "danger" },
 ];
 
 export default async function ApprovalsPage({
@@ -41,10 +42,10 @@ export default async function ApprovalsPage({
   ]);
 
   if (emailResult.error) {
-    return <p className="text-sm text-red-700">Failed to load email approvals: {emailResult.error.message}</p>;
+    return <p className="text-[13px] text-alert">Couldn&apos;t load email drafts: {emailResult.error.message}</p>;
   }
   if (whatsappResult.error) {
-    return <p className="text-sm text-red-700">Failed to load WhatsApp approvals: {whatsappResult.error.message}</p>;
+    return <p className="text-[13px] text-alert">Couldn&apos;t load WhatsApp drafts: {whatsappResult.error.message}</p>;
   }
 
   const drafts = [
@@ -68,19 +69,14 @@ export default async function ApprovalsPage({
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold text-ink">Approvals</h1>
-      <p className="mb-4 text-sm text-gray-500">
-        {scoped.length} total this view
-        {days && (
-          <>
-            {" "}
-            · filtered to the last {days} days ·{" "}
-            <a href="/dashboard/approvals" className="text-indigo-600 hover:underline">
-              clear filter
-            </a>
-          </>
-        )}
-      </p>
+      <PageHeader
+        title="Approvals"
+        description={
+          <FilterDescription days={days} count={scoped.length} noun={["draft", "drafts"]} clearHref="/dashboard/approvals">
+            Replies Elliot has drafted. Nothing is sent until you approve it. You can edit a draft before sending.
+          </FilterDescription>
+        }
+      />
 
       <FolderTabs
         tabs={tabs}
@@ -89,13 +85,17 @@ export default async function ApprovalsPage({
         extraParams={days ? { days: String(days) } : {}}
       />
 
-      {visible.length === 0 && <p className="text-sm text-gray-400">Nothing in this folder.</p>}
-
-      <div className="flex flex-col gap-4">
-        {visible.map((draft: any) => (
-          <ApprovalCard key={draft.id} draft={draft} />
-        ))}
-      </div>
+      {visible.length === 0 ? (
+        <EmptyState title={activeStatus === "pending" ? "You're all caught up" : "Nothing here"}>
+          {activeStatus === "pending" ? "New drafts appear here when Elliot needs your approval to send." : null}
+        </EmptyState>
+      ) : (
+        <div className="grid gap-4">
+          {visible.map((draft: any) => (
+            <ApprovalCard key={draft.id} draft={draft} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

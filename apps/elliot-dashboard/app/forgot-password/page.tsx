@@ -31,45 +31,53 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 340, padding: 32, background: "white", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 8 }}>Reset your password</h1>
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-[380px]">
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-ink text-[14px] font-semibold text-white">
+            E
+          </span>
+          <span className="text-[16px] font-semibold text-ink">Elliot</span>
+        </div>
+      <div className="rounded-lg border border-gray-200 bg-white p-7">
+        <h1 className="m-0 mb-2 text-[20px] font-semibold text-ink">Reset your password</h1>
 
         {sent ? (
-          <p style={{ fontSize: 14, color: "#555", lineHeight: 1.5 }}>
+          <p className="m-0 text-[14px] leading-relaxed text-gray-600">
             If an account exists for <strong>{email}</strong>, we&apos;ve sent a link to reset the password.
           </p>
         ) : (
           <form onSubmit={handleSubmit}>
-            <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
+            <p className="mb-4 mt-0 text-[13px] text-gray-500">
               Enter the email on your account and we&apos;ll send you a reset link.
             </p>
-            <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Email</label>
+            <label className="mb-1 block text-[13px] font-medium text-gray-700">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={{ width: "100%", padding: 8, marginBottom: 16, border: "1px solid #ddd", borderRadius: 6 }}
+              className="mb-4 h-10 w-full px-3"
             />
 
-            {error && <p style={{ color: "crimson", fontSize: 13, marginBottom: 12 }}>{error}</p>}
+            {error && <p className="mb-3 mt-0 text-[13px] text-alert" role="alert">{error}</p>}
 
             <button
               type="submit"
               disabled={loading}
-              style={{ width: "100%", padding: 10, background: "#111", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-md border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Sending..." : "Send reset link"}
             </button>
           </form>
         )}
 
-        <p style={{ textAlign: "center", marginTop: 16 }}>
-          <Link href="/login" style={{ fontSize: 13, color: "#666" }}>
+        <p className="mb-0 mt-4 text-center">
+          <Link href="/login" className="text-[13px] text-gray-500 hover:text-ink">
             Back to sign in
           </Link>
         </p>
+      </div>
       </div>
     </div>
   );

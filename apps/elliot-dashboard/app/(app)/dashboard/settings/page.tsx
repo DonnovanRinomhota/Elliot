@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { PageHeader } from "../../../_ui/ui";
 import SettingsForm from "./settings-form";
 
 export default async function SettingsPage() {
@@ -17,7 +18,7 @@ export default async function SettingsPage() {
     .single();
 
   if (!tenantUser) {
-    return <p className="text-sm text-red-700">No tenant found for this account.</p>;
+    return <p className="text-sm text-alert">No tenant found for this account.</p>;
   }
 
   const [{ data: tenant, error: tenantError }, { data: aiConfig, error: configError }] = await Promise.all([
@@ -30,13 +31,12 @@ export default async function SettingsPage() {
   ]);
 
   if (tenantError || !tenant) {
-    return <p className="text-sm text-red-700">Failed to load settings: {tenantError?.message}</p>;
+    return <p className="text-sm text-alert">Failed to load settings: {tenantError?.message}</p>;
   }
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-medium">Settings</h1>
-      <p className="mb-6 text-sm text-gray-500">Business profile, automation rules, and integrations.</p>
+      <PageHeader title="Settings" description="Your business details, what Elliot may do on its own, and connected services." />
       <SettingsForm tenant={tenant} aiConfig={aiConfig} configError={configError?.message ?? null} />
     </div>
   );

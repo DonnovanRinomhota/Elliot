@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import KnowledgeForm from "./knowledge-form";
+import { PageHeader } from "../../../_ui/ui";
 
 export default async function KnowledgePage() {
   const supabase = createClient();
@@ -17,7 +18,7 @@ export default async function KnowledgePage() {
     .single();
 
   if (!tenantUser) {
-    return <p className="text-sm text-red-700">No tenant found for this account.</p>;
+    return <p className="text-sm text-alert">No tenant found for this account.</p>;
   }
 
   const { data: tenant, error: tenantError } = await supabase
@@ -27,18 +28,18 @@ export default async function KnowledgePage() {
     .single();
 
   if (tenantError || !tenant) {
-    return <p className="text-sm text-red-700">Failed to load tenant: {tenantError?.message}</p>;
+    return <p className="text-sm text-alert">Failed to load tenant: {tenantError?.message}</p>;
   }
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-medium">Knowledge base</h1>
-      <p className="mb-1 text-sm text-gray-500">Content Elliot draws on when answering FAQ / RAG questions.</p>
-      <p className="mb-6 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        PDFs are parsed in your browser before upload; websites are fetched and extracted server-side.
-        Neither handles everything -- scanned/image-only PDFs need OCR (not built), and heavily
-        JavaScript-rendered websites won&apos;t extract cleanly (needs a headless browser, not built). See
-        each option&apos;s own note below for what to expect.
+      <PageHeader
+        title="Knowledge base"
+        description="What Elliot knows about your business: listings, prices, areas, opening hours and FAQs. Elliot answers clients from this content."
+      />
+      <p className="mb-6 max-w-3xl text-[13px] text-gray-500">
+        Scanned PDFs (photos of pages) and websites that load their content with JavaScript can&apos;t be read yet. If
+        an upload comes back empty, paste the text instead.
       </p>
       <KnowledgeForm tenantSlug={tenant.slug} />
     </div>

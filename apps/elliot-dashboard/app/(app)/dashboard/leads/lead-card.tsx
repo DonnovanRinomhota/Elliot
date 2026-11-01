@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { btn, humanize, formatDate } from "../../../_ui/ui";
+import { LEAD_GRID } from "./grid";
 
 type Lead = {
   id: string;
@@ -18,14 +20,12 @@ type Lead = {
 const STATUS_OPTIONS = ["NEW", "QUALIFYING", "HOT", "WARM", "COLD", "CONVERTED", "LOST"];
 const CLOSED_STATUSES = ["CONVERTED", "LOST"];
 
-const STATUS_STYLES: Record<string, string> = {
-  HOT: "bg-coral-soft text-coral-dark",
-  WARM: "bg-amber-soft text-amber-dark",
-  COLD: "bg-gray-100 text-gray-600",
-  NEW: "bg-blue-50 text-blue-700",
-  QUALIFYING: "bg-blue-50 text-blue-700",
-  CONVERTED: "bg-pulse-soft text-pulse-dark",
-  LOST: "bg-gray-100 text-gray-500",
+// The stage control's own colour follows the same rules as everywhere else:
+// hot = alert, warm = brass, converted = ink, the rest neutral.
+const STAGE_CONTROL: Record<string, string> = {
+  HOT: "border-alert/40 bg-alert-soft text-alert-dark",
+  WARM: "border-brass/40 bg-brass-soft text-brass-dark",
+  CONVERTED: "border-ink/30 bg-ink-soft text-ink",
 };
 
 type ScoreReason = { label: string; points: number; met: boolean };
@@ -48,30 +48,31 @@ function computeScoreReasons(lead: Lead): ScoreReason[] {
   const isUrgentTimeline = !!timeline && /\b(week|month|asap|now|soon)\b/i.test(timeline);
 
   return [
-    { label: budget ? `Budget provided: ${budget}` : "Budget not yet provided", points: 25, met: !!budget },
+    { label: budget ? `Budget: ${budget}` : "Budget not given yet", points: 25, met: !!budget },
     {
       label: isUrgentTimeline
-        ? `Urgent timeline: ${timeline}`
+        ? `Timeline: ${timeline}`
         : timeline
-          ? `Timeline given but not urgent: ${timeline}`
-          : "Timeline not yet provided",
+          ? `Timeline given, not urgent: ${timeline}`
+          : "Timeline not given yet",
       points: 25,
       met: isUrgentTimeline,
     },
     {
-      label: propertyType ? `Property type specified: ${propertyType}` : "Property type not yet specified",
+      label: propertyType ? `Looking for: ${propertyType}` : "Property type not given yet",
       points: 15,
       met: !!propertyType,
     },
     {
-      label: intentSignal ? `Intent signal: ${intentSignal}` : "No clear intent signal yet",
+      label: intentSignal ? `Intent: ${intentSignal}` : "No clear intent yet",
       points: 20,
       met: !!intentSignal,
     },
-    { label: "Email provided", points: 10, met: !!lead.contact?.email },
-    { label: "Phone provided", points: 5, met: !!lead.contact?.phone },
+    { label: "Email address given", points: 10, met: !!lead.contact?.email },
+    { label: "Phone number given", points: 5, met: !!lead.contact?.phone },
   ];
 }
+
 
 export default function LeadCard({
   lead,
@@ -86,9 +87,15 @@ export default function LeadCard({
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [sequenceId, setSequenceId] = useState(sequences[0]?.id ?? "");
   const hasEmail = !!lead.contact?.email?.trim();
+  const isClosed = CLOSED_STATUSES.includes(lead.status);
+  const reasons = computeScoreReasons(lead);
+  const hasAnswers = !!lead.qualification_answers && Object.keys(lead.qualification_answers).length > 0;
+  const name = lead.contact?.name || lead.contact?.email || "Unknown contact";
+  const detailsId = `lead-details-${lead.id}`;
 
   // Same row shape workflow 21 inserts: the sweep (20) picks it up from
   // next_run_at, and the "contact replied" stop check counts from now.
@@ -124,17 +131,12 @@ export default function LeadCard({
     if (updateError) return setError(updateError.message);
     router.refresh();
   }
-  const isClosed = CLOSED_STATUSES.includes(lead.status);
-  const reasons = computeScoreReasons(lead);
-  const metReasons = reasons.filter((r) => r.met);
-  const openReasons = reasons.filter((r) => !r.met);
 
   async function updateStatus(newStatus: string) {
+    if (newStatus === lead.status) return;
     setBusy(true);
     setError(null);
-
     const { error: updateError } = await supabase.from("leads").update({ status: newStatus }).eq("id", lead.id);
-
     setBusy(false);
     if (updateError) {
       setError(updateError.message);
@@ -143,126 +145,157 @@ export default function LeadCard({
     router.refresh();
   }
 
+  const followUpText = runningRun
+    ? runningRun.sequenceName
+    : isClosed
+      ? "Not needed"
+      : !hasEmail
+        ? "No email address"
+        : "None";
+
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white p-5 ${isClosed ? "opacity-70" : ""}`}>
-      <div className="mb-2 flex items-start justify-between">
+    <li className="border-t border-gray-200 first:border-t-0">
+      <div className={`grid gap-2 px-5 py-3.5 ${LEAD_GRID}`}>
+        <div className="min-w-0">
+          <div className={`truncate text-[14px] font-medium ${isClosed ? "text-gray-500" : "text-ink"}`}>{name}</div>
+          <div className="truncate text-[12.5px] text-gray-500">
+            {[lead.contact?.name ? lead.contact?.email : null, lead.contact?.phone].filter(Boolean).join(", ") || " "}
+          </div>
+        </div>
+
         <div>
-          <span className="font-medium">{lead.contact?.name || lead.contact?.email || "Unknown contact"}</span>
-          <span className="ml-2 text-xs text-gray-400">
-            {lead.contact?.email} {lead.contact?.phone ? `· ${lead.contact.phone}` : ""}
-          </span>
-        </div>
-        <span className="text-xs text-gray-400">
-          {new Date(lead.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-        </span>
-      </div>
-
-      <div className="mb-3 flex items-center gap-3 text-xs">
-        <span className={`rounded-md px-2 py-0.5 font-medium ${STATUS_STYLES[lead.status] || "bg-gray-100 text-gray-600"}`}>
-          {lead.status}
-        </span>
-        {lead.score != null && <span className="text-gray-500">Score: {lead.score}/100</span>}
-      </div>
-
-      {lead.qualification_answers && Object.keys(lead.qualification_answers).length > 0 && (
-        <div className="mb-3 rounded-md bg-gray-50 p-3">
-          {metReasons.length > 0 && (
-            <ul className="mb-1.5 list-none space-y-1">
-              {metReasons.map((r) => (
-                <li key={r.label} className="flex items-start gap-1.5 text-xs text-gray-700">
-                  <span className="mt-0.5 text-green-600">✓</span>
-                  <span>
-                    {r.label} <span className="text-gray-400">(+{r.points})</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {openReasons.length > 0 && (
-            <ul className="list-none space-y-1">
-              {openReasons.map((r) => (
-                <li key={r.label} className="flex items-start gap-1.5 text-xs text-gray-400">
-                  <span className="mt-0.5">·</span>
-                  <span>{r.label}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <button
-            onClick={() => setShowRaw((v) => !v)}
-            className="mt-2 text-[11px] font-medium text-gray-400 hover:text-gray-600"
-          >
-            {showRaw ? "Hide raw answers" : "View raw answers"}
-          </button>
-          {showRaw && (
-            <pre className="mt-2 overflow-x-auto rounded-md bg-white p-2.5 text-xs">
-              {JSON.stringify(lead.qualification_answers, null, 2)}
-            </pre>
-          )}
-        </div>
-      )}
-
-      {!isClosed && (runningRun || sequences.length > 0) && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-gray-100 px-3 py-2 text-xs">
-          {runningRun ? (
-            <>
-              <span className="text-gray-600">
-                In follow-up: <span className="font-medium text-gray-800">{runningRun.sequenceName}</span>
-              </span>
-              <button
-                onClick={stopFollowUp}
-                disabled={busy}
-                className="rounded-md border border-gray-200 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50"
-              >
-                Stop follow-up
-              </button>
-            </>
-          ) : hasEmail ? (
-            <>
-              <label htmlFor={`seq-${lead.id}`} className="text-gray-600">
-                Follow-up
-              </label>
-              <select
-                id={`seq-${lead.id}`}
-                value={sequenceId}
-                onChange={(e) => setSequenceId(e.target.value)}
-                disabled={busy}
-                className="rounded-md border border-gray-300 bg-white px-2 py-1"
-              >
-                {sequences.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={startFollowUp}
-                disabled={busy || !sequenceId}
-                className="rounded-md bg-ink px-3 py-1.5 font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                Start follow-up
-              </button>
-            </>
-          ) : (
-            <span className="text-gray-400">No email address, so this lead can&apos;t get email follow-ups.</span>
-          )}
-        </div>
-      )}
-
-      {error && <p className="mb-2 text-xs text-red-700">{error}</p>}
-
-      <div className="flex flex-wrap gap-2">
-        {STATUS_OPTIONS.filter((s) => s !== lead.status).map((s) => (
-          <button
-            key={s}
-            onClick={() => updateStatus(s)}
+          <label htmlFor={`stage-${lead.id}`} className="sr-only">
+            Stage for {name}
+          </label>
+          <select
+            id={`stage-${lead.id}`}
+            value={lead.status}
+            onChange={(e) => updateStatus(e.target.value)}
             disabled={busy}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
+            className={`h-8 w-full cursor-pointer px-2 text-[13px] font-medium ${STAGE_CONTROL[lead.status] ?? ""}`}
           >
-            Mark {s}
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {humanize(s)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="tabular text-[13.5px] text-ink">
+          <span className="text-gray-500 md:hidden">Score </span>
+          {lead.score != null ? lead.score : <span className="text-gray-400">–</span>}
+        </div>
+
+        <div className={`truncate text-[13px] ${runningRun ? "text-ink" : "text-gray-500"}`}>
+          <span className="text-gray-500 md:hidden">Follow-up: </span>
+          {followUpText}
+        </div>
+
+        <div className="text-[13px] text-gray-500">{formatDate(lead.created_at, { day: "numeric", month: "short" })}</div>
+
+        <div className="md:text-right">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-controls={detailsId}
+            className={`${btn.ghost} ${btn.small}`}
+          >
+            {open ? "Hide" : "Details"}
           </button>
-        ))}
+        </div>
       </div>
-    </div>
+
+      {error && (
+        <p className="m-0 px-5 pb-3 text-[13px] text-alert" role="alert">
+          {error}
+        </p>
+      )}
+
+      {open && (
+        <div id={detailsId} className="grid gap-6 border-t border-gray-100 bg-gray-50 px-5 py-5 md:grid-cols-2">
+          <div>
+            <h3 className="m-0 mb-2 text-[13px] font-semibold text-ink">
+              Why this score{lead.score != null ? ` (${lead.score} of 100)` : ""}
+            </h3>
+            {hasAnswers || lead.contact?.email || lead.contact?.phone ? (
+              <ul className="m-0 grid list-none gap-1.5 p-0">
+                {reasons.map((r) => (
+                  <li key={r.label} className="flex items-baseline justify-between gap-4 text-[13px]">
+                    <span className={r.met ? "text-ink" : "text-gray-400"}>{r.label}</span>
+                    <span className={`tabular ${r.met ? "text-ink-600" : "text-gray-300"}`}>+{r.points}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="m-0 text-[13px] text-gray-500">Elliot hasn&apos;t collected any answers from this lead yet.</p>
+            )}
+            {hasAnswers && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowRaw((v) => !v)}
+                  className="mt-3 cursor-pointer border-0 bg-transparent p-0 text-[12.5px] text-gray-500 underline hover:text-ink"
+                >
+                  {showRaw ? "Hide all answers" : "Show all answers"}
+                </button>
+                {showRaw && (
+                  <pre className="mb-0 mt-2 overflow-x-auto rounded-md border border-gray-200 bg-white p-3 text-[12px]">
+                    {JSON.stringify(lead.qualification_answers, null, 2)}
+                  </pre>
+                )}
+              </>
+            )}
+          </div>
+
+          <div>
+            <h3 className="m-0 mb-2 text-[13px] font-semibold text-ink">Follow-up emails</h3>
+            {runningRun ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-[13px] text-ink">In sequence: {runningRun.sequenceName}</span>
+                <button type="button" onClick={stopFollowUp} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
+                  Stop follow-up
+                </button>
+              </div>
+            ) : isClosed ? (
+              <p className="m-0 text-[13px] text-gray-500">This lead is {humanize(lead.status).toLowerCase()}, so no follow-up is needed.</p>
+            ) : !hasEmail ? (
+              <p className="m-0 text-[13px] text-gray-500">No email address, so this lead can&apos;t get email follow-ups.</p>
+            ) : sequences.length === 0 ? (
+              <p className="m-0 text-[13px] text-gray-500">
+                Create a sequence in{" "}
+                <a href="/dashboard/follow-ups" className="text-ink underline">
+                  Follow-ups
+                </a>{" "}
+                to start one for this lead.
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor={`seq-${lead.id}`} className="sr-only">
+                  Sequence
+                </label>
+                <select
+                  id={`seq-${lead.id}`}
+                  value={sequenceId}
+                  onChange={(e) => setSequenceId(e.target.value)}
+                  disabled={busy}
+                  className="h-8 px-2 text-[13px]"
+                >
+                  {sequences.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" onClick={startFollowUp} disabled={busy || !sequenceId} className={`${btn.primary} ${btn.small}`}>
+                  Start follow-up
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </li>
   );
 }

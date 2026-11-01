@@ -58,12 +58,12 @@ export default function OnboardingForm() {
 
   if (result?.success) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <div className="mb-3 text-sm font-medium text-green-700">
+      <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <div className="mb-3 text-sm font-medium text-ink">
           Tenant &quot;{result.name}&quot; created (slug: {result.slug})
         </div>
-        <div className="mb-2 text-xs font-medium text-gray-700">Remaining manual steps:</div>
-        <ul className="list-inside list-disc space-y-2 text-xs text-gray-600">
+        <div className="mb-2 text-[12.5px] font-medium text-gray-700">Remaining manual steps:</div>
+        <ul className="list-inside list-disc space-y-2 text-[12.5px] text-gray-600">
           {result.next_steps.map((step, i) => (
             <li key={i} className="whitespace-pre-wrap">
               {step}
@@ -79,7 +79,7 @@ export default function OnboardingForm() {
             setIndustry("");
             setPlan("trial");
           }}
-          className="mt-4 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium hover:bg-gray-50"
+          className="mt-4 rounded-md border border-gray-300 px-3 py-1.5 text-[12.5px] font-medium hover:bg-gray-50"
         >
           Onboard another
         </button>
@@ -88,18 +88,18 @@ export default function OnboardingForm() {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 bg-white p-5">
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-gray-700">Business name</label>
+        <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Business name</label>
         <input
           value={name}
           onChange={(e) => handleNameChange(e.target.value)}
           disabled={busy}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="w-full h-9 px-3"
         />
       </div>
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-gray-700">Slug</label>
+        <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Slug</label>
         <input
           value={slug}
           onChange={(e) => {
@@ -107,31 +107,31 @@ export default function OnboardingForm() {
             setSlugTouched(true);
           }}
           disabled={busy}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm"
+          className="w-full h-9 px-3"
         />
-        <p className="mt-1 text-[11px] text-gray-400">
+        <p className="mt-1 text-[12px] text-gray-400">
           Used in the chat widget embed and the knowledge-ingestion API. Auto-filled from the name -- edit it
           directly if you need something different.
         </p>
       </div>
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-gray-700">Industry (optional)</label>
+        <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Industry (optional)</label>
         <input
           value={industry}
           onChange={(e) => setIndustry(e.target.value)}
           disabled={busy}
           placeholder="e.g. real_estate"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="w-full h-9 px-3"
         />
       </div>
       <div className="mb-4 flex gap-4">
         <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-gray-700">Plan</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Plan</label>
           <select
             value={plan}
             onChange={(e) => setPlan(e.target.value)}
             disabled={busy}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="w-full h-9 px-3"
           >
             {PLANS.map((p) => (
               <option key={p} value={p}>
@@ -141,22 +141,22 @@ export default function OnboardingForm() {
           </select>
         </div>
         <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-gray-700">Timezone</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Timezone</label>
           <input
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
             disabled={busy}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="w-full h-9 px-3"
           />
         </div>
       </div>
 
-      {error && <p className="mb-3 text-xs text-red-700">{error}</p>}
+      {error && <p className="mb-3 text-[12.5px] text-alert">{error}</p>}
 
       <button
         onClick={handleSubmit}
         disabled={busy || !name.trim() || !slug.trim()}
-        className="rounded-md bg-ink px-4 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? "Creating…" : "Create tenant"}
       </button>

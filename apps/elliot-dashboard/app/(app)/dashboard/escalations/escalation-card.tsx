@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Badge, StatusBadge, btn, timeAgo } from "../../../_ui/ui";
 
 type Escalation = {
   id: string;
@@ -18,33 +19,26 @@ type Escalation = {
 // Matches escalations' check constraints exactly (see 0006_escalations_crm_sync.sql).
 const REASON_LABELS: Record<string, string> = {
   low_confidence: "Low confidence",
-  customer_requested_human: "Customer requested human",
+  customer_requested_human: "Customer asked for a person",
   angry_customer: "Angry customer",
   legal_issue: "Legal issue",
   refund_requested: "Refund requested",
-  sensitive_info: "Sensitive info",
-  no_trusted_source: "No trusted source",
-  action_exceeds_permissions: "Action exceeds permissions",
+  sensitive_info: "Sensitive information",
+  no_trusted_source: "Elliot had no source to answer from",
+  action_exceeds_permissions: "Needs a person's permission",
   other: "Other",
-};
-
-const PRIORITY_COLORS: Record<string, string> = {
-  low: "#999",
-  normal: "#666",
-  high: "#c2410c",
-  urgent: "#dc2626",
 };
 
 function formatDuration(startIso: string, endIso: string) {
   const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
   const mins = Math.round(ms / 60000);
-  if (mins < 60) return `${mins}m`;
+  if (mins < 60) return `${mins} min`;
   const hours = Math.floor(mins / 60);
   const remMins = mins % 60;
-  if (hours < 24) return `${hours}h ${remMins}m`;
+  if (hours < 24) return `${hours} h ${remMins} min`;
   const days = Math.floor(hours / 24);
   const remHours = hours % 24;
-  return `${days}d ${remHours}h`;
+  return `${days} d ${remHours} h`;
 }
 
 export default function EscalationCard({ escalation }: { escalation: Escalation }) {
@@ -72,58 +66,54 @@ export default function EscalationCard({ escalation }: { escalation: Escalation 
     router.refresh();
   }
 
+  const isOpen = escalation.status === "open";
+  const urgent = escalation.priority === "high" || escalation.priority === "urgent";
+
   return (
-    <div style={{ background: "white", border: "1px solid #eee", borderRadius: 10, padding: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-        <div>
-          <strong>{REASON_LABELS[escalation.reason] || escalation.reason}</strong>
-          <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, color: PRIORITY_COLORS[escalation.priority] || "#666" }}>
-            {escalation.priority?.toUpperCase()}
-          </span>
+    <li
+      className={`rounded-lg border border-gray-200 bg-white ${isOpen ? "border-l-[3px] border-l-alert" : ""} ${
+        escalation.status === "resolved" ? "opacity-80" : ""
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4 px-5 pt-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="m-0 text-[15px] font-semibold text-ink">{REASON_LABELS[escalation.reason] || escalation.reason}</h2>
+            {urgent && <Badge tone="alert">{escalation.priority === "urgent" ? "Urgent" : "High priority"}</Badge>}
+            <StatusBadge kind="escalation" value={escalation.status} />
+          </div>
+          <p className="m-0 mt-0.5 text-[12.5px] text-gray-500">
+            {timeAgo(escalation.created_at)}
+            {escalation.status === "resolved" && escalation.resolved_at
+              ? `, resolved in ${formatDuration(escalation.created_at, escalation.resolved_at)}`
+              : ""}
+          </p>
         </div>
-        <span style={{ fontSize: 12, color: "#999" }}>
-          {new Date(escalation.created_at).toLocaleString("en-GB", { timeZone: "UTC" })}
-        </span>
-      </div>
-
-      <p style={{ fontSize: 14, color: "#333", marginBottom: 12 }}>{escalation.context_summary}</p>
-
-      <div style={{ display: "flex", gap: 16, fontSize: 13, color: "#666", marginBottom: 12 }}>
-        <span>
-          Status: <strong>{escalation.status}</strong>
-        </span>
-        {escalation.status === "resolved" && escalation.resolved_at && (
-          <span>
-            Resolved in <strong>{formatDuration(escalation.created_at, escalation.resolved_at)}</strong>
-          </span>
-        )}
-        <a href={`/dashboard/conversations/${escalation.conversation_id}`} style={{ color: "#2563eb" }}>
-          View conversation →
+        <a href={`/dashboard/conversations/${escalation.conversation_id}`} className={`${btn.secondary} ${btn.small}`}>
+          Open conversation
         </a>
       </div>
 
-      {error && <p style={{ color: "crimson", fontSize: 13, marginBottom: 8 }}>{error}</p>}
+      <p className="m-0 max-w-3xl px-5 py-3 text-[14px] leading-relaxed text-gray-700">{escalation.context_summary}</p>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {escalation.status === "open" && (
-          <button
-            onClick={() => updateStatus("acknowledged")}
-            disabled={busy}
-            style={{ padding: "6px 12px", background: "white", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
-          >
-            Acknowledge
-          </button>
-        )}
-        {escalation.status !== "resolved" && (
-          <button
-            onClick={() => updateStatus("resolved")}
-            disabled={busy}
-            style={{ padding: "6px 12px", background: "white", border: "1px solid #ddd", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
-          >
+      {error && (
+        <p className="m-0 px-5 pb-3 text-[13px] text-alert" role="alert">
+          {error}
+        </p>
+      )}
+
+      {escalation.status !== "resolved" && (
+        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-5 py-3">
+          {isOpen && (
+            <button type="button" onClick={() => updateStatus("acknowledged")} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
+              Acknowledge
+            </button>
+          )}
+          <button type="button" onClick={() => updateStatus("resolved")} disabled={busy} className={`${btn.primary} ${btn.small}`}>
             Mark resolved
           </button>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </li>
   );
 }

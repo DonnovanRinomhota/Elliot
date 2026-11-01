@@ -5,6 +5,13 @@ import { useState } from "react";
 // Real values the ingestion webhook (08-knowledge-ingestion.json) accepts --
 // see its Validate Input node.
 const SOURCE_TYPES = ["faq", "manual_text", "pdf", "website", "other"];
+const SOURCE_LABELS: Record<string, string> = {
+  faq: "FAQ (pasted text)",
+  manual_text: "Other text (pasted)",
+  pdf: "PDF file",
+  website: "Web page",
+  other: "Other",
+};
 
 // pdfjs-dist is imported dynamically inside the event handler, not at the
 // top of this file -- a static top-level import risks being evaluated
@@ -104,51 +111,51 @@ export default function KnowledgeForm({ tenantSlug: _tenantSlug }: { tenantSlug:
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 bg-white p-5">
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-gray-700">Title</label>
+        <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Title</label>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           disabled={busy}
           placeholder="e.g. Pricing FAQ"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="w-full h-9 px-3"
         />
       </div>
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-medium text-gray-700">Source type</label>
+        <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Source type</label>
         <select
           value={sourceType}
           onChange={(e) => setSourceType(e.target.value)}
           disabled={busy}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="w-full h-9 px-3"
         >
           {SOURCE_TYPES.map((t) => (
             <option key={t} value={t}>
-              {t}
-            </option>
+                {SOURCE_LABELS[t] ?? t}
+              </option>
           ))}
         </select>
       </div>
 
       {isWebsite ? (
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium text-gray-700">URL</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-gray-700">URL</label>
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             disabled={busy}
             placeholder="https://example.com/faq"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="w-full h-9 px-3"
           />
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-[12.5px] text-gray-400">
             Fetched and extracted server-side. Won&apos;t work on pages that render their content with
             JavaScript (most modern site builders don&apos;t do this for plain FAQ/about pages, but some do).
           </p>
         </div>
       ) : isPdf ? (
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium text-gray-700">PDF file</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-gray-700">PDF file</label>
           <input
             type="file"
             accept="application/pdf"
@@ -156,28 +163,28 @@ export default function KnowledgeForm({ tenantSlug: _tenantSlug }: { tenantSlug:
             disabled={busy}
             className="w-full text-sm"
           />
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-[12.5px] text-gray-400">
             Text is extracted in your browser before upload. Scanned/image-only PDFs (no real text layer)
             won&apos;t work -- that needs OCR, which isn&apos;t built.
           </p>
         </div>
       ) : (
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium text-gray-700">Content</label>
+          <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Content</label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             disabled={busy}
             rows={10}
             placeholder="Paste FAQ answers, policy text, property details, etc."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs"
+            className="w-full p-3 text-[14px] leading-relaxed"
           />
         </div>
       )}
 
-      {error && <p className="mb-3 text-xs text-red-700">{error}</p>}
+      {error && <p className="mb-3 text-[12.5px] text-alert">{error}</p>}
       {success && (
-        <p className="mb-3 text-xs text-green-700">
+        <p className="mb-3 text-[12.5px] text-ink">
           Ingested as {success.chunks_created} chunk{success.chunks_created === 1 ? "" : "s"} (document{" "}
           {success.document_id}).
         </p>
@@ -186,7 +193,7 @@ export default function KnowledgeForm({ tenantSlug: _tenantSlug }: { tenantSlug:
       <button
         onClick={handleSubmit}
         disabled={busy || !canSubmit}
-        className="rounded-md bg-ink px-4 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {extracting ? "Extracting PDF text…" : busy ? "Ingesting…" : "Add to knowledge base"}
       </button>

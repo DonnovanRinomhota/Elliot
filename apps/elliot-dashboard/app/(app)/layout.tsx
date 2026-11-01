@@ -52,137 +52,105 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .select("id", { count: "exact", head: true })
     .eq("status", "pending");
 
-  const initials =
-    (tenantUser?.email || user.email || "")
-      .split("@")[0]
-      .split(/[._-]/)
-      .map((p: string) => p[0]?.toUpperCase())
-      .slice(0, 2)
-      .join("") || "?";
+  const navIcon = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
+  const tenantName = tenant?.name || "Elliot";
+  const userEmail = tenantUser?.email || user.email || "";
+  const isAdmin = isAdminEmail(user.email);
 
-  const HEADER_HEIGHT = 57;
+  const navSections = (
+    <>
+      <NavLink href="/" icon={<LayoutDashboard {...navIcon} />} label="Overview" />
+
+      <div className="mt-5">
+        <p className="mb-1 px-2.5 text-[12px] text-gray-400">Needs attention</p>
+        <NavLink
+          href="/dashboard/escalations"
+          icon={<AlertTriangle {...navIcon} />}
+          label="Escalations"
+          badge={openEscalations}
+          badgeTone="danger"
+        />
+        <NavLink
+          href="/dashboard/approvals"
+          icon={<CheckSquare {...navIcon} />}
+          label="Approvals"
+          badge={pendingApprovals}
+          badgeTone="warning"
+        />
+      </div>
+
+      <div className="mt-5">
+        <p className="mb-1 px-2.5 text-[12px] text-gray-400">Customers</p>
+        <NavLink href="/dashboard/leads" icon={<Users {...navIcon} />} label="Leads" />
+        <NavLink href="/dashboard/appointments" icon={<Calendar {...navIcon} />} label="Appointments" />
+        <NavLink href="/dashboard/conversations" icon={<MessageCircle {...navIcon} />} label="Conversations" />
+        <NavLink href="/dashboard/follow-ups" icon={<Repeat {...navIcon} />} label="Follow-ups" />
+        <NavLink href="/dashboard/knowledge" icon={<BookOpen {...navIcon} />} label="Knowledge base" />
+      </div>
+
+      {isAdmin && (
+        <div className="mt-5">
+          <p className="mb-1 px-2.5 text-[12px] text-gray-400">Platform</p>
+          <NavLink href="/dashboard/onboarding" icon={<PlusCircle {...navIcon} />} label="New tenant" />
+        </div>
+      )}
+    </>
+  );
+
+  const brand = (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span
+        aria-hidden="true"
+        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-ink text-[14px] font-semibold text-white"
+      >
+        {tenantName.charAt(0).toUpperCase()}
+      </span>
+      <div className="min-w-0 leading-tight">
+        <div className="truncate text-[14px] font-semibold text-ink">{tenantName}</div>
+        <div className="text-[12px] text-gray-400">Elliot assistant</div>
+      </div>
+    </div>
+  );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          height: HEADER_HEIGHT,
-          padding: "0 24px",
-          borderBottom: "1px solid #eee",
-          background: "white",
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 7,
-              background: "#111",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
-              fontWeight: 500,
-            }}
-          >
-            E
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 500 }}>{tenant?.name || "Elliot"}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: "#666" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
-            Live
-          </span>
-          <div
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: "50%",
-              background: "#eee",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 11,
-              fontWeight: 500,
-            }}
-            title={tenantUser?.email || user.email || ""}
-          >
-            {initials}
-          </div>
-        </div>
-      </header>
-
-      <div style={{ display: "flex", flex: 1 }}>
-        <nav
-          style={{
-            width: 200,
-            flexShrink: 0,
-            alignSelf: "flex-start",
-            position: "sticky",
-            top: HEADER_HEIGHT,
-            height: `calc(100vh - ${HEADER_HEIGHT}px)`,
-            overflowY: "auto",
-            background: "white",
-            borderRight: "1px solid #eee",
-            padding: "16px 14px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-          }}
-        >
-          <NavLink href="/" icon={<LayoutDashboard size={15} strokeWidth={2} aria-hidden="true" />} label="Dashboard" />
-
-          <div>
-            <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Needs attention</div>
-            <NavLink
-              href="/dashboard/escalations"
-              icon={<AlertTriangle size={15} strokeWidth={2} aria-hidden="true" />}
-              label="Escalations"
-              badge={openEscalations}
-              badgeTone="danger"
-            />
-            <NavLink
-              href="/dashboard/approvals"
-              icon={<CheckSquare size={15} strokeWidth={2} aria-hidden="true" />}
-              label="Approvals"
-              badge={pendingApprovals}
-              badgeTone="warning"
-            />
-          </div>
-
-          <div>
-            <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Customers</div>
-            <NavLink href="/dashboard/leads" icon={<Users size={15} strokeWidth={2} aria-hidden="true" />} label="Leads" />
-            <NavLink href="/dashboard/appointments" icon={<Calendar size={15} strokeWidth={2} aria-hidden="true" />} label="Appointments" />
-            <NavLink href="/dashboard/conversations" icon={<MessageCircle size={15} strokeWidth={2} aria-hidden="true" />} label="Conversations" />
-            <NavLink href="/dashboard/follow-ups" icon={<Repeat size={15} strokeWidth={2} aria-hidden="true" />} label="Follow-ups" />
-            <NavLink href="/dashboard/knowledge" icon={<BookOpen size={15} strokeWidth={2} aria-hidden="true" />} label="Knowledge base" />
-          </div>
-
-          {isAdminEmail(user.email) && (
-            <div>
-              <div style={{ fontSize: 11, color: "#999", padding: "0 8px 4px" }}>Platform admin</div>
-              <NavLink href="/dashboard/onboarding" icon={<PlusCircle size={15} strokeWidth={2} aria-hidden="true" />} label="New tenant" />
-            </div>
-          )}
-
-          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-            <NavLink href="/dashboard/settings" icon={<Settings size={15} strokeWidth={2} aria-hidden="true" />} label="Settings" />
+    <div className="min-h-screen md:flex">
+      {/* Desktop: full-height sidebar */}
+      <aside className="sticky top-0 hidden h-screen w-[240px] flex-shrink-0 flex-col border-r border-gray-200 bg-white md:flex">
+        <div className="border-b border-gray-200 px-4 py-4">{brand}</div>
+        <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-4">
+          {navSections}
+        </nav>
+        <div className="border-t border-gray-200 px-3 py-3">
+          <NavLink href="/dashboard/settings" icon={<Settings {...navIcon} />} label="Settings" />
+          <div className="mt-1 flex min-w-0 items-center justify-between gap-2 pl-2.5">
+            <span className="min-w-0 truncate text-[12px] text-gray-400" title={userEmail}>
+              {userEmail}
+            </span>
             <SignOutButton />
           </div>
-        </nav>
+        </div>
+      </aside>
 
-        <main style={{ flex: 1, padding: 28 }}>{children}</main>
-      </div>
+      {/* Mobile: top bar with a menu */}
+      <header className="sticky top-0 z-20 border-b border-gray-200 bg-white md:hidden">
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 [&::-webkit-details-marker]:hidden">
+            {brand}
+            <span className="rounded-md border border-gray-300 px-2.5 py-1 text-[13px] text-ink">Menu</span>
+          </summary>
+          <nav aria-label="Main" className="border-t border-gray-200 px-3 pb-4 pt-2">
+            {navSections}
+            <div className="mt-5 border-t border-gray-200 pt-3">
+              <NavLink href="/dashboard/settings" icon={<Settings {...navIcon} />} label="Settings" />
+              <SignOutButton />
+            </div>
+          </nav>
+        </details>
+      </header>
+
+      <main className="min-w-0 flex-1">
+        <div className="mx-auto max-w-[1200px] px-4 py-6 md:px-10 md:py-9">{children}</div>
+      </main>
     </div>
   );
 }

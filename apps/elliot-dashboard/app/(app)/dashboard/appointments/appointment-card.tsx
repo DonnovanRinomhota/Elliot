@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { StatusBadge, btn } from "../../../_ui/ui";
+import { APPOINTMENT_GRID } from "./grid";
 
 type Appointment = {
   id: string;
@@ -12,14 +14,6 @@ type Appointment = {
   status: string;
   notes: string | null;
   contact: { name: string | null; email: string | null; phone: string | null } | null;
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  confirmed: "bg-blue-50 text-blue-700",
-  completed: "bg-pulse-soft text-pulse-dark",
-  cancelled: "bg-gray-100 text-gray-500",
-  no_show: "bg-coral-soft text-coral-dark",
-  rescheduled: "bg-amber-soft text-amber-dark",
 };
 
 export default function AppointmentCard({ appointment }: { appointment: Appointment }) {
@@ -78,66 +72,65 @@ export default function AppointmentCard({ appointment }: { appointment: Appointm
     router.refresh();
   }
 
-  const opts: Intl.DateTimeFormatOptions = {
-    timeZone: appointment.timezone || "UTC",
-    dateStyle: "medium",
-    timeStyle: "short",
-  };
+  const tz = appointment.timezone || "UTC";
+  const start = new Date(appointment.starts_at);
+  const end = new Date(appointment.ends_at);
+  const day = start.toLocaleDateString("en-GB", { timeZone: tz, weekday: "short", day: "numeric", month: "short" });
+  const time = `${start.toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" })}–${end.toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" })}`;
+  const name = appointment.contact?.name || appointment.contact?.email || "Unknown contact";
+  const contactLine = [appointment.contact?.name ? appointment.contact?.email : null, appointment.contact?.phone].filter(Boolean).join(", ");
 
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white p-5 ${isCancelled ? "opacity-60" : ""}`}>
-      <div className="mb-2 flex items-start justify-between">
-        <div>
-          <span className="font-medium">{appointment.contact?.name || appointment.contact?.email || "Unknown contact"}</span>
-          <span className="ml-2 text-xs text-gray-400">
-            {appointment.contact?.email} {appointment.contact?.phone ? `· ${appointment.contact.phone}` : ""}
-          </span>
+    <li className="border-t border-gray-200 first:border-t-0">
+      <div className={`grid gap-1.5 px-5 py-3.5 ${APPOINTMENT_GRID}`}>
+        <div className={isFinal ? "text-gray-500" : "text-ink"}>
+          <div className="text-[14px] font-medium">{day}</div>
+          <div className="tabular text-[12.5px] text-gray-500">
+            {time}
+            {tz !== "Europe/Warsaw" ? ` (${tz})` : ""}
+          </div>
         </div>
-        <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[appointment.status] || "bg-gray-100 text-gray-600"}`}>
-          {appointment.status.replace("_", " ")}
-        </span>
-      </div>
 
-      <div className="mb-2 text-sm">
-        {new Date(appointment.starts_at).toLocaleString("en-GB", opts)} –{" "}
-        {new Date(appointment.ends_at).toLocaleString("en-GB", { ...opts, dateStyle: undefined })}
-        {appointment.timezone ? ` (${appointment.timezone})` : ""}
-      </div>
+        <div className="min-w-0">
+          <div className={`truncate text-[14px] ${isCancelled ? "text-gray-500 line-through decoration-gray-300" : "text-ink"}`}>{name}</div>
+          {contactLine && <div className="truncate text-[12.5px] text-gray-500">{contactLine}</div>}
+        </div>
 
-      {appointment.notes && <p className="mb-3 text-sm text-gray-500">{appointment.notes}</p>}
+        <div className="min-w-0 text-[13px] text-gray-600">{appointment.notes || <span className="text-gray-400">No notes</span>}</div>
 
-      {error && <p className="mb-2 text-xs text-red-700">{error}</p>}
-      {notice && <p className="mb-2 rounded-md bg-amber-soft px-2.5 py-1.5 text-xs text-amber-dark">{notice}</p>}
+        <div>
+          <StatusBadge kind="appointment" value={appointment.status} />
+        </div>
 
-      <div className="flex flex-wrap gap-2">
-        {!isFinal && !isPast && (
-          <button
-            onClick={cancel}
-            disabled={busy}
-            className="rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
-          >
-            Cancel appointment
-          </button>
-        )}
-        {!isFinal && isPast && (
-          <>
-            <button
-              onClick={() => setStatus("completed")}
-              disabled={busy}
-              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
-            >
-              Mark completed
+        <div className="flex flex-wrap gap-2 md:justify-end">
+          {!isFinal && !isPast && (
+            <button type="button" onClick={cancel} disabled={busy} className={`${btn.danger} ${btn.small}`}>
+              Cancel
             </button>
-            <button
-              onClick={() => setStatus("no_show")}
-              disabled={busy}
-              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
-            >
-              Mark no-show
-            </button>
-          </>
-        )}
+          )}
+          {!isFinal && isPast && (
+            <>
+              <button type="button" onClick={() => setStatus("completed")} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
+                Completed
+              </button>
+              <button type="button" onClick={() => setStatus("no_show")} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
+                No-show
+              </button>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+
+      {(error || notice) && (
+        <div className="px-5 pb-3">
+          {error && (
+            <p className="m-0 text-[13px] text-alert" role="alert">
+              {error}
+            </p>
+          )}
+          {notice && <p className="m-0 rounded-md bg-brass-soft px-3 py-2 text-[13px] text-brass-dark">{notice}</p>}
+        </div>
+      )}
+    </li>
   );
 }

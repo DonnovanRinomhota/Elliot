@@ -1,15 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  AlertTriangle,
-  Mail,
-  CalendarCheck,
-  UserPlus,
-  MessageCircle,
-  Sparkles,
-  ArrowRight,
-  TrendingUp,
-  DollarSign,
-} from "lucide-react";
+import { PageHeader, Panel, btn, humanize, timeAgo } from "../_ui/ui";
 
 type ActivityItem = {
   kind: "escalation" | "draft" | "appointment" | "lead";
@@ -18,24 +8,11 @@ type ActivityItem = {
   href: string;
 };
 
-// Same brand mapping lead-card.tsx already uses for status pills, kept in
-// sync here so the "Leads by stage" chart uses identical colors to the
-// badges you see on the Leads page itself.
 const STAGE_ORDER = ["NEW", "QUALIFYING", "WARM", "HOT", "COLD", "CONVERTED", "LOST"];
-const STAGE_COLORS: Record<string, string> = {
-  NEW: "#3B82F6",
-  QUALIFYING: "#60A5FA",
-  WARM: "#E7A33E",
-  HOT: "#FF6B5B",
-  COLD: "#9CA3AF",
-  CONVERTED: "#22E58F",
-  LOST: "#D1D5DB",
-};
 
-// Cycles through this palette by channel name so whatever channels this
-// tenant actually uses (email, chat_widget, sms, ...) each get a stable,
-// distinct color -- nothing here is hardcoded to a specific channel list.
-const CHANNEL_PALETTE = ["#4F46E5", "#22E58F", "#E7A33E", "#FF6B5B", "#0EA5E9", "#A855F7"];
+// Channels are shades of the one ink colour (darkest = most common), so the
+// chart stays in palette however many channels a tenant uses.
+const CHANNEL_SHADES = ["#13223A", "#7D8BA3", "#C9D1DE", "#3B4D6B"];
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -76,6 +53,7 @@ export default async function DashboardPage() {
     { data: leads },
     { data: leadStatuses },
     { data: recentConversations },
+    { count: pendingApprovals },
   ] = await Promise.all([
     supabase
       .from("escalations")
@@ -102,55 +80,37 @@ export default async function DashboardPage() {
       .from("conversations")
       .select("channel, created_at")
       .gte("created_at", sevenDaysAgo.toISOString()),
+    supabase.from("email_drafts").select("id", { count: "exact", head: true }).eq("status", "pending"),
   ]);
 
   const activity: ActivityItem[] = [
     ...(escalations ?? []).map((e: any) => ({
       kind: "escalation" as const,
-      text: `Escalated: ${e.reason.replace(/_/g, " ")}`,
+      text: humanize(e.reason),
       createdAt: e.created_at,
       href: "/dashboard/escalations",
     })),
     ...(drafts ?? []).map((d: any) => ({
       kind: "draft" as const,
-      text:
-        d.status === "auto_sent"
-          ? `Auto-sent: ${d.subject}`
-          : `Draft pending: ${d.subject}`,
+      text: d.status === "auto_sent" ? `Sent automatically: ${d.subject}` : `Waiting for approval: ${d.subject}`,
       createdAt: d.created_at,
       href: d.status === "auto_sent" ? "/dashboard/approvals?status=auto_sent" : "/dashboard/approvals?status=pending",
     })),
     ...(appointments ?? []).map((a: any) => ({
       kind: "appointment" as const,
-      text: `Appointment booked: ${a.contact?.name || a.contact?.email || "unknown"}, ${new Date(a.starts_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}`,
+      text: `${a.contact?.name || a.contact?.email || "Unknown contact"}, ${new Date(a.starts_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
       createdAt: a.created_at,
       href: "/dashboard/appointments",
     })),
     ...(leads ?? []).map((l: any) => ({
       kind: "lead" as const,
-      text: `New lead (${l.status}): ${l.contact?.name || l.contact?.email || "unknown"}`,
+      text: `${l.contact?.name || l.contact?.email || "Unknown contact"}, ${humanize(l.status).toLowerCase()}`,
       createdAt: l.created_at,
       href: `/dashboard/leads?status=${l.status}`,
     })),
   ]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 8);
-
-  const activityStyles: Record<ActivityItem["kind"], { icon: JSX.Element; bg: string; color: string }> = {
-    escalation: { icon: <AlertTriangle size={14} />, bg: "bg-coral-soft", color: "text-coral-dark" },
-    draft: { icon: <Mail size={14} />, bg: "bg-indigo-50", color: "text-indigo-600" },
-    appointment: { icon: <CalendarCheck size={14} />, bg: "bg-amber-soft", color: "text-amber-dark" },
-    lead: { icon: <UserPlus size={14} />, bg: "bg-pulse-soft", color: "text-pulse-dark" },
-  };
-
-  function timeAgo(iso: string) {
-    const diffMs = Date.now() - new Date(iso).getTime();
-    const mins = Math.round(diffMs / 60000);
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.round(mins / 60);
-    if (hours < 24) return `${hours}h`;
-    return `${Math.round(hours / 24)}d`;
-  }
 
   // Takes seconds (this stat comes from a SQL avg(extract(epoch from ...))),
   // not the two-ISO-string shape used by the escalation card's own
@@ -184,7 +144,7 @@ export default async function DashboardPage() {
   const channels = Array.from(new Set((recentConversations ?? []).map((r: any) => r.channel))).sort();
   const channelColor: Record<string, string> = {};
   channels.forEach((c, i) => {
-    channelColor[c] = CHANNEL_PALETTE[i % CHANNEL_PALETTE.length];
+    channelColor[c] = CHANNEL_SHADES[i % CHANNEL_SHADES.length];
   });
   const dayData = dayKeys.map((key) => {
     const rowsForDay = (recentConversations ?? []).filter((r: any) => r.created_at.slice(0, 10) === key);
@@ -201,280 +161,245 @@ export default async function DashboardPage() {
   });
   const maxDayTotal = Math.max(1, ...dayData.map((d) => d.total));
 
-  const CHART_HEIGHT = 128;
+  const CHART_HEIGHT = 140;
+  const KIND_LABEL: Record<ActivityItem["kind"], string> = {
+    escalation: "Escalation",
+    draft: "Email",
+    appointment: "Viewing",
+    lead: "Lead",
+  };
 
-  // Every stat card links to the real, filtered page it's counting --
-  // clicking "23" on Conversations takes you to the same 23 conversations,
-  // not a dead number.
-  const statCards = [
-    {
-      label: "Conversations",
-      value: stats?.conversations_count ?? "–",
-      icon: <MessageCircle size={18} />,
-      bg: "bg-indigo-50",
-      color: "text-indigo-600",
-      href: "/dashboard/conversations?days=7",
-    },
-    {
-      label: "New leads",
-      value: stats?.new_leads_count ?? "–",
-      icon: <UserPlus size={18} />,
-      bg: "bg-pulse-soft",
-      color: "text-pulse-dark",
-      href: "/dashboard/leads?days=7",
-    },
-    {
-      label: "Appointments booked",
-      value: stats?.appointments_booked_count ?? "–",
-      icon: <CalendarCheck size={18} />,
-      bg: "bg-amber-soft",
-      color: "text-amber-dark",
-      href: "/dashboard/appointments?days=7",
-    },
-    {
-      label: "Auto-resolved",
-      value: stats?.auto_resolved_count ?? "–",
-      icon: <Sparkles size={18} />,
-      bg: "bg-violet-50",
-      color: "text-violet-600",
-      href: "/dashboard/approvals?status=auto_sent&days=7",
-    },
+  // Every figure links to the filtered page it's counting.
+  const kpis = [
+    { label: "Conversations", value: stats?.conversations_count, href: "/dashboard/conversations?days=7" },
+    { label: "New leads", value: stats?.new_leads_count, href: "/dashboard/leads?days=7" },
+    { label: "Viewings booked", value: stats?.appointments_booked_count, href: "/dashboard/appointments?days=7" },
+    { label: "Answered without help", value: stats?.auto_resolved_count, href: "/dashboard/approvals?status=auto_sent&days=7" },
   ];
+
+  const escalationCount = Number(stats?.escalations_count ?? 0);
+  const approvalCount = Number(pendingApprovals ?? 0);
 
   return (
     <div>
-      <div className="mb-6 flex items-baseline justify-between">
-        <div>
-          <h1 className="m-0 text-3xl font-extrabold tracking-tight text-ink">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Here&apos;s what Elliot&apos;s been doing.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">Last 7 days</span>
-          <a
-            href="/dashboard/leads"
-            className="inline-flex items-center gap-1.5 rounded-md bg-ink px-4 py-2 text-xs font-semibold text-white no-underline transition hover:opacity-90"
-          >
-            View leads <ArrowRight size={14} />
+      <PageHeader
+        title="Overview"
+        description="What Elliot has handled in the last 7 days."
+        actions={
+          <a href="/dashboard/leads" className={btn.secondary}>
+            View leads
           </a>
-        </div>
-      </div>
+        }
+      />
 
-      {statsError && (
-        <p className="mb-4 text-sm text-red-700">Failed to load stats: {statsError.message}</p>
-      )}
+      {statsError && <p className="mb-4 text-[13px] text-alert">Couldn&apos;t load the figures: {statsError.message}</p>}
 
-      {stats && (Number(stats.escalations_count) > 0 || Number(stats.auto_resolved_count) === 0) && (
-        <a
-          href="/dashboard/escalations"
-          className="mb-6 block rounded-xl bg-amber-soft px-4 py-2.5 text-sm font-medium text-amber-dark no-underline transition hover:opacity-90"
-        >
-          {Number(stats.escalations_count) > 0
-            ? `${stats.escalations_count} escalation${Number(stats.escalations_count) === 1 ? "" : "s"} in the last 7 days -- check the Escalations page.`
-            : "No activity in the last 7 days yet."}
-        </a>
-      )}
-
-      {revenueError && (
-        <p className="mb-4 text-sm text-red-700">Failed to load revenue estimate: {revenueError.message}</p>
-      )}
-
-      {revenue && revenue.avg_deal_value != null ? (
-        <div className="mb-6 rounded-xl border border-gray-100 bg-ink p-5 text-white shadow-sm">
-          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/60">
-            <DollarSign size={14} /> Estimated impact -- last 30 days
-          </div>
-          <div className="flex items-end gap-8">
-            <div>
-              <div className="text-3xl font-extrabold tracking-tight">
-                {Number(revenue.estimated_pipeline_value).toLocaleString()}
-              </div>
-              <div className="text-xs text-white/60">
-                Estimated pipeline -- {revenue.qualified_leads_count} qualified lead
-                {Number(revenue.qualified_leads_count) === 1 ? "" : "s"} × {Number(revenue.avg_deal_value).toLocaleString()}
-              </div>
-            </div>
-            <div>
-              <div className="text-3xl font-extrabold tracking-tight">
-                {Number(revenue.estimated_closed_value).toLocaleString()}
-              </div>
-              <div className="text-xs text-white/60">
-                Estimated closed value -- {revenue.converted_leads_count} converted lead
-                {Number(revenue.converted_leads_count) === 1 ? "" : "s"}
-              </div>
-            </div>
-          </div>
-          <p className="mt-3 text-[11px] text-white/40">
-            Estimate based on your average deal value ({Number(revenue.avg_deal_value).toLocaleString()}, set in
-            Settings) -- not a computed fact, an assumption you provided. No currency conversion is applied.
-          </p>
-        </div>
-      ) : (
-        <a
-          href="/dashboard/settings"
-          className="mb-6 block rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 no-underline transition hover:border-gray-300 hover:bg-gray-100"
-        >
-          Set your average deal value in Settings to see an estimated pipeline/revenue figure here.
-        </a>
-      )}
-
-      <div className="mb-6 grid grid-cols-4 gap-3">
-        {statCards.map((card) => (
-          <a
-            key={card.label}
-            href={card.href}
-            className="group flex flex-col rounded-xl border border-gray-100 bg-white p-4 no-underline shadow-sm transition hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-md"
-          >
-            <div className="mb-4 flex items-center gap-3">
-              <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${card.bg} ${card.color}`}>
-                {card.icon}
+      {(escalationCount > 0 || approvalCount > 0) && (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2">
+          {escalationCount > 0 && (
+            <a
+              href="/dashboard/escalations"
+              className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 border-l-[3px] border-l-alert bg-white px-5 py-4 no-underline hover:bg-gray-50"
+            >
+              <span>
+                <span className="block text-[14px] font-medium text-ink">
+                  {escalationCount} escalation{escalationCount === 1 ? "" : "s"} this week
+                </span>
+                <span className="text-[13px] text-gray-500">Conversations Elliot handed to a person.</span>
               </span>
-              <span className="text-sm font-semibold text-gray-600 group-hover:text-ink">{card.label}</span>
-            </div>
-            <div className="text-3xl font-extrabold tracking-tight text-ink">{card.value}</div>
+              <span className="text-[13px] font-medium text-alert">Review</span>
+            </a>
+          )}
+          {approvalCount > 0 && (
+            <a
+              href="/dashboard/approvals"
+              className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 border-l-[3px] border-l-brass bg-white px-5 py-4 no-underline hover:bg-gray-50"
+            >
+              <span>
+                <span className="block text-[14px] font-medium text-ink">
+                  {approvalCount} email{approvalCount === 1 ? "" : "s"} waiting for approval
+                </span>
+                <span className="text-[13px] text-gray-500">Drafted by Elliot, sent once you approve.</span>
+              </span>
+              <span className="text-[13px] font-medium text-brass-dark">Review</span>
+            </a>
+          )}
+        </div>
+      )}
+
+      <section aria-label="Last 7 days" className="mb-6 grid grid-cols-2 overflow-hidden rounded-lg border border-gray-200 bg-white lg:grid-cols-4">
+        {kpis.map((k, i) => (
+          <a
+            key={k.label}
+            href={k.href}
+            className={`block px-5 py-5 no-underline hover:bg-gray-50 ${i > 0 ? "lg:border-l" : ""} ${i % 2 === 1 ? "border-l" : ""} ${i > 1 ? "border-t lg:border-t-0" : ""} border-gray-200`}
+          >
+            <div className="tabular text-[30px] font-semibold leading-none tracking-[-0.02em] text-ink">{k.value ?? "–"}</div>
+            <div className="mt-2 text-[13px] text-gray-500">{k.label}</div>
           </a>
         ))}
-      </div>
+      </section>
 
-      <div className="mb-6 grid grid-cols-2 gap-4">
-        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <span className="text-sm font-bold text-ink">Activity this week</span>
-            <a href="/dashboard/conversations?days=7" className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-600">
-              View all <TrendingUp size={14} />
+      <div className="mb-6 grid gap-6 lg:grid-cols-3">
+        <Panel
+          className="lg:col-span-2"
+          title="Conversations by day"
+          action={
+            <a href="/dashboard/conversations?days=7" className="text-[13px] text-gray-500 hover:text-ink">
+              View all
             </a>
-          </div>
+          }
+        >
           {channels.length === 0 ? (
-            <p className="text-sm text-gray-400">No conversations in the last 7 days.</p>
+            <p className="m-0 text-[13px] text-gray-500">No conversations in the last 7 days.</p>
           ) : (
             <>
-              <div className="flex items-end justify-between gap-2" style={{ height: CHART_HEIGHT }}>
+              <div className="flex items-end justify-between gap-3" style={{ height: CHART_HEIGHT }}>
                 {dayData.map((day) => (
                   <a
                     key={day.key}
                     href={`/dashboard/conversations?date=${day.key}`}
                     title={`${day.total} conversation${day.total === 1 ? "" : "s"} on ${day.label}`}
-                    className="group flex flex-1 flex-col items-center justify-end gap-1 no-underline"
-                    style={{ height: "100%" }}
+                    className="group flex h-full flex-1 flex-col items-center justify-end gap-2 no-underline"
                   >
+                    <span className="tabular text-[12px] text-gray-500">{day.total || ""}</span>
                     <div
-                      className="flex w-full max-w-[28px] flex-col-reverse overflow-hidden rounded-md transition group-hover:opacity-70 group-hover:ring-2 group-hover:ring-indigo-200"
-                      style={{ height: CHART_HEIGHT - 20 }}
+                      className="flex w-full max-w-[36px] flex-col-reverse overflow-hidden rounded-[3px] group-hover:opacity-80"
+                      style={{ height: `${(day.total / maxDayTotal) * (CHART_HEIGHT - 44)}px`, minHeight: 2, background: day.total ? undefined : "#E5E7EB" }}
                     >
                       {channels.map((c) => {
                         const count = day.perChannel[c] ?? 0;
-                        const pct = maxDayTotal > 0 ? (count / maxDayTotal) * 100 : 0;
-                        if (pct === 0) return null;
-                        return (
-                          <div
-                            key={c}
-                            style={{ height: `${pct}%`, background: channelColor[c] }}
-                          />
-                        );
+                        if (!count) return null;
+                        return <div key={c} style={{ height: `${(count / day.total) * 100}%`, background: channelColor[c] }} />;
                       })}
-                      {day.total === 0 && <div className="h-full w-full bg-gray-100" />}
                     </div>
-                    <span className="text-[11px] font-medium text-gray-400 group-hover:text-ink">{day.label}</span>
+                    <span className="text-[12px] text-gray-500 group-hover:text-ink">{day.label}</span>
                   </a>
                 ))}
               </div>
-              <div className="mt-4 flex flex-wrap gap-3">
+              <div className="mt-4 flex flex-wrap gap-4 border-t border-gray-100 pt-3">
                 {channels.map((c) => (
-                  <span key={c} className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: channelColor[c] }} />
-                    {c.replace(/_/g, " ")}
+                  <span key={c} className="flex items-center gap-1.5 text-[12.5px] text-gray-600">
+                    <span className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: channelColor[c] }} />
+                    {humanize(c)}
                   </span>
                 ))}
               </div>
             </>
           )}
-        </div>
+        </Panel>
 
-        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <span className="text-sm font-bold text-ink">Leads by stage</span>
-            <a href="/dashboard/leads" className="text-xs font-medium text-gray-400 hover:text-gray-600">
-              View all →
-            </a>
-          </div>
-          {(leadStatuses ?? []).length === 0 ? (
-            <p className="text-sm text-gray-400">No leads yet.</p>
+        <Panel title="Estimated value, last 30 days">
+          {revenueError && <p className="m-0 text-[13px] text-alert">Couldn&apos;t load: {revenueError.message}</p>}
+          {revenue && revenue.avg_deal_value != null ? (
+            <>
+              <dl className="m-0 grid gap-4">
+                <div>
+                  <dt className="text-[13px] text-gray-500">Pipeline</dt>
+                  <dd className="tabular m-0 text-[24px] font-semibold tracking-[-0.01em] text-ink">
+                    {Number(revenue.estimated_pipeline_value).toLocaleString("en-GB")}
+                  </dd>
+                  <dd className="m-0 text-[12.5px] text-gray-500">
+                    {revenue.qualified_leads_count} qualified lead{Number(revenue.qualified_leads_count) === 1 ? "" : "s"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[13px] text-gray-500">Closed</dt>
+                  <dd className="tabular m-0 text-[24px] font-semibold tracking-[-0.01em] text-ink">
+                    {Number(revenue.estimated_closed_value).toLocaleString("en-GB")}
+                  </dd>
+                  <dd className="m-0 text-[12.5px] text-gray-500">
+                    {revenue.converted_leads_count} converted lead{Number(revenue.converted_leads_count) === 1 ? "" : "s"}
+                  </dd>
+                </div>
+              </dl>
+              <p className="mb-0 mt-4 border-t border-gray-100 pt-3 text-[12px] leading-relaxed text-gray-400">
+                Based on your average deal value of {Number(revenue.avg_deal_value).toLocaleString("en-GB")} from
+                Settings. An estimate, not a booked figure.
+              </p>
+            </>
           ) : (
-            <div className="flex items-end justify-between gap-2" style={{ height: CHART_HEIGHT }}>
-              {stageCounts.map(({ stage, count }) => {
-                const pct = (count / maxStageCount) * 100;
-                return (
-                  <a
-                    key={stage}
-                    href={`/dashboard/leads?status=${stage}`}
-                    title={`${count} ${stage.toLowerCase()} lead${count === 1 ? "" : "s"}`}
-                    className="group flex flex-1 flex-col items-center justify-end gap-1 no-underline"
-                    style={{ height: "100%" }}
-                  >
-                    <span className="text-[11px] font-semibold text-gray-600 group-hover:text-ink">{count}</span>
-                    <div
-                      className="w-full max-w-[26px] rounded-md transition group-hover:opacity-70 group-hover:ring-2 group-hover:ring-indigo-200"
-                      style={{
-                        height: `${Math.max(pct, count > 0 ? 4 : 0)}%`,
-                        background: STAGE_COLORS[stage],
-                        minHeight: count > 0 ? 3 : 0,
-                      }}
-                    />
-                    <span className="text-[10px] font-medium text-gray-400 group-hover:text-ink">{stage.slice(0, 4)}</span>
-                  </a>
-                );
-              })}
-            </div>
+            !revenueError && (
+              <p className="m-0 text-[13px] text-gray-500">
+                Add your average deal value in{" "}
+                <a href="/dashboard/settings" className="text-ink underline">
+                  Settings
+                </a>{" "}
+                to see an estimate of your pipeline here.
+              </p>
+            )
           )}
-        </div>
+        </Panel>
       </div>
 
-      <div className="grid grid-cols-[1.3fr_1fr] gap-4">
-        <div>
-          <div className="mb-2.5 text-sm font-bold text-ink">Recent activity</div>
-          {activity.length === 0 && <p className="text-sm text-gray-400">Nothing yet.</p>}
-          <div className="flex flex-col gap-1.5">
-            {activity.map((item, i) => {
-              const s = activityStyles[item.kind];
-              return (
-                <a
-                  key={i}
-                  href={item.href}
-                  className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2.5 no-underline transition hover:bg-gray-100"
-                >
-                  <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${s.bg} ${s.color}`}>
-                    {s.icon}
-                  </span>
-                  <span className="flex-1 text-sm text-gray-700">{item.text}</span>
-                  <span className="text-xs text-gray-400">{timeAgo(item.createdAt)}</span>
-                </a>
-              );
-            })}
-          </div>
-        </div>
-        <div>
-          <div className="mb-2.5 text-sm font-bold text-ink">Response quality</div>
-          <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-            {[
-              {
-                label: "Avg response time",
-                value: stats?.avg_response_seconds != null ? `${Math.round(stats.avg_response_seconds)}s` : "–",
-              },
-              { label: "Auto-resolved rate", value: stats?.auto_resolve_rate != null ? `${stats.auto_resolve_rate}%` : "–" },
-              { label: "Escalation rate", value: stats?.escalation_rate != null ? `${stats.escalation_rate}%` : "–" },
-              {
-                label: "Avg resolution time",
-                value:
-                  stats?.avg_escalation_resolution_seconds != null
-                    ? formatDuration(stats.avg_escalation_resolution_seconds)
-                    : "–",
-              },
-            ].map((row) => (
-              <div key={row.label} className="mb-2.5 flex items-center justify-between text-sm last:mb-0">
-                <span className="text-gray-500">{row.label}</span>
-                <span className="font-bold text-ink">{row.value}</span>
-              </div>
-            ))}
-          </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Panel className="lg:col-span-2" title="Recent activity" flush>
+          {activity.length === 0 ? (
+            <p className="m-0 px-5 py-4 text-[13px] text-gray-500">Nothing has happened yet.</p>
+          ) : (
+            <ul className="m-0 list-none p-0">
+              {activity.map((item, i) => (
+                <li key={i} className="border-t border-gray-100 first:border-t-0">
+                  <a href={item.href} className="grid grid-cols-[96px_1fr_auto] items-baseline gap-3 px-5 py-3 no-underline hover:bg-gray-50">
+                    <span className="text-[12.5px] text-gray-500">{KIND_LABEL[item.kind]}</span>
+                    <span className="truncate text-[13.5px] text-ink">{item.text}</span>
+                    <span className="whitespace-nowrap text-[12.5px] text-gray-400">{timeAgo(item.createdAt)}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <div className="grid content-start gap-6">
+          <Panel
+            title="Leads by stage"
+            action={
+              <a href="/dashboard/leads" className="text-[13px] text-gray-500 hover:text-ink">
+                View all
+              </a>
+            }
+          >
+            {(leadStatuses ?? []).length === 0 ? (
+              <p className="m-0 text-[13px] text-gray-500">No leads yet.</p>
+            ) : (
+              <ul className="m-0 grid list-none gap-2.5 p-0">
+                {stageCounts.map(({ stage, count }) => (
+                  <li key={stage}>
+                    <a href={`/dashboard/leads?status=${stage}`} className="group grid grid-cols-[88px_1fr_24px] items-center gap-3 no-underline">
+                      <span className="text-[13px] text-gray-600 group-hover:text-ink">{humanize(stage)}</span>
+                      <span className="h-2 overflow-hidden rounded-full bg-gray-100">
+                        <span className="block h-full rounded-full bg-ink" style={{ width: `${(count / maxStageCount) * 100}%` }} />
+                      </span>
+                      <span className="tabular text-right text-[13px] text-ink">{count}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel title="Response quality">
+            <dl className="m-0 grid gap-2.5">
+              {[
+                {
+                  label: "Average reply time",
+                  value: stats?.avg_response_seconds != null ? `${Math.round(stats.avg_response_seconds)} s` : "–",
+                },
+                { label: "Answered without help", value: stats?.auto_resolve_rate != null ? `${stats.auto_resolve_rate}%` : "–" },
+                { label: "Handed to a person", value: stats?.escalation_rate != null ? `${stats.escalation_rate}%` : "–" },
+                {
+                  label: "Time to resolve a handover",
+                  value: stats?.avg_escalation_resolution_seconds != null ? formatDuration(stats.avg_escalation_resolution_seconds) : "–",
+                },
+              ].map((row) => (
+                <div key={row.label} className="flex items-baseline justify-between gap-3">
+                  <dt className="text-[13px] text-gray-500">{row.label}</dt>
+                  <dd className="tabular m-0 text-[13.5px] font-medium text-ink">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </Panel>
         </div>
       </div>
     </div>
