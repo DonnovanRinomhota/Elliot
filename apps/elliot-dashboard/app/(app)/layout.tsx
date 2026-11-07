@@ -11,6 +11,7 @@ import {
   CheckSquare,
   Users,
   Calendar,
+  CalendarDays,
   MessageCircle,
   Settings,
   BookOpen,
@@ -85,6 +86,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <p className="mb-1 px-2.5 text-[12px] text-gray-400">Customers</p>
         <NavLink href="/dashboard/leads" icon={<Users {...navIcon} />} label="Leads" />
         <NavLink href="/dashboard/appointments" icon={<Calendar {...navIcon} />} label="Appointments" />
+        <NavLink href="/dashboard/calendar" icon={<CalendarDays {...navIcon} />} label="Calendar" />
         <NavLink href="/dashboard/conversations" icon={<MessageCircle {...navIcon} />} label="Conversations" />
         <NavLink href="/dashboard/follow-ups" icon={<Repeat {...navIcon} />} label="Follow-ups" />
       </div>

@@ -101,6 +101,35 @@ imported; earlier replies show $0.
   days are offered; Elliot says "available from …" when it isn't free yet.
   Each time a listing is shown, its *Suggested* count goes up.
 
+### Viewings: property, agent and calendar (0030)
+- Every appointment can be linked to the **listing being viewed** and the
+  **agent doing the viewing**:
+  - Elliot passes the listing when it books (`book_appointment` now takes the
+    `listing_id` that `search_listings` returned; workflows 01 and 12).
+  - Otherwise a listing reference in the booking notes (e.g. "W-101") is
+    used, if exactly one listing matches.
+  - The agent defaults to whoever owns the client's lead (round-robin).
+  - Both can be changed on the appointment's page.
+- **Appointments** shows each viewing's cover photo, title, address and
+  agent, with an *Agent* filter and a **List / Calendar** switch. The
+  calendar is a month grid (phone: a list of days).
+- **An appointment's page** (click the client or the property) has the
+  photos, address with *Open in Google Maps*, price and size, the client's
+  phone and email, the conversation with Elliot, the agent picker and the
+  booking notes. If Elliot didn't record a property, you pick it there.
+- **Calendar** (`/dashboard/calendar`): week by week.
+  - *My calendar* is the default for team members. *Whole team* shows a
+    row per agent and a column per day; any one agent or *Unassigned* can be
+    picked too.
+  - *Coming weeks* shows how many viewings each of the next six weeks has.
+  - Cancelled viewings are left out.
+- New Google Calendar events get the address as their location, the
+  property and agent in the description, and the agent as a guest (if the
+  client's lead has an owner). Changing the agent in the dashboard later
+  doesn't change the Google event.
+- The Overview's *Viewings today* shows the property and agent, and opens
+  the viewing.
+
 ### Team (`/dashboard/team`)
 - Invite by email (Supabase sends the invitation; the link opens
   `/reset-password` to choose a password). One person = one agency.
@@ -145,10 +174,12 @@ admin can switch it off for the whole agency.
    Optional check on a scratch database:
    `db/seed/test_0027_platform_listings_team_inbox.sql` (ends with
    "0027 checks passed", rolls everything back).
-   Then `db/migrations/0028_listings_available_from.sql` and
-   `db/migrations/0029_listing_photos.sql` (same way). 0029 creates the
-   `listing-photos` storage bucket and its access rules; check it appears
-   under Supabase → Storage.
+   Then `db/migrations/0028_listings_available_from.sql`,
+   `db/migrations/0029_listing_photos.sql` and
+   `db/migrations/0030_appointment_listing_and_agent.sql` (same way). 0029
+   creates the `listing-photos` storage bucket and its access rules; check it
+   appears under Supabase → Storage. 0030 also fills in the property and
+   agent on existing appointments where it can.
 2. **Vercel** (dashboard project):
    - `ANTHROPIC_API_KEY`: an Anthropic API key for the "read any file"
      listings import (console.anthropic.com → API keys; can be the same key
@@ -180,6 +211,11 @@ admin can switch it off for the whole agency.
      still points at 24.
    - **10 Lead Capture**: open *Escalate Hot Lead (24)* and pick
      "24 - Escalate To Human" in the workflow dropdown.
+   - **12 Book Appointment** (changed in 0030): re-select the Postgres
+     credentials (*Load Tenant + Contact Info* = service role, *Insert
+     Appointment* = RLS-scoped, as before) and the Google Calendar
+     credential if n8n asks. Re-import **01** too: *Execute: Book
+     Appointment Sub-Workflow* must still point at 12.
    - **24 Escalate To Human**: re-select the Postgres and Gmail
      credentials if n8n asks.
    - **31 Daily Summary Email** (new): pick the Postgres (service role) and

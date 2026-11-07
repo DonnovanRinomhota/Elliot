@@ -59,7 +59,8 @@
           "contact_id": { "type": "string", "description": "The UUID of the contact this appointment is for" },
           "starts_at": { "type": "string", "description": "ISO 8601 UTC datetime the appointment starts, e.g. 2026-08-17T10:00:00.000Z" },
           "ends_at": { "type": "string", "description": "ISO 8601 UTC datetime the appointment ends" },
-          "notes": { "type": "string", "description": "Brief note on what the appointment is for, based on the conversation" }
+          "notes": { "type": "string", "description": "Brief note on what the appointment is for, based on the conversation" },
+          "listing_id": { "type": "string", "description": "If the viewing is for a property from search_listings, its listing_id exactly as search_listings returned it. Leave out if it is not about one specific listing." }
         },
         "required": ["contact_id", "starts_at", "ends_at"]
       }

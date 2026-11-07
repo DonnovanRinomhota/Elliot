@@ -4,7 +4,7 @@
     {
       "parameters": {
         "inputSource": "jsonExample",
-        "jsonExample": "{\n  \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"contact_id\": \"a1a1a1a1-0000-0000-0000-000000000000\",\n  \"starts_at\": \"2026-08-17T10:00:00.000Z\",\n  \"ends_at\": \"2026-08-17T11:00:00.000Z\",\n  \"notes\": \"Property viewing requested via chat\"\n}"
+        "jsonExample": "{\n  \"tenant_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"contact_id\": \"a1a1a1a1-0000-0000-0000-000000000000\",\n  \"starts_at\": \"2026-08-17T10:00:00.000Z\",\n  \"ends_at\": \"2026-08-17T11:00:00.000Z\",\n  \"notes\": \"Property viewing requested via chat\",\n  \"listing_id\": \"listing uuid or reference from search_listings (optional)\"\n}"
       },
       "id": "67ead15b-3b6a-453d-87b7-834e99efd51f",
       "name": "When Executed by Another Workflow",
@@ -103,9 +103,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "select ac.google_calendar_id, t.timezone, c.name as contact_name, c.email as contact_email\nfrom ai_config ac\njoin tenants t on t.id = ac.tenant_id\nleft join contacts c on c.id = $2\nwhere ac.tenant_id = $1;",
+        "query": "-- Also finds the listing being viewed (by id or reference, from\n-- book_appointment's listing_id) and the agent who owns the client's lead,\n-- so the calendar event shows the address and goes in the agent's calendar.\nselect ac.google_calendar_id, t.timezone, c.name as contact_name, c.email as contact_email,\n       li.id as listing_id, li.title as listing_title, li.reference as listing_reference,\n       nullif(concat_ws(', ', li.address, li.district, li.city), '') as listing_address,\n       ag.email as agent_email, coalesce(ag.full_name, ag.email) as agent_name\nfrom ai_config ac\njoin tenants t on t.id = ac.tenant_id\nleft join contacts c on c.id = $2 and c.tenant_id = $1\nleft join lateral (\n    select l.id, l.title, l.reference, l.address, l.district, l.city\n    from listings l\n    where l.tenant_id = $1 and nullif($3, '') is not null\n      and (l.id::text = $3 or lower(l.reference) = lower($3))\n    order by (l.id::text = $3) desc\n    limit 1\n) li on true\nleft join lateral (\n    select u.email, u.full_name\n    from leads ld\n    join tenant_users u on u.id = ld.assigned_to and u.removed_at is null\n    where ld.tenant_id = $1 and ld.contact_id = $2\n    order by ld.updated_at desc\n    limit 1\n) ag on true\nwhere ac.tenant_id = $1;",
         "options": {
-          "queryReplacement": "={{ [$json.tenant_id, $json.contact_id] }}"
+          "queryReplacement": "={{ [$json.tenant_id, $json.contact_id, String($json.listing_id || '').trim()] }}"
         }
       },
       "id": "fcdd5adf-e77c-43cd-b011-d27e87298a49",
@@ -132,7 +132,7 @@
         "nodeCredentialType": "googleCalendarOAuth2Api",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"summary\": \"Property viewing — {{ $json.contact_name }}\",\n  \"description\": \"{{ $('When Executed by Another Workflow').first().json.notes }}\",\n  \"start\": {\n    \"dateTime\": \"{{ $('When Executed by Another Workflow').first().json.starts_at }}\",\n    \"timeZone\": \"{{ $json.timezone }}\"\n  },\n  \"end\": {\n    \"dateTime\": \"{{ $('When Executed by Another Workflow').first().json.ends_at }}\",\n    \"timeZone\": \"{{ $json.timezone }}\"\n  },\n  \"attendees\": [\n    { \"email\": \"{{ $json.contact_email }}\" }\n  ]\n}",
+        "jsonBody": "={{ (() => {\n  const req = $('When Executed by Another Workflow').first().json;\n  const info = $json;\n  const place = [info.listing_title, info.listing_reference ? `ref ${info.listing_reference}` : null].filter(Boolean).join(', ');\n  const attendees = [info.contact_email, info.agent_email].filter(Boolean).map((email) => ({ email }));\n  return JSON.stringify({\n    summary: `Property viewing — ${info.contact_name || 'client'}${info.listing_title ? ` — ${info.listing_title}` : ''}`,\n    location: info.listing_address || undefined,\n    description: [\n      place ? `Property: ${place}` : null,\n      info.listing_address ? `Address: ${info.listing_address}` : null,\n      info.agent_name ? `Agent: ${info.agent_name}` : null,\n      req.notes || null,\n    ].filter(Boolean).join('\\n'),\n    start: { dateTime: req.starts_at, timeZone: info.timezone },\n    end: { dateTime: req.ends_at, timeZone: info.timezone },\n    attendees,\n  });\n})() }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -153,9 +153,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "insert into appointments (tenant_id, contact_id, starts_at, ends_at, timezone, status, external_calendar_id, notes)\nvalues ($1, $2, $3, $4, $5, 'confirmed', $6, $7)\nreturning id, starts_at, ends_at, status;",
+        "query": "-- agent_id is filled in by trg_appointments_fill_links (0030) from the\n-- lead's owner; listing_id comes from 'Load Tenant + Contact Info'.\ninsert into appointments (tenant_id, contact_id, starts_at, ends_at, timezone, status, external_calendar_id, notes, listing_id)\nvalues ($1, $2, $3, $4, $5, 'confirmed', $6, $7, nullif($8, '')::uuid)\nreturning id, starts_at, ends_at, status, listing_id;",
         "options": {
-          "queryReplacement": "={{ [\n  $('When Executed by Another Workflow').first().json.tenant_id,\n  $('When Executed by Another Workflow').first().json.contact_id,\n  $('When Executed by Another Workflow').first().json.starts_at,\n  $('When Executed by Another Workflow').first().json.ends_at,\n  $('Load Tenant + Contact Info').first().json.timezone,\n  $json.id,\n  $('When Executed by Another Workflow').first().json.notes || null\n] }}"
+          "queryReplacement": "={{ [\n  $('When Executed by Another Workflow').first().json.tenant_id,\n  $('When Executed by Another Workflow').first().json.contact_id,\n  $('When Executed by Another Workflow').first().json.starts_at,\n  $('When Executed by Another Workflow').first().json.ends_at,\n  $('Load Tenant + Contact Info').first().json.timezone,\n  $json.id,\n  $('When Executed by Another Workflow').first().json.notes || null,\n  $('Load Tenant + Contact Info').first().json.listing_id || ''\n] }}"
         }
       },
       "id": "4a1d114b-fba2-4d14-8bf8-7e6e37c82ac8",
@@ -177,7 +177,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Normalize output for the Main Agent's tool_result formatting.\nconst appt = $input.first().json;\nreturn [{\n  json: {\n    success: true,\n    appointment_id: appt.id,\n    starts_at: appt.starts_at,\n    ends_at: appt.ends_at,\n    status: appt.status\n  }\n}];"
+        "jsCode": "// Normalize output for the Main Agent's tool_result formatting.\nconst appt = $input.first().json;\nconst info = $('Load Tenant + Contact Info').first().json;\nreturn [{\n  json: {\n    success: true,\n    appointment_id: appt.id,\n    starts_at: appt.starts_at,\n    ends_at: appt.ends_at,\n    status: appt.status,\n    listing_title: appt.listing_id ? info.listing_title || null : null,\n    listing_address: appt.listing_id ? info.listing_address || null : null,\n  }\n}];"
       },
       "id": "fed6c35d-99d4-473c-a4e7-0e8aa10cc008",
       "name": "Format Results",
