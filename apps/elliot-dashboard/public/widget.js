@@ -14,6 +14,8 @@
  *                        is no way to get a real AI-authored opening line before
  *                        the visitor has said something.
  *   data-accent       -- accent color (hex), default "#111111"
+ *   data-api-base     -- where to poll for team replies (defaults to the
+ *                        origin this script was loaded from, i.e. the dashboard)
  *
  * Deliberately vanilla JS, no build step, no framework runtime shipped to the
  * host page -- this file is the whole widget. It renders into a Shadow DOM so
@@ -22,8 +24,14 @@
  * Talks directly to the "chat" webhook (01-main-ai-agent.json). Request/response
  * contract, confirmed against that workflow's Validate Input / Respond to
  * Webhook nodes:
- *   POST { tenant_slug, message, conversation_id?, contact?: {name,email,phone} }
- *   ->   { conversation_id, reply }
+ *   POST { tenant_slug, message, conversation_id?, contact: {name,email,phone} }
+ *   ->   { conversation_id, reply }  or  { conversation_id, reply, needs_contact: true }
+ *
+ * Before the first message the visitor gives their name and an email or
+ * phone (a short form in the panel). They're sent with every message, and
+ * remembered in this browser so a returning visitor doesn't type them again.
+ * Elliot won't answer a chat without them (needs_contact), in which case the
+ * form comes back and the message is sent again once it's filled in.
  *
  * KNOWN GAP, not fixable from this file: that webhook has no auth (same as
  * every other n8n webhook in this project so far -- see KNOWN_ISSUES.md).
@@ -48,10 +56,21 @@
   }
 
   var WEBHOOK_URL = scriptEl.dataset.webhookUrl || DEFAULT_WEBHOOK_URL;
+  // Team replies (live takeover from the dashboard) are fetched from the
+  // dashboard, which is also where this script is served from.
+  var API_BASE = scriptEl.dataset.apiBase || (function () {
+    try {
+      return new URL(scriptEl.src).origin;
+    } catch (e) {
+      return "";
+    }
+  })();
+  var POLL_MS = 4000;
   var TITLE = scriptEl.dataset.title || "Chat with us";
   var GREETING = scriptEl.dataset.greeting || "Hi! How can I help you today?";
   var ACCENT = scriptEl.dataset.accent || "#111111";
   var STORAGE_KEY = "elliot_conversation_id:" + TENANT;
+  var VISITOR_KEY = "elliot_visitor:" + TENANT;
 
   // sessionStorage, not localStorage: a conversation survives page navigation
   // within the same tab/session (so multi-page chats stay coherent) but resets
@@ -69,6 +88,23 @@
       sessionStorage.setItem(STORAGE_KEY, id);
     } catch (e) {
       /* ignore */
+    }
+  }
+
+  // The visitor's details: localStorage, so they're asked once per browser.
+  function getVisitor() {
+    try {
+      var v = JSON.parse(localStorage.getItem(VISITOR_KEY) || "null");
+      return v && v.name && (v.email || v.phone) ? v : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function setVisitor(v) {
+    try {
+      localStorage.setItem(VISITOR_KEY, JSON.stringify(v));
+    } catch (e) {
+      /* ignore: details still go with this session's messages */
     }
   }
 
@@ -99,6 +135,8 @@
     ".msg{max-width:80%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}" +
     ".msg.user{align-self:flex-end;background:" + ACCENT + ";color:#fff;border-bottom-right-radius:3px}" +
     ".msg.assistant{align-self:flex-start;background:#fff;color:#111;border:1px solid #e5e5e5;border-bottom-left-radius:3px}" +
+    ".msg.agent{align-self:flex-start;background:#fff;color:#111;border:1px solid " + ACCENT + ";border-bottom-left-radius:3px}" +
+    ".note{align-self:center;font-size:11px;color:#777;padding:2px 0}" +
     ".msg.error{align-self:flex-start;background:#fdecea;color:#7c2d20;border:1px solid #f3c6c0}" +
     ".typing{align-self:flex-start;display:flex;gap:3px;padding:10px 12px}" +
     ".typing span{width:6px;height:6px;border-radius:50%;background:#999;display:inline-block;animation:elliot-bounce 1.2s infinite}" +
@@ -107,7 +145,15 @@
     ".inputRow{display:flex;border-top:1px solid #e5e5e5;padding:8px}" +
     ".inputRow textarea{flex:1;resize:none;border:none;outline:none;font-size:13px;padding:8px;max-height:80px;font-family:inherit}" +
     ".inputRow button{background:" + ACCENT + ";color:#fff;border:none;border-radius:8px;padding:0 14px;cursor:pointer;font-size:13px;margin-left:6px}" +
-    ".inputRow button:disabled{opacity:.5;cursor:default}";
+    ".inputRow button:disabled{opacity:.5;cursor:default}" +
+    ".form{align-self:stretch;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}" +
+    ".form p{margin:0;font-size:12.5px;color:#444;line-height:1.4}" +
+    ".form label{font-size:12px;color:#555;display:flex;flex-direction:column;gap:3px}" +
+    ".form input{font-size:13px;padding:7px 9px;border:1px solid #d4d4d4;border-radius:7px;outline:none;font-family:inherit}" +
+    ".form input:focus{border-color:" + ACCENT + "}" +
+    ".form .err{color:#b42318;font-size:12px;min-height:0}" +
+    ".form button{background:" + ACCENT + ";color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;cursor:pointer}" +
+    ".hidden{display:none !important}";
   root.appendChild(style);
 
   var bubble = document.createElement("button");
@@ -135,9 +181,113 @@
   var closeBtn = panel.querySelector(".header button");
 
   var conversationId = getConversationId();
+  var visitor = getVisitor();
+  var pendingText = null; // a message to send once the details form is filled in
+  var formEl = null;
   var isOpen = false;
   var isSending = false;
   var hasGreeted = false;
+
+  function addNote(text) {
+    var div = document.createElement("div");
+    div.className = "note";
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // ---- Team replies: poll while the chat is open ----
+  var seenAgentIds = {};
+  var lastAgentAt = new Date(Date.now() - 60 * 1000).toISOString();
+  var humanActive = false;
+  var pollTimer = null;
+
+  function poll() {
+    if (!API_BASE || !conversationId || !isOpen) return;
+    var url =
+      API_BASE + "/api/widget/messages?tenant=" + encodeURIComponent(TENANT) +
+      "&conversation_id=" + encodeURIComponent(conversationId) +
+      "&after=" + encodeURIComponent(lastAgentAt);
+    fetch(url)
+      .then(function (res) {
+        return res.ok ? res.json() : null;
+      })
+      .then(function (data) {
+        if (!data) return;
+        if (data.human_active && !humanActive) {
+          addNote((data.agent_name ? data.agent_name + " from the team" : "A member of the team") + " has joined the chat.");
+        }
+        humanActive = !!data.human_active;
+        (data.messages || []).forEach(function (m) {
+          if (seenAgentIds[m.id]) return;
+          seenAgentIds[m.id] = true;
+          addMessage("agent", m.content);
+          if (m.created_at > lastAgentAt) lastAgentAt = m.created_at;
+        });
+      })
+      .catch(function () {
+        /* offline or blocked: try again next tick */
+      });
+  }
+  function startPolling() {
+    if (pollTimer) return;
+    poll();
+    pollTimer = setInterval(poll, POLL_MS);
+  }
+  function stopPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  // ---- Details form: name + email or phone, before the chat starts ----
+  var inputRow = panel.querySelector(".inputRow");
+
+  function showForm(note) {
+    if (formEl) formEl.remove();
+    inputRow.classList.add("hidden");
+    formEl = document.createElement("form");
+    formEl.className = "form";
+    formEl.noValidate = true;
+    formEl.innerHTML =
+      "<p></p>" +
+      '<label>Your name<input name="name" autocomplete="name" required></label>' +
+      '<label>Email<input name="email" type="email" autocomplete="email"></label>' +
+      '<label>Phone<input name="phone" type="tel" autocomplete="tel"></label>' +
+      '<div class="err" role="alert"></div>' +
+      '<button type="submit">Start chat</button>';
+    formEl.querySelector("p").textContent =
+      note || "Before we start, please tell us your name and an email or phone number, so the team can get back to you.";
+    if (visitor) {
+      formEl.elements.name.value = visitor.name || "";
+      formEl.elements.email.value = visitor.email || "";
+      formEl.elements.phone.value = visitor.phone || "";
+    }
+    formEl.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = formEl.elements.name.value.trim();
+      var email = formEl.elements.email.value.trim();
+      var phone = formEl.elements.phone.value.trim();
+      var err = formEl.querySelector(".err");
+      if (!name) return (err.textContent = "Please enter your name.");
+      if (!email && !phone) return (err.textContent = "Please enter an email or a phone number.");
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return (err.textContent = "That email address doesn't look right.");
+      if (phone && phone.replace(/\D/g, "").length < 6) return (err.textContent = "That phone number looks too short.");
+      visitor = { name: name, email: email || null, phone: phone || null };
+      setVisitor(visitor);
+      formEl.remove();
+      formEl = null;
+      inputRow.classList.remove("hidden");
+      textareaEl.focus();
+      if (pendingText) {
+        var t = pendingText;
+        pendingText = null;
+        deliver(t);
+      }
+    });
+    messagesEl.appendChild(formEl);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    formEl.elements.name.focus();
+  }
 
   function addMessage(role, text) {
     var div = document.createElement("div");
@@ -172,12 +322,15 @@
     if (!hasGreeted) {
       addMessage("assistant", GREETING);
       hasGreeted = true;
+      if (!visitor) showForm();
     }
-    textareaEl.focus();
+    if (!formEl) textareaEl.focus();
+    startPolling();
   }
   function closePanel() {
     isOpen = false;
     panel.classList.remove("open");
+    stopPolling();
   }
 
   bubble.addEventListener("click", function () {
@@ -195,10 +348,19 @@
 
     addMessage("user", text);
     textareaEl.value = "";
+    if (!visitor) {
+      pendingText = text;
+      showForm();
+      return;
+    }
+    deliver(text);
+  }
+
+  function deliver(text) {
     setSending(true);
     showTyping();
 
-    var payload = { tenant_slug: TENANT, message: text };
+    var payload = { tenant_slug: TENANT, message: text, contact: visitor };
     if (conversationId) payload.conversation_id = conversationId;
 
     fetch(WEBHOOK_URL, {
@@ -219,11 +381,23 @@
           conversationId = data.conversation_id;
           setConversationId(conversationId);
         }
-        if (data.reply) {
+        if (data.needs_contact) {
+          // Elliot needs the details first; the message wasn't saved, so it's
+          // sent again once the form is filled in.
+          pendingText = text;
+          showForm(data.reply);
+        } else if (data.reply) {
           addMessage("assistant", data.reply);
+        } else if (data.human) {
+          // A team member is handling this chat; their reply arrives by polling.
+          if (!humanActive) {
+            humanActive = true;
+            addNote("A member of the team will reply here.");
+          }
         } else {
           addMessage("error", "Sorry, something went wrong. Please try again.");
         }
+        startPolling();
       })
       .catch(function (err) {
         hideTyping();

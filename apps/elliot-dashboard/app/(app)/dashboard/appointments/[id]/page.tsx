@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ExternalLink, MapPin, Phone, Mail, MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { contactLabel } from "@/lib/contacts";
 import { listingPhotos } from "@/lib/listing-photos";
 import { formatPrice } from "@/lib/listings";
 import {
@@ -38,7 +39,7 @@ export default async function AppointmentPage({ params }: { params: { id: string
 
   const tz = a.timezone || DEFAULT_TZ;
   const day = dayKey(a.starts_at, tz);
-  const client = a.contact?.name || a.contact?.email || "Unknown contact";
+  const client = contactLabel(a.contact);
   const l = a.listing;
   const photos = l ? listingPhotos(l) : [];
   const address = listingAddress(l);

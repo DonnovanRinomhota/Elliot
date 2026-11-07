@@ -130,6 +130,32 @@ imported; earlier replies show $0.
 - The Overview's *Viewings today* shows the property and agent, and opens
   the viewing.
 
+### Who you're talking to (0031)
+- **Website chat needs a name plus an email or phone before Elliot answers.**
+  The chat window (dashboard `widget.js` and the Elliot-web site) shows a
+  short form first and sends the details with every message. Workflow 01
+  saves them (`identify_chat_visitor`), links the chat to the contact, tells
+  Elliot who it's talking to (so it doesn't ask again), and replies
+  `needs_contact: true` without answering if they're missing, so an old or
+  hand-made client can't skip it.
+- **WhatsApp** gives the phone number and profile name; **email** gives the
+  address and the sender's display name (workflow 16 now saves it). If the
+  name is still unknown, the drafted reply (workflows 14 / 26) ends by asking
+  for it; anyone in the team can then fill it in.
+- **Contact panel** on a conversation: *Edit* (or *Add details*) to fill in or
+  correct the name, email and phone. It stays on screen while the messages
+  scroll, and the page title stays at the top.
+- Contacts are matched by email (any case) and by phone (digits only, so
+  "+48 601 234 567" and "48601234567" are the same person), through one
+  database function used by workflows 01, 10, 16 and 25. Lead capture (10)
+  now links the contact to the conversation too, so chats no longer show as
+  "Unknown contact". Where there's no name, the email, phone or channel is
+  shown ("Website visitor", "WhatsApp contact", "Email sender").
+- **Repeated visitor messages**: workflow 01 saved each visitor message once
+  per earlier message in the chat (so the 8th message was saved 8 times).
+  Fixed (*Log User Message* runs once), and 0031 deletes the existing copies
+  (same chat, same text, within 10 seconds of the first).
+
 ### Team (`/dashboard/team`)
 - Invite by email (Supabase sends the invitation; the link opens
   `/reset-password` to choose a password). One person = one agency.
@@ -176,7 +202,9 @@ admin can switch it off for the whole agency.
    "0027 checks passed", rolls everything back).
    Then `db/migrations/0028_listings_available_from.sql`,
    `db/migrations/0029_listing_photos.sql` and
-   `db/migrations/0030_appointment_listing_and_agent.sql` (same way). 0029
+   `db/migrations/0030_appointment_listing_and_agent.sql` and
+   `db/migrations/0031_chat_contacts_and_duplicate_messages.sql` (same way;
+   0031 prints how many duplicate messages it removed). 0029
    creates the `listing-photos` storage bucket and its access rules; check it
    appears under Supabase → Storage. 0030 also fills in the property and
    agent on existing appointments where it can.
@@ -218,6 +246,9 @@ admin can switch it off for the whole agency.
      Appointment Sub-Workflow* must still point at 12.
    - **24 Escalate To Human**: re-select the Postgres and Gmail
      credentials if n8n asks.
+   - **0031 (chat contacts)**: re-import **01, 10, 14, 16, 25 and 26**. The
+     new *Identify Visitor* node in 01 and every *Upsert Contact* node use the
+     **Elliot Postgres (service role)** credential.
    - **31 Daily Summary Email** (new): pick the Postgres (service role) and
      Gmail credentials, then **Publish** it when you want summaries to
      start. It runs once a day.

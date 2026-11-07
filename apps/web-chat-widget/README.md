@@ -87,3 +87,12 @@ Run from a scratch Node project with `jsdom` installed:
   (see the main repo's deploy notes) -- there's no build step wiring this
   up automatically yet, so it's easy for the two to drift out of sync if
   one gets edited and not the other.
+
+## Visitor details (required)
+
+Before the first message the widget asks for the visitor's name and an email
+or phone number, and sends them with every message as `contact`. They're kept
+in `localStorage` (`elliot_visitor:<tenant>`), so a returning visitor isn't
+asked again. Elliot doesn't answer a chat without them: workflow 01 replies
+`{ needs_contact: true }`, and the widget shows the form again and re-sends the
+message once it's filled in.
