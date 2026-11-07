@@ -77,13 +77,14 @@ export default async function ApprovalsPage({
             Replies Elliot has drafted. Nothing is sent until you approve it. You can edit a draft before sending.
           </FilterDescription>
         }
-      />
-
-      <FolderTabs
-        tabs={tabs}
-        activeKey={activeStatus}
-        basePath="/dashboard/approvals"
-        extraParams={days ? { days: String(days) } : {}}
+        tabs={
+          <FolderTabs
+            tabs={tabs}
+            activeKey={activeStatus}
+            basePath="/dashboard/approvals"
+            extraParams={days ? { days: String(days) } : {}}
+          />
+        }
       />
 
       {visible.length === 0 ? (

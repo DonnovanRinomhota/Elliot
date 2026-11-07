@@ -22,17 +22,19 @@ export const btn = {
 
 // ── Page header ──
 
-/** Page title, description and buttons. Stays at the top while the page scrolls. */
+/** Page title, description, buttons and status tabs. Stays at the top while the page scrolls. */
 export function PageHeader({
   title,
   description,
   actions,
+  tabs,
 }: {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
+  tabs?: ReactNode;
 }) {
-  return <StickyHeader title={title} description={description} actions={actions} />;
+  return <StickyHeader title={title} description={description} actions={actions} tabs={tabs} />;
 }
 
 /**
@@ -185,7 +187,10 @@ export function timeAgo(iso: string): string {
 
 // ── Pagination ──
 
-export const PER_PAGE = 12;
+/** Rows per page on every list. */
+export const PER_PAGE = 20;
+/** Listings have photos, so their pages are shorter. */
+export const LISTINGS_PER_PAGE = 12;
 
 /** One page of a list, plus what the Pagination bar needs. Pages start at 1. */
 export function paginate<T>(items: T[], pageParam?: string | null, perPage = PER_PAGE) {

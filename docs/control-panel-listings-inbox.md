@@ -68,8 +68,10 @@ imported; earlier replies show $0.
   - The folder must be shared as "Anyone with the link". Folders that aren't
     are listed with the fix.
   - Needs `GOOGLE_DRIVE_API_KEY` in Vercel (see Setup).
-- The list is numbered (first added = 1) and shows 12 per page, like every
-  other list in the dashboard.
+- The list is numbered (first added = 1) and shows 12 per page (they have
+  photos). Every other list in the dashboard is numbered too and shows 20
+  per page. Page titles and status tabs (All / Open / Resolved…) stay at
+  the top while you scroll.
 - **Import from any file** (Listings → Import):
   - **Excel (.xlsx) and CSV**: the header row is found automatically (even
     under a title or merged cells), and counter/summary rows are dropped. If the

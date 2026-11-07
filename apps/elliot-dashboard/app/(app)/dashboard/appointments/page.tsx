@@ -51,7 +51,7 @@ export default async function AppointmentsPage({
     .filter((a: any) => new Date(a.ends_at).getTime() < nowMs)
     .sort((a: any, b: any) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime());
 
-  // Upcoming first, then past; 12 per page across both, numbered in that order.
+  // Upcoming first, then past; 20 per page across both, numbered in that order.
   const ordered = [...upcoming, ...past];
   const pg = paginate(ordered, searchParams.page);
   const numberOf = new Map(ordered.map((a: any, i: number) => [a.id, i + 1]));
@@ -99,13 +99,14 @@ export default async function AppointmentsPage({
             "Viewings Elliot has booked into your calendar. Cancelling here also removes the calendar event."
           )
         }
-      />
-
-      <FolderTabs
-        tabs={tabs}
-        activeKey={activeStatus}
-        basePath="/dashboard/appointments"
-        extraParams={days ? { days: String(days) } : {}}
+        tabs={
+          <FolderTabs
+            tabs={tabs}
+            activeKey={activeStatus}
+            basePath="/dashboard/appointments"
+            extraParams={days ? { days: String(days) } : {}}
+          />
+        }
       />
 
       {visible.length === 0 ? (

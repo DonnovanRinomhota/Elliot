@@ -1,6 +1,7 @@
 // Status filter tabs used across Appointments, Leads, Approvals, Escalations
 // and Conversations. Plain links: the active tab is just a `status` query
 // param read server-side by each page, so no client JS is needed.
+// Pass them to PageHeader as `tabs` so they stay on screen while scrolling.
 
 export type FolderTab = {
   key: string;
@@ -22,7 +23,7 @@ export default function FolderTabs({
   extraParams?: Record<string, string>;
 }) {
   return (
-    <nav aria-label="Filter by status" className="mb-5 overflow-x-auto border-b border-gray-200">
+    <nav aria-label="Filter by status" className="overflow-x-auto border-b border-gray-200">
       <div className="flex min-w-max gap-5">
         {tabs.map((tab) => {
           const active = tab.key === activeKey;

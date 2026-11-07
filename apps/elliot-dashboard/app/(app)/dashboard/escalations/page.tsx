@@ -48,13 +48,14 @@ export default async function EscalationsPage({
             Conversations Elliot handed to a person. Acknowledge one when you&apos;ve picked it up, resolve it when it&apos;s done.
           </FilterDescription>
         }
-      />
-
-      <FolderTabs
-        tabs={tabs}
-        activeKey={activeStatus}
-        basePath="/dashboard/escalations"
-        extraParams={days ? { days: String(days) } : {}}
+        tabs={
+          <FolderTabs
+            tabs={tabs}
+            activeKey={activeStatus}
+            basePath="/dashboard/escalations"
+            extraParams={days ? { days: String(days) } : {}}
+          />
+        }
       />
 
       {visible.length === 0 ? (
