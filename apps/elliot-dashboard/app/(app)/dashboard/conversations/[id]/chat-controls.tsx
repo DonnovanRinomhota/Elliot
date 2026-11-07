@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { ErrorText, btn } from "../../../../_ui/ui";
 
 // Live website chat: take over from Elliot, reply as yourself, hand back.
+// Pinned to the bottom of the screen (see the conversation page), so it's
+// always in reach however far up the messages you are. Kept compact.
 // Replies are saved as human_agent messages; the visitor's chat window picks
 // them up within a few seconds (it polls /api/widget/messages).
 export default function ChatControls({
@@ -46,42 +48,46 @@ export default function ChatControls({
 
   if (!handledByMe) {
     return (
-      <section className="mt-6 rounded-lg border border-gray-200 bg-white p-5">
-        <h2 className="m-0 text-[14px] font-semibold text-ink">
-          {handlerName ? `${handlerName} is handling this chat` : "Elliot is answering this chat"}
-        </h2>
-        <p className="mb-3 mt-1 text-[13px] text-gray-500">
-          {handlerName
-            ? "Elliot is paused. You can take it over yourself."
-            : "Take over to reply yourself. Elliot stays quiet until you hand the chat back. The visitor sees your replies in the same chat window."}
-        </p>
-        {canTakeOver ? (
-          <button type="button" disabled={busy} onClick={() => call("take_over_conversation", { p_conversation_id: conversationId })} className={btn.primary}>
-            {busy ? "Taking over…" : "Take over this chat"}
-          </button>
-        ) : (
-          <p className="m-0 text-[13px] text-gray-500">Only members of this agency can take over chats.</p>
-        )}
+      <section className="rounded-lg border border-gray-200 bg-white px-5 py-3.5 shadow-[0_-4px_16px_rgba(19,34,58,0.08)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 md:flex-nowrap">
+          <div className="min-w-0 md:flex-1">
+            <h2 className="m-0 text-[14px] font-semibold text-ink">
+              {handlerName ? `${handlerName} is handling this chat` : "Elliot is answering this chat"}
+            </h2>
+            <p className="m-0 mt-0.5 text-[13px] text-gray-500">
+              {handlerName
+                ? "Elliot is paused. You can take it over yourself."
+                : "Take over to reply yourself. Elliot stays quiet until you hand it back; the visitor sees your replies in the same chat window."}
+            </p>
+          </div>
+          {canTakeOver ? (
+            <button type="button" disabled={busy} onClick={() => call("take_over_conversation", { p_conversation_id: conversationId })} className={`${btn.primary} shrink-0`}>
+              {busy ? "Taking over…" : "Take over this chat"}
+            </button>
+          ) : (
+            <p className="m-0 text-[13px] text-gray-500">Only members of this agency can take over chats.</p>
+          )}
+        </div>
         {error && <div className="mt-3"><ErrorText>{error}</ErrorText></div>}
       </section>
     );
   }
 
   return (
-    <section className="mt-6 rounded-lg border border-ink/20 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
+    <section className="rounded-lg border border-ink/20 bg-white shadow-[0_-4px_16px_rgba(19,34,58,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-2.5">
         <h2 className="m-0 text-[14px] font-semibold text-ink">You&apos;re handling this chat. Elliot is paused.</h2>
         <button type="button" disabled={busy} onClick={() => call("hand_back_conversation", { p_conversation_id: conversationId })} className={`${btn.secondary} ${btn.small}`}>
           Hand back to Elliot
         </button>
       </div>
-      <form onSubmit={send} className="grid gap-3 p-5">
+      <form onSubmit={send} className="grid gap-2.5 px-5 py-3.5">
         <label htmlFor="chat-reply" className="sr-only">
           Your reply
         </label>
         <textarea
           id="chat-reply"
-          rows={3}
+          rows={2}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
