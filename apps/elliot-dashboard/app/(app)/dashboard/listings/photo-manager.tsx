@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { MAX_PHOTOS, PHOTO_BUCKET, move, photoUrl, shrinkImage } from "@/lib/listing-photos";
+import { driveFolderId, mergeDrivePhotos, resizedPhotoUrl } from "@/lib/google-drive";
 import { ErrorText, btn } from "../../../_ui/ui";
 
 // Upload, order and remove a listing's photos. Photos upload straight away
@@ -13,16 +14,36 @@ export default function PhotoManager({
   listingId,
   photos,
   onChange,
+  folderUrl,
 }: {
   tenantId: string;
   listingId: string;
   photos: string[];
   onChange: (photos: string[]) => void;
+  /** The listing's link; when it's a Google Drive folder, photos can be read from it. */
+  folderUrl?: string;
 }) {
   const supabase = createClient();
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState("");
+  const [driveBusy, setDriveBusy] = useState(false);
+  const hasFolder = Boolean(driveFolderId(folderUrl));
+
+  async function fromDrive() {
+    setDriveBusy(true);
+    setError(null);
+    const res = await fetch("/api/listings/drive-photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder_url: folderUrl }),
+    });
+    const data = await res.json().catch(() => null);
+    setDriveBusy(false);
+    if (!res.ok || !data?.success) return setError(data?.error || "Couldn't read the Drive folder.");
+    if (!data.photos.length) return setError("That folder has no photos in it.");
+    onChange(mergeDrivePhotos(photos, data.photos));
+  }
 
   async function upload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -81,7 +102,7 @@ export default function PhotoManager({
               <div className="relative aspect-[4/3] bg-gray-100">
                 <a href={photoUrl(p)} target="_blank" rel="noreferrer" className="block h-full w-full" title="Open full size">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photoUrl(p)} alt={`Photo ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
+                  <img src={resizedPhotoUrl(photoUrl(p), 480)} alt={`Photo ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
                 </a>
                 {i === 0 ? (
                   <span className="absolute left-1.5 top-1.5 rounded bg-ink px-1.5 py-0.5 text-[11px] font-medium text-white">Cover</span>
@@ -131,6 +152,11 @@ export default function PhotoManager({
           Add photos
           <input type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple onChange={upload} className="sr-only" />
         </label>
+        {hasFolder && (
+          <button type="button" onClick={fromDrive} disabled={driveBusy} className={btn.secondary}>
+            {driveBusy ? "Reading the folder…" : "Get photos from the Drive folder"}
+          </button>
+        )}
         {uploading && (
           <span className="text-[13px] text-gray-600" role="status">
             {uploading}

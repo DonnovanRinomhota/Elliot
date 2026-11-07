@@ -11,6 +11,7 @@ except onboarding is scoped to the logged-in user's own tenant via RLS.
    - `ADMIN_EMAILS` (comma-separated, no `NEXT_PUBLIC_` prefix -- gates the control panel `/platform` and `/dashboard/onboarding`; see `lib/admin.ts`)
    - `SUPABASE_SERVICE_ROLE_KEY` (server-only; self-serve signup, the control panel, team invites and the widget's `/api/widget/messages` -- see `lib/supabase/admin.ts`)
    - `ANTHROPIC_API_KEY` (server-only; the listings import reads PDFs, Word files and unfamiliar spreadsheets with Claude -- see `lib/anthropic.ts`). Optional `ANTHROPIC_MODEL`, `ANTHROPIC_BASE_URL`.
+   - `GOOGLE_DRIVE_API_KEY` (server-only; reads listing photos from shared Google Drive folders -- see `lib/google-drive.ts` and `docs/control-panel-listings-inbox.md`)
    - Optional: `AI_PRICE_INPUT_PER_MTOK` / `AI_PRICE_OUTPUT_PER_MTOK` (USD per million tokens, defaults 3 / 15) for the control panel's AI cost -- see `docs/control-panel-listings-inbox.md`
    - Server-only, for the internal n8n webhooks (see `lib/n8n-webhook.ts` and
      `docs/workflow-specs/internal-webhook-auth.md`):

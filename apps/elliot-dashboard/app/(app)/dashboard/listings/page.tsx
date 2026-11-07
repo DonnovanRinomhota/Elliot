@@ -11,6 +11,8 @@ import {
 } from "@/lib/listings";
 import { Image as ImageIcon } from "lucide-react";
 import { isPhotoFolderLink, listingPhotos } from "@/lib/listing-photos";
+import { resizedPhotoUrl } from "@/lib/google-drive";
+import DriveSync from "./drive-sync";
 import { Badge, EmptyState, PER_PAGE, PageHeader, Pagination, btn, timeAgo, type Tone } from "../../../_ui/ui";
 
 const STATUS_TONE: Record<ListingStatus, Tone> = {
@@ -45,9 +47,12 @@ export default async function ListingsPage({
 
   // 12 per page, fetched from the database page by page. Count first, so a
   // page number past the end (e.g. after deleting listings) shows the last page.
-  const [{ count }, { count: availableCount }] = await Promise.all([
+  const [{ count }, { count: availableCount }, { count: driveFolders }, { count: driveMissing }] = await Promise.all([
     filteredQuery("id", { count: "exact", head: true }),
     supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "available"),
+    // Listings whose link is a Google Drive folder, and those without photos yet.
+    supabase.from("listings").select("id", { count: "exact", head: true }).ilike("url", "%drive.google.com%"),
+    supabase.from("listings").select("id", { count: "exact", head: true }).ilike("url", "%drive.google.com%").eq("photos", "{}"),
   ]);
   const total = count ?? 0;
   const pages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -89,6 +94,8 @@ export default async function ListingsPage({
           </>
         }
       />
+
+      <DriveSync missingCount={driveMissing ?? 0} folderCount={driveFolders ?? 0} />
 
       <form className="mb-4 flex flex-wrap gap-2" action="/dashboard/listings">
         <label className="sr-only" htmlFor="l-q">Search</label>
@@ -156,7 +163,7 @@ export default async function ListingsPage({
                     {photos.length ? (
                       <a href={`/dashboard/listings/${l.id}`} className="relative block h-[72px] w-[96px] overflow-hidden rounded-md bg-gray-100">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={photos[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
+                        <img src={resizedPhotoUrl(photos[0], 320)} alt="" loading="lazy" className="h-full w-full object-cover" />
                         {photos.length > 1 && (
                           <span className="tabular absolute bottom-1 right-1 rounded bg-ink/80 px-1.5 text-[11px] font-medium text-white">
                             {photos.length}
