@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import LeadCard, { type RunningRun, type StartableSequence } from "./lead-card";
 import { LEAD_GRID } from "./grid";
-import { EmptyState, PageHeader } from "../../../_ui/ui";
+import { EmptyState, PageHeader, Pagination, paginate } from "../../../_ui/ui";
 import FolderTabs, { FolderTab } from "../folder-tabs";
 
 // Real values confirmed via leads_status_check constraint (see lead-card.tsx).
@@ -18,7 +18,7 @@ const STATUS_TABS: FolderTab[] = [
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; days?: string; owner?: string };
+  searchParams: { status?: string; days?: string; owner?: string; page?: string };
 }) {
   const supabase = createClient();
 
@@ -60,6 +60,7 @@ export default async function LeadsPage({
 
   const activeStatus = tabs.some((t) => t.key === searchParams.status) ? (searchParams.status as string) : "all";
   const visible = activeStatus === "all" ? scoped : scoped.filter((l: any) => l.status === activeStatus);
+  const pg = paginate(visible, searchParams.page);
 
   return (
     <div>
@@ -93,6 +94,7 @@ export default async function LeadsPage({
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           <div className={`hidden border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 ${LEAD_GRID}`}>
+            <span>#</span>
             <span>Contact</span>
             <span>Stage</span>
             <span>Score</span>
@@ -101,12 +103,25 @@ export default async function LeadsPage({
             <span className="sr-only">Actions</span>
           </div>
           <ul className="m-0 list-none p-0">
-            {visible.map((lead: any) => (
-              <LeadCard key={lead.id} lead={lead} sequences={startableSequences} runningRun={runByLead.get(lead.id) ?? null} />
+            {pg.items.map((lead: any, i: number) => (
+              <LeadCard
+                key={lead.id}
+                number={pg.offset + i + 1}
+                lead={lead}
+                sequences={startableSequences}
+                runningRun={runByLead.get(lead.id) ?? null}
+              />
             ))}
           </ul>
         </div>
       )}
+      <Pagination
+        {...pg}
+        shown={pg.items.length}
+        basePath="/dashboard/leads"
+        params={{ days: days ? String(days) : undefined, owner: owner ?? undefined, status: activeStatus === "all" ? undefined : activeStatus }}
+        noun="leads"
+      />
     </div>
   );
 }

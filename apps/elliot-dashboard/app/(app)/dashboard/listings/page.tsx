@@ -9,7 +9,9 @@ import {
   type PropertyType,
   type TransactionType,
 } from "@/lib/listings";
-import { Badge, EmptyState, PageHeader, btn, timeAgo, type Tone } from "../../../_ui/ui";
+import { Image as ImageIcon } from "lucide-react";
+import { isPhotoFolderLink, listingPhotos } from "@/lib/listing-photos";
+import { Badge, EmptyState, PER_PAGE, PageHeader, Pagination, btn, timeAgo, type Tone } from "../../../_ui/ui";
 
 const STATUS_TONE: Record<ListingStatus, Tone> = {
   available: "ink",
@@ -22,30 +24,42 @@ const STATUS_TONE: Record<ListingStatus, Tone> = {
 export default async function ListingsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; type?: string; q?: string };
+  searchParams: { status?: string; type?: string; q?: string; page?: string };
 }) {
   const supabase = createClient();
   const status = LISTING_STATUSES.includes(searchParams.status as ListingStatus) ? searchParams.status : undefined;
   const type = searchParams.type === "sale" || searchParams.type === "rent" ? searchParams.type : undefined;
   const q = (searchParams.q || "").trim();
 
-  let query = supabase
-    .from("listings")
-    .select(
-      "id, reference, title, status, transaction_type, property_type, price, currency, city, district, area_m2, rooms, available_from, times_suggested, last_suggested_at, updated_at"
-    )
-    .order("updated_at", { ascending: false })
-    .limit(500);
-  if (status) query = query.eq("status", status);
-  if (type) query = query.eq("transaction_type", type);
-  if (q) {
-    const like = `%${q.replace(/[%,()]/g, " ")}%`;
-    query = query.or(`title.ilike.${like},reference.ilike.${like},city.ilike.${like},district.ilike.${like}`);
-  }
-  const [{ data: listings, error }, { count: availableCount }] = await Promise.all([
-    query,
+  // Same filters for the count and for the page of rows.
+  const filteredQuery = (columns: string, opts?: { count: "exact"; head?: boolean }) => {
+    let qb = supabase.from("listings").select(columns, opts);
+    if (status) qb = qb.eq("status", status);
+    if (type) qb = qb.eq("transaction_type", type);
+    if (q) {
+      const like = `%${q.replace(/[%,()]/g, " ")}%`;
+      qb = qb.or(`title.ilike.${like},reference.ilike.${like},city.ilike.${like},district.ilike.${like}`);
+    }
+    return qb;
+  };
+
+  // 12 per page, fetched from the database page by page. Count first, so a
+  // page number past the end (e.g. after deleting listings) shows the last page.
+  const [{ count }, { count: availableCount }] = await Promise.all([
+    filteredQuery("id", { count: "exact", head: true }),
     supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "available"),
   ]);
+  const total = count ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const requested = Math.min(Math.max(1, Number.parseInt(searchParams.page || "1", 10) || 1), pages);
+  const offset = (requested - 1) * PER_PAGE;
+  const { data: listings, error } = await filteredQuery(
+    "id, reference, title, status, transaction_type, property_type, price, currency, city, district, area_m2, rooms, available_from, photos, image_url, url, times_suggested, last_suggested_at, updated_at"
+  )
+    // Stable order so numbers don't jump between pages: first added = 1.
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(offset, offset + PER_PAGE - 1);
 
   const filtered = Boolean(status || type || q);
   const today = new Date().toISOString().slice(0, 10);
@@ -67,7 +81,7 @@ export default async function ListingsPage({
         actions={
           <>
             <a href="/dashboard/listings/import" className={btn.secondary}>
-              Import CSV
+              Import
             </a>
             <a href="/dashboard/listings/new" className={btn.primary}>
               Add listing
@@ -108,16 +122,20 @@ export default async function ListingsPage({
             Add your properties one by one, or import them all from a spreadsheet. Once they&apos;re here, Elliot can answer
             &ldquo;what do you have in Mokotów under 900k?&rdquo; with your real listings.
             <div className="mt-4 flex justify-center gap-2">
-              <a href="/dashboard/listings/import" className={btn.secondary}>Import CSV</a>
+              <a href="/dashboard/listings/import" className={btn.secondary}>Import</a>
               <a href="/dashboard/listings/new" className={btn.primary}>Add listing</a>
             </div>
           </EmptyState>
         )
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-          <table className="w-full min-w-[820px] border-collapse text-left text-[13px]">
+          <table className="w-full min-w-[900px] border-collapse text-left text-[13px]">
             <thead>
               <tr className="border-b border-gray-200 text-[12px] text-gray-500">
+                <th className="w-10 px-4 py-2.5 font-medium">#</th>
+                <th className="w-[112px] py-2.5 font-medium">
+                  <span className="sr-only">Photo</span>
+                </th>
                 <th className="px-4 py-2.5 font-medium">Listing</th>
                 <th className="px-4 py-2.5 font-medium">Price</th>
                 <th className="px-4 py-2.5 font-medium">Location</th>
@@ -129,8 +147,43 @@ export default async function ListingsPage({
               </tr>
             </thead>
             <tbody>
-              {(listings ?? []).map((l: any) => (
+              {(listings ?? []).map((l: any, i: number) => {
+                const photos = listingPhotos(l);
+                return (
                 <tr key={l.id} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+                  <td className="tabular px-4 py-3 text-[12.5px] text-gray-400">{offset + i + 1}</td>
+                  <td className="py-2.5">
+                    {photos.length ? (
+                      <a href={`/dashboard/listings/${l.id}`} className="relative block h-[72px] w-[96px] overflow-hidden rounded-md bg-gray-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photos[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
+                        {photos.length > 1 && (
+                          <span className="tabular absolute bottom-1 right-1 rounded bg-ink/80 px-1.5 text-[11px] font-medium text-white">
+                            {photos.length}
+                          </span>
+                        )}
+                      </a>
+                    ) : isPhotoFolderLink(l.url) ? (
+                      <a
+                        href={l.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex h-[72px] w-[96px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 text-[11.5px] text-gray-500 no-underline hover:border-ink-400 hover:text-ink"
+                        title="Photos are in a shared folder. Open the listing to add them here."
+                      >
+                        <ImageIcon size={16} strokeWidth={1.75} aria-hidden="true" />
+                        Photo folder
+                      </a>
+                    ) : (
+                      <a
+                        href={`/dashboard/listings/${l.id}`}
+                        className="flex h-[72px] w-[96px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 text-[11.5px] text-gray-400 no-underline hover:border-ink-400 hover:text-ink"
+                      >
+                        <ImageIcon size={16} strokeWidth={1.75} aria-hidden="true" />
+                        Add photos
+                      </a>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <a href={`/dashboard/listings/${l.id}`} className="font-medium text-ink no-underline hover:underline">
                       {l.title}
@@ -159,11 +212,22 @@ export default async function ListingsPage({
                     {l.last_suggested_at && <div className="text-[12px] text-gray-500">last {timeAgo(l.last_suggested_at)}</div>}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
+      <Pagination
+        page={requested}
+        pages={pages}
+        total={total}
+        offset={offset}
+        shown={(listings ?? []).length}
+        basePath="/dashboard/listings"
+        params={{ status, type, q: q || undefined }}
+        noun="listings"
+      />
     </div>
   );
 }

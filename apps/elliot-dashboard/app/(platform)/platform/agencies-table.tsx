@@ -10,7 +10,7 @@ import {
   type AccountState,
   type TenantOverviewRow,
 } from "@/lib/platform";
-import { Badge, EmptyState, btn, timeAgo, type Tone } from "../../_ui/ui";
+import { Badge, EmptyState, PER_PAGE, btn, pageWindow, timeAgo, type Tone } from "../../_ui/ui";
 
 const STATE_TONE: Record<AccountState, Tone> = {
   trial: "brass",
@@ -27,6 +27,7 @@ const n = (v: number | string | null | undefined) => Number(v || 0);
 export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
   const [query, setQuery] = useState("");
   const [state, setState] = useState<"" | AccountState>("");
+  const [page, setPage] = useState(1);
   const now = useMemo(() => new Date(), []);
 
   const enriched = useMemo(
@@ -45,6 +46,11 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
     return [r.name, r.slug, r.contact_email].some((v) => (v || "").toLowerCase().includes(q));
   });
 
+  const pages = Math.max(1, Math.ceil(shown.length / PER_PAGE));
+  const current = Math.min(page, pages);
+  const offset = (current - 1) * PER_PAGE;
+  const pageRows = shown.slice(offset, offset + PER_PAGE);
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap gap-2">
@@ -54,14 +60,25 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
         <input
           id="agency-search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(1);
+          }}
           placeholder="Search by name, slug or contact email"
           className="h-9 min-w-[240px] flex-1 px-3"
         />
         <label className="sr-only" htmlFor="agency-state">
           Account status
         </label>
-        <select id="agency-state" value={state} onChange={(e) => setState(e.target.value as AccountState | "")} className="h-9 px-3">
+        <select
+          id="agency-state"
+          value={state}
+          onChange={(e) => {
+            setState(e.target.value as AccountState | "");
+            setPage(1);
+          }}
+          className="h-9 px-3"
+        >
           <option value="">All statuses</option>
           {(Object.keys(ACCOUNT_STATE_LABEL) as AccountState[]).map((k) => (
             <option key={k} value={k}>
@@ -80,6 +97,7 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
           <table className="w-full min-w-[980px] border-collapse text-left text-[13px]">
             <thead>
               <tr className="border-b border-gray-200 text-[12px] text-gray-500">
+                <th className="px-4 py-2.5 font-medium">#</th>
                 <th className="px-4 py-2.5 font-medium">Agency</th>
                 <th className="px-4 py-2.5 font-medium">Account</th>
                 <th className="px-4 py-2.5 font-medium">Trial / paid until</th>
@@ -93,10 +111,11 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
               </tr>
             </thead>
             <tbody>
-              {shown.map(({ r, s, issues, cost }) => {
+              {pageRows.map(({ r, s, issues, cost }, i) => {
                 const dateIso = r.plan === "trial" ? r.trial_ends_at : r.paid_until;
                 return (
                   <tr key={r.tenant_id} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+                    <td className="tabular px-4 py-3 text-gray-400">{offset + i + 1}</td>
                     <td className="px-4 py-3">
                       <a href={`/platform/tenants/${r.tenant_id}`} className="font-medium text-ink no-underline hover:underline">
                         {r.name}
@@ -155,6 +174,38 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+      {shown.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[13px]">
+          <span className="tabular text-gray-500">
+            {offset + 1}–{offset + pageRows.length} of {shown.length} agencies
+          </span>
+          {pages > 1 && (
+            <div className="flex items-center gap-1">
+              <button type="button" disabled={current === 1} onClick={() => setPage(current - 1)} className={`${btn.secondary} ${btn.small}`}>
+                Previous
+              </button>
+              {pageWindow(current, pages).map((p, i) =>
+                p === "…" ? (
+                  <span key={`g${i}`} className="px-2 text-gray-400">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p)}
+                    aria-current={p === current ? "page" : undefined}
+                    className={`tabular h-8 min-w-8 rounded-md px-2.5 ${p === current ? "bg-ink font-medium text-white" : "text-gray-600 hover:bg-ink-soft"}`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+              <button type="button" disabled={current === pages} onClick={() => setPage(current + 1)} className={`${btn.secondary} ${btn.small}`}>
+                Next
+              </button>
+            </div>
+          )}
         </div>
       )}
       <p className="mt-3 text-[12px] text-gray-400">

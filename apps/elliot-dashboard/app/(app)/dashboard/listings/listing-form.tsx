@@ -12,11 +12,13 @@ import {
   TRANSACTION_TYPES,
   parseNumber,
 } from "@/lib/listings";
+import { PHOTO_BUCKET, photoUrl, removedStoragePaths } from "@/lib/listing-photos";
 import { ErrorText, Panel, btn } from "../../../_ui/ui";
+import PhotoManager from "./photo-manager";
 
 type Listing = Record<string, any>;
 
-const FIELDS_TEXT = ["reference", "title", "currency", "city", "district", "address", "description", "url", "image_url"] as const;
+const FIELDS_TEXT = ["reference", "title", "currency", "city", "district", "address", "description", "url"] as const;
 const FIELDS_NUM = ["price", "area_m2", "rooms", "bedrooms", "bathrooms", "floor"] as const;
 
 export default function ListingForm({ tenantId, listing }: { tenantId: string; listing?: Listing }) {
@@ -45,6 +47,16 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
     image_url: init("image_url"),
     available_from: init("available_from"),
   });
+  // A new listing gets its id now, so photos can be uploaded into its folder
+  // before it's saved for the first time.
+  const [listingId] = useState<string>(() => listing?.id ?? crypto.randomUUID());
+  const originalPhotos: string[] = listing?.photos ?? [];
+  const [photos, setPhotos] = useState<string[]>(() => {
+    const p: string[] = listing?.photos ?? [];
+    // Older listings (and imports) may have one photo link in image_url.
+    return p.length ? p : listing?.image_url ? [listing.image_url] : [];
+  });
+  const [uploadedNow, setUploadedNow] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +75,10 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
     for (const k of FIELDS_TEXT) row[k] = f[k].trim() || null;
     row.currency = (row.currency || "PLN").toUpperCase();
     row.available_from = f.available_from || null;
+    row.photos = photos;
+    // The cover's full link doubles as image_url, so anything reading the
+    // older single-photo field gets the right picture.
+    row.image_url = photos[0] ? photoUrl(photos[0]) : null;
     for (const k of FIELDS_NUM) {
       if (!f[k].trim()) {
         row[k] = null;
@@ -76,12 +92,17 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
     setBusy(true);
     const { error: e } = listing
       ? await supabase.from("listings").update(row).eq("id", listing.id)
-      : await supabase.from("listings").insert({ ...row, tenant_id: tenantId });
-    setBusy(false);
+      : await supabase.from("listings").insert({ ...row, id: listingId, tenant_id: tenantId });
     if (e) {
+      setBusy(false);
       setError(e.code === "23505" ? "Another listing already uses this reference." : e.message);
       return;
     }
+    // Photos removed in this edit are deleted from storage only now that
+    // the listing no longer points at them.
+    const gone = removedStoragePaths([...originalPhotos, ...uploadedNow], photos);
+    if (gone.length) await supabase.storage.from(PHOTO_BUCKET).remove(gone);
+    setBusy(false);
     router.push("/dashboard/listings");
     router.refresh();
   }
@@ -90,8 +111,13 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
     if (!listing || !window.confirm(`Delete "${listing.title}"? If it's sold or let, consider changing the status instead so you keep the record.`)) return;
     setBusy(true);
     const { error: e } = await supabase.from("listings").delete().eq("id", listing.id);
+    if (e) {
+      setBusy(false);
+      return setError(e.message);
+    }
+    const files = removedStoragePaths([...originalPhotos, ...uploadedNow], []);
+    if (files.length) await supabase.storage.from(PHOTO_BUCKET).remove(files);
     setBusy(false);
-    if (e) return setError(e.message);
     router.push("/dashboard/listings");
     router.refresh();
   }
@@ -150,6 +176,18 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
         </div>
       </Panel>
 
+      <Panel title="Photos">
+        <PhotoManager
+          tenantId={tenantId}
+          listingId={listingId}
+          photos={photos}
+          onChange={(next) => {
+            setUploadedNow((u) => Array.from(new Set([...u, ...next.filter((p) => !photos.includes(p) && !/^https?:/i.test(p))])));
+            setPhotos(next);
+          }}
+        />
+      </Panel>
+
       <Panel title="Location">
         <div className="grid gap-4 sm:grid-cols-2">
           {input("city", "City")}
@@ -165,8 +203,8 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
             <textarea id="f-description" rows={5} value={f.description} onChange={set("description")} className="w-full p-3 leading-relaxed" />
           </div>
           {input("features", "Features (comma-separated)", { placeholder: "balcony, lift, parking, garden" })}
-          {input("url", "Link to the listing page", { type: "url", placeholder: "https://" })}
-          {input("image_url", "Photo link (optional)", { type: "url", placeholder: "https://" })}
+          {input("url", "Link to the listing page or photo folder", { type: "url", placeholder: "https://" })}
+
         </div>
       </Panel>
 

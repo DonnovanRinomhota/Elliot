@@ -145,7 +145,7 @@ export default function ResetPasswordPage() {
             </p>
             <button
               onClick={() => {
-                router.push("/dashboard/approvals");
+                router.push("/");
                 router.refresh();
               }}
               className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-md border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60"

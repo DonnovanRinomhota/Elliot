@@ -35,7 +35,7 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    router.push("/dashboard/approvals");
+    router.push("/");
     router.refresh();
   }
 

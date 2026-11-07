@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMembership } from "@/lib/tenant";
-import { Badge, EmptyState, PageHeader, humanize, timeAgo, type Tone } from "../../../_ui/ui";
+import { Badge, EmptyState, PageHeader, Pagination, humanize, paginate, timeAgo, type Tone } from "../../../_ui/ui";
 import AutoRefresh from "../auto-refresh";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ type Row = {
   mine: boolean;
 };
 
-export default async function InboxPage({ searchParams }: { searchParams: { view?: string } }) {
+export default async function InboxPage({ searchParams }: { searchParams: { view?: string; page?: string } }) {
   const supabase = createClient();
   const {
     data: { user },
@@ -144,6 +144,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
   const view = searchParams.view === "mine" ? "mine" : "all";
   const sortByTime = (a: Row, b: Row) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime();
   const shownNeeds = (view === "mine" ? needsPerson.filter((r) => r.mine) : needsPerson).sort(sortByTime);
+  const pg = paginate(shownNeeds, searchParams.page);
 
   return (
     <div>
@@ -170,27 +171,41 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
         }
       />
 
-      <Section title="Needs a person" rows={shownNeeds} empty={view === "mine" ? "You're not handling any chats." : "Nothing is waiting for a person."} />
-      {view === "all" && <Section title="Live on your website now" rows={liveRows} empty="No website chats in the last 30 minutes." />}
+      <Section
+        title="Needs a person"
+        count={shownNeeds.length}
+        rows={pg.items}
+        offset={pg.offset}
+        empty={view === "mine" ? "You're not handling any chats." : "Nothing is waiting for a person."}
+      />
+      {pg.pages > 1 && (
+        <div className="-mt-4 mb-8">
+          <Pagination {...pg} shown={pg.items.length} basePath="/dashboard/inbox" params={{ view: view === "mine" ? "mine" : undefined }} noun="chats" />
+        </div>
+      )}
+      {view === "all" && (
+        <Section title="Live on your website now" count={liveRows.length} rows={liveRows.slice(0, 12)} offset={0} empty="No website chats in the last 30 minutes." />
+      )}
     </div>
   );
 }
 
-function Section({ title, rows, empty }: { title: string; rows: Row[]; empty: string }) {
+function Section({ title, count, rows, offset, empty }: { title: string; count: number; rows: Row[]; offset: number; empty: string }) {
   return (
     <section className="mb-8">
       <h2 className="mb-2 text-[14px] font-semibold text-ink">
-        {title} <span className="font-normal text-gray-500">({rows.length})</span>
+        {title} <span className="font-normal text-gray-500">({count})</span>
       </h2>
       {rows.length === 0 ? (
         <EmptyState title={empty} />
       ) : (
         <ul className="m-0 list-none overflow-hidden rounded-lg border border-gray-200 bg-white p-0">
-          {rows.map((r) => (
+          {rows.map((r, i) => (
             <li key={r.id} className="border-t border-gray-100 first:border-t-0">
               <a href={`/dashboard/conversations/${r.id}`} className="block px-4 py-3.5 no-underline hover:bg-gray-50 sm:px-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
+                    <span className="tabular w-6 text-[12.5px] text-gray-400">{offset + i + 1}</span>
                     <span className="truncate text-[14px] font-medium text-ink">{r.contactName}</span>
                     <Badge tone={r.state.tone}>{r.state.label}</Badge>
                   </div>

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import AppointmentCard from "./appointment-card";
 import { APPOINTMENT_GRID } from "./grid";
-import { EmptyState, PageHeader } from "../../../_ui/ui";
+import { EmptyState, PageHeader, Pagination, paginate } from "../../../_ui/ui";
 import FolderTabs, { FolderTab } from "../folder-tabs";
 
 // Matches appointment-card.tsx's STATUS_STYLES exactly -- these are the
@@ -17,7 +17,7 @@ const STATUS_TABS: FolderTab[] = [
 export default async function AppointmentsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; days?: string };
+  searchParams: { status?: string; days?: string; page?: string };
 }) {
   const supabase = createClient();
 
@@ -51,14 +51,23 @@ export default async function AppointmentsPage({
     .filter((a: any) => new Date(a.ends_at).getTime() < nowMs)
     .sort((a: any, b: any) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime());
 
-  const table = (title: string, rows: any[]) =>
+  // Upcoming first, then past; 12 per page across both, numbered in that order.
+  const ordered = [...upcoming, ...past];
+  const pg = paginate(ordered, searchParams.page);
+  const numberOf = new Map(ordered.map((a: any, i: number) => [a.id, i + 1]));
+  const upcomingIds = new Set(upcoming.map((a: any) => a.id));
+  const pageUpcoming = pg.items.filter((a: any) => upcomingIds.has(a.id));
+  const pagePast = pg.items.filter((a: any) => !upcomingIds.has(a.id));
+
+  const table = (title: string, rows: any[], total: number) =>
     rows.length > 0 && (
       <section className="mb-6">
         <h2 className="m-0 mb-2 text-[14px] font-semibold text-ink">
-          {title} <span className="tabular font-normal text-gray-400">{rows.length}</span>
+          {title} <span className="tabular font-normal text-gray-400">{total}</span>
         </h2>
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           <div className={`hidden border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 ${APPOINTMENT_GRID}`}>
+            <span>#</span>
             <span>When</span>
             <span>Client</span>
             <span>Notes</span>
@@ -67,7 +76,7 @@ export default async function AppointmentsPage({
           </div>
           <ul className="m-0 list-none p-0">
             {rows.map((appointment: any) => (
-              <AppointmentCard key={appointment.id} appointment={appointment} />
+              <AppointmentCard key={appointment.id} number={numberOf.get(appointment.id)} appointment={appointment} />
             ))}
           </ul>
         </div>
@@ -103,10 +112,17 @@ export default async function AppointmentsPage({
         <EmptyState title="No appointments here">Viewings appear as soon as Elliot books one with a client.</EmptyState>
       ) : (
         <>
-          {table("Upcoming", upcoming)}
-          {table("Past", past)}
+          {table("Upcoming", pageUpcoming, upcoming.length)}
+          {table("Past", pagePast, past.length)}
         </>
       )}
+      <Pagination
+        {...pg}
+        shown={pg.items.length}
+        basePath="/dashboard/appointments"
+        params={{ days: days ? String(days) : undefined, status: activeStatus === "all" ? undefined : activeStatus }}
+        noun="appointments"
+      />
     </div>
   );
 }
