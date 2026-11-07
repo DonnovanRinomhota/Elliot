@@ -102,7 +102,7 @@ export default async function DashboardPage() {
       .limit(5),
     supabase
       .from("appointments")
-      .select("id, starts_at, notes, contact:contacts(name, phone)")
+      .select("id, starts_at, notes, contact:contacts(name, phone), listing:listings(title, address, district), agent:tenant_users(full_name, email)")
       .eq("status", "confirmed")
       .gte("starts_at", new Date(Date.now() - 14 * 3600 * 1000).toISOString())
       .lte("starts_at", new Date(Date.now() + 26 * 3600 * 1000).toISOString())
@@ -136,7 +136,7 @@ export default async function DashboardPage() {
       kind: "appointment" as const,
       text: `${a.contact?.name || a.contact?.email || "Unknown contact"}, ${new Date(a.starts_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
       createdAt: a.created_at,
-      href: "/dashboard/appointments",
+      href: `/dashboard/appointments/${a.id}`,
     })),
     ...(leads ?? []).map((l: any) => ({
       kind: "lead" as const,
@@ -290,7 +290,7 @@ export default async function DashboardPage() {
         <Panel
           title={`Viewings today (${todaysViewings.length})`}
           action={
-            <a href="/dashboard/appointments" className="text-[13px] text-gray-500 hover:text-ink">
+            <a href="/dashboard/calendar" className="text-[13px] text-gray-500 hover:text-ink">
               Calendar
             </a>
           }
@@ -301,14 +301,23 @@ export default async function DashboardPage() {
           ) : (
             <ul className="m-0 list-none p-0">
               {todaysViewings.map((a: any) => (
-                <li key={a.id} className="grid grid-cols-[52px_1fr] gap-3 border-t border-gray-100 px-5 py-3 first:border-t-0">
-                  <span className="tabular text-[13.5px] font-medium text-ink">
-                    {new Date(a.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: tz })}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[13.5px] text-ink">{a.contact?.name || "Unknown contact"}</span>
-                    {a.notes && <span className="block truncate text-[12.5px] text-gray-500">{a.notes}</span>}
-                  </span>
+                <li key={a.id} className="border-t border-gray-100 first:border-t-0">
+                  <a href={`/dashboard/appointments/${a.id}`} className="grid grid-cols-[52px_1fr] gap-3 px-5 py-3 no-underline hover:bg-gray-50">
+                    <span className="tabular text-[13.5px] font-medium text-ink">
+                      {new Date(a.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: tz })}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13.5px] text-ink">{a.contact?.name || "Unknown contact"}</span>
+                      <span className="block truncate text-[12.5px] text-gray-500">
+                        {[
+                          a.listing ? [a.listing.title, a.listing.address || a.listing.district].filter(Boolean).join(", ") : a.notes,
+                          a.agent ? a.agent.full_name || a.agent.email : "no agent yet",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                  </a>
                 </li>
               ))}
             </ul>

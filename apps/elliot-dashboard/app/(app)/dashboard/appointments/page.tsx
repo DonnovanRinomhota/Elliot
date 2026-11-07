@@ -1,11 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
+import { APPOINTMENT_SELECT, DEFAULT_TZ, parseMonth, personName, todayKey, type Appointment, type TeamMember } from "@/lib/appointments";
 import AppointmentCard from "./appointment-card";
+import MonthCalendar from "./month-calendar";
 import { APPOINTMENT_GRID } from "./grid";
 import { EmptyState, PageHeader, Pagination, paginate } from "../../../_ui/ui";
 import FolderTabs, { FolderTab } from "../folder-tabs";
+import AgentSelect from "../agent-select";
 
-// Matches appointment-card.tsx's STATUS_STYLES exactly -- these are the
-// real values the "Cancel / Mark completed / Mark no-show" buttons set.
+// Matches the real values the "Cancel / Mark completed / Mark no-show"
+// buttons set.
 const STATUS_TABS: FolderTab[] = [
   { key: "confirmed", label: "Confirmed", count: 0, tone: "info" },
   { key: "completed", label: "Completed", count: 0, tone: "success" },
@@ -14,52 +17,139 @@ const STATUS_TABS: FolderTab[] = [
   { key: "rescheduled", label: "Rescheduled", count: 0, tone: "warning" },
 ];
 
-export default async function AppointmentsPage({
-  searchParams,
-}: {
-  searchParams: { status?: string; days?: string; page?: string };
-}) {
+type Params = { status?: string; days?: string; page?: string; view?: string; month?: string; agent?: string };
+
+export default async function AppointmentsPage({ searchParams }: { searchParams: Params }) {
   const supabase = createClient();
 
-  const { data: appointments, error } = await supabase
-    .from("appointments")
-    .select("id, starts_at, ends_at, timezone, status, notes, created_at, contact:contacts(name, email, phone)")
-    .order("starts_at", { ascending: false });
+  const [{ data: appointments, error }, { data: team }, { data: tenant }] = await Promise.all([
+    supabase.from("appointments").select(APPOINTMENT_SELECT).order("starts_at", { ascending: false }),
+    supabase.from("tenant_users").select("id, full_name, email, role").is("removed_at", null).in("role", ["admin", "agent"]).order("full_name"),
+    supabase.from("tenants").select("timezone").maybeSingle(),
+  ]);
 
   if (error) {
     return <p className="text-[13px] text-alert">Failed to load appointments: {error.message}</p>;
   }
 
+  const tz = (tenant as { timezone?: string } | null)?.timezone || DEFAULT_TZ;
+  const today = todayKey(tz);
+  const view = searchParams.view === "calendar" ? "calendar" : "list";
+  const members = (team ?? []) as TeamMember[];
+  const agent = searchParams.agent === "none" || members.some((m) => m.id === searchParams.agent) ? searchParams.agent! : "";
+
+  const all = (appointments ?? []) as unknown as Appointment[];
   const days = searchParams.days ? Number(searchParams.days) : null;
   const cutoff = days ? Date.now() - days * 24 * 60 * 60 * 1000 : null;
-  const scoped = cutoff ? (appointments ?? []).filter((a: any) => new Date(a.created_at).getTime() >= cutoff) : appointments ?? [];
+  const scoped = all
+    .filter((a) => !cutoff || new Date(a.created_at).getTime() >= cutoff)
+    .filter((a) => (agent === "none" ? !a.agent_id : agent ? a.agent_id === agent : true));
 
   const tabs: FolderTab[] = [
     { key: "all", label: "All", count: scoped.length, tone: "neutral" },
-    ...STATUS_TABS.map((t) => ({ ...t, count: scoped.filter((a: any) => a.status === t.key).length })),
+    ...STATUS_TABS.map((t) => ({ ...t, count: scoped.filter((a) => a.status === t.key).length })),
   ];
 
   const activeStatus = tabs.some((t) => t.key === searchParams.status) ? (searchParams.status as string) : "all";
-  const visible = activeStatus === "all" ? scoped : scoped.filter((a: any) => a.status === activeStatus);
+  const visible = activeStatus === "all" ? scoped : scoped.filter((a) => a.status === activeStatus);
+
+  // Settings every link on this page keeps.
+  const keep: Record<string, string> = {};
+  if (days) keep.days = String(days);
+  if (agent) keep.agent = agent;
+  if (view === "calendar") keep.view = "calendar";
+  const href = (extra: Record<string, string | undefined>) => {
+    const p = new URLSearchParams(keep);
+    if (activeStatus !== "all") p.set("status", activeStatus);
+    for (const [k, v] of Object.entries(extra)) {
+      if (v) p.set(k, v);
+      else p.delete(k);
+    }
+    const qs = p.toString();
+    return `/dashboard/appointments${qs ? `?${qs}` : ""}`;
+  };
+
+  const agentOptions = [
+    { value: "", label: "Everyone" },
+    ...members.map((m) => ({ value: m.id, label: personName(m) })),
+    { value: "none", label: "Unassigned" },
+  ];
+
+  const viewSwitch = (
+    <div className="inline-flex rounded-md border border-gray-300 bg-white p-0.5" role="group" aria-label="View">
+      {(["list", "calendar"] as const).map((v) => (
+        <a
+          key={v}
+          href={href({ view: v === "calendar" ? "calendar" : undefined, page: undefined, month: undefined })}
+          aria-current={view === v ? "page" : undefined}
+          className={`rounded px-3 py-1.5 text-[13px] font-medium no-underline ${view === v ? "bg-ink text-white" : "text-ink-600 hover:bg-ink-soft"}`}
+        >
+          {v === "list" ? "List" : "Calendar"}
+        </a>
+      ))}
+    </div>
+  );
+
+  const header = (
+    <PageHeader
+      title="Appointments"
+      description={
+        days ? (
+          <>
+            {scoped.length} booking{scoped.length === 1 ? "" : "s"} made in the last {days} days.{" "}
+            <a href="/dashboard/appointments" className="text-ink underline">
+              Show all
+            </a>
+          </>
+        ) : (
+          "Viewings Elliot has booked, with the property, the client and the agent going. Cancelling here also removes the calendar event."
+        )
+      }
+      actions={
+        <>
+          <AgentSelect options={agentOptions} value={agent} basePath="/dashboard/appointments" />
+          {viewSwitch}
+        </>
+      }
+      tabs={<FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/appointments" extraParams={keep} />}
+    />
+  );
+
+  if (view === "calendar") {
+    const month = parseMonth(searchParams.month, today);
+    return (
+      <div>
+        {header}
+        <MonthCalendar
+          appointments={visible}
+          month={month}
+          today={today}
+          tz={tz}
+          hrefFor={(m) => href({ month: m === today.slice(0, 7) ? undefined : m })}
+          weekHref={(day) => `/dashboard/calendar?week=${day}&agent=${agent && agent !== "none" ? agent : "all"}`}
+        />
+      </div>
+    );
+  }
 
   // Upcoming first (soonest at the top), then past (most recent first).
   const nowMs = Date.now();
   const upcoming = visible
-    .filter((a: any) => new Date(a.ends_at).getTime() >= nowMs)
-    .sort((a: any, b: any) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+    .filter((a) => new Date(a.ends_at).getTime() >= nowMs)
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
   const past = visible
-    .filter((a: any) => new Date(a.ends_at).getTime() < nowMs)
-    .sort((a: any, b: any) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime());
+    .filter((a) => new Date(a.ends_at).getTime() < nowMs)
+    .sort((a, b) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime());
 
   // Upcoming first, then past; 20 per page across both, numbered in that order.
   const ordered = [...upcoming, ...past];
   const pg = paginate(ordered, searchParams.page);
-  const numberOf = new Map(ordered.map((a: any, i: number) => [a.id, i + 1]));
-  const upcomingIds = new Set(upcoming.map((a: any) => a.id));
-  const pageUpcoming = pg.items.filter((a: any) => upcomingIds.has(a.id));
-  const pagePast = pg.items.filter((a: any) => !upcomingIds.has(a.id));
+  const numberOf = new Map(ordered.map((a, i) => [a.id, i + 1]));
+  const upcomingIds = new Set(upcoming.map((a) => a.id));
+  const pageUpcoming = pg.items.filter((a) => upcomingIds.has(a.id));
+  const pagePast = pg.items.filter((a) => !upcomingIds.has(a.id));
 
-  const table = (title: string, rows: any[], total: number) =>
+  const table = (title: string, rows: Appointment[], total: number) =>
     rows.length > 0 && (
       <section className="mb-6">
         <h2 className="m-0 mb-2 text-[14px] font-semibold text-ink">
@@ -70,12 +160,13 @@ export default async function AppointmentsPage({
             <span>#</span>
             <span>When</span>
             <span>Client</span>
-            <span>Notes</span>
+            <span>Property</span>
+            <span>Agent</span>
             <span>Status</span>
             <span className="sr-only">Actions</span>
           </div>
           <ul className="m-0 list-none p-0">
-            {rows.map((appointment: any) => (
+            {rows.map((appointment) => (
               <AppointmentCard key={appointment.id} number={numberOf.get(appointment.id)} appointment={appointment} />
             ))}
           </ul>
@@ -85,30 +176,7 @@ export default async function AppointmentsPage({
 
   return (
     <div>
-      <PageHeader
-        title="Appointments"
-        description={
-          days ? (
-            <>
-              {scoped.length} booking{scoped.length === 1 ? "" : "s"} made in the last {days} days.{" "}
-              <a href="/dashboard/appointments" className="text-ink underline">
-                Show all
-              </a>
-            </>
-          ) : (
-            "Viewings Elliot has booked into your calendar. Cancelling here also removes the calendar event."
-          )
-        }
-        tabs={
-          <FolderTabs
-            tabs={tabs}
-            activeKey={activeStatus}
-            basePath="/dashboard/appointments"
-            extraParams={days ? { days: String(days) } : {}}
-          />
-        }
-      />
-
+      {header}
       {visible.length === 0 ? (
         <EmptyState title="No appointments here">Viewings appear as soon as Elliot books one with a client.</EmptyState>
       ) : (
@@ -121,7 +189,7 @@ export default async function AppointmentsPage({
         {...pg}
         shown={pg.items.length}
         basePath="/dashboard/appointments"
-        params={{ days: days ? String(days) : undefined, status: activeStatus === "all" ? undefined : activeStatus }}
+        params={{ ...keep, status: activeStatus === "all" ? undefined : activeStatus }}
         noun="appointments"
       />
     </div>
