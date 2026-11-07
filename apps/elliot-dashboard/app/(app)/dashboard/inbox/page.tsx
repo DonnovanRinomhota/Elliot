@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMembership } from "@/lib/tenant";
-import { Badge, EmptyState, PageHeader, Pagination, humanize, paginate, timeAgo, type Tone } from "../../../_ui/ui";
+import { Badge, EmptyState, PER_PAGE, PageHeader, Pagination, humanize, paginate, timeAgo, type Tone } from "../../../_ui/ui";
 import AutoRefresh from "../auto-refresh";
 
 export const dynamic = "force-dynamic";
@@ -184,7 +184,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
         </div>
       )}
       {view === "all" && (
-        <Section title="Live on your website now" count={liveRows.length} rows={liveRows.slice(0, 12)} offset={0} empty="No website chats in the last 30 minutes." />
+        <Section title="Live on your website now" count={liveRows.length} rows={liveRows.slice(0, PER_PAGE)} offset={0} empty="No website chats in the last 30 minutes." />
       )}
     </div>
   );

@@ -85,9 +85,10 @@ export default async function LeadsPage({
             "Everyone Elliot has spoken to, with their stage and score. Change a stage from the list; open Details for the score breakdown and follow-ups."
           )
         }
+        tabs={
+          <FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/leads" extraParams={{ ...(days ? { days: String(days) } : {}), ...(owner ? { owner } : {}) }} />
+        }
       />
-
-      <FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/leads" extraParams={{ ...(days ? { days: String(days) } : {}), ...(owner ? { owner } : {}) }} />
 
       {visible.length === 0 ? (
         <EmptyState title="No leads here">Leads appear as soon as Elliot qualifies someone in a conversation.</EmptyState>

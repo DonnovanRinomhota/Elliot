@@ -13,7 +13,7 @@ import { Image as ImageIcon } from "lucide-react";
 import { isPhotoFolderLink, listingPhotos } from "@/lib/listing-photos";
 import { resizedPhotoUrl } from "@/lib/google-drive";
 import DriveSync from "./drive-sync";
-import { Badge, EmptyState, PER_PAGE, PageHeader, Pagination, btn, timeAgo, type Tone } from "../../../_ui/ui";
+import { Badge, EmptyState, LISTINGS_PER_PAGE, PageHeader, Pagination, btn, timeAgo, type Tone } from "../../../_ui/ui";
 
 const STATUS_TONE: Record<ListingStatus, Tone> = {
   available: "ink",
@@ -45,8 +45,9 @@ export default async function ListingsPage({
     return qb;
   };
 
-  // 12 per page, fetched from the database page by page. Count first, so a
-  // page number past the end (e.g. after deleting listings) shows the last page.
+  // 12 per page (other lists show 20), fetched from the database page by
+  // page. Count first, so a page number past the end (e.g. after deleting
+  // listings) shows the last page.
   const [{ count }, { count: availableCount }, { count: driveFolders }, { count: driveMissing }] = await Promise.all([
     filteredQuery("id", { count: "exact", head: true }),
     supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "available"),
@@ -55,16 +56,16 @@ export default async function ListingsPage({
     supabase.from("listings").select("id", { count: "exact", head: true }).ilike("url", "%drive.google.com%").eq("photos", "{}"),
   ]);
   const total = count ?? 0;
-  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const pages = Math.max(1, Math.ceil(total / LISTINGS_PER_PAGE));
   const requested = Math.min(Math.max(1, Number.parseInt(searchParams.page || "1", 10) || 1), pages);
-  const offset = (requested - 1) * PER_PAGE;
+  const offset = (requested - 1) * LISTINGS_PER_PAGE;
   const { data: listings, error } = await filteredQuery(
     "id, reference, title, status, transaction_type, property_type, price, currency, city, district, area_m2, rooms, available_from, photos, image_url, url, times_suggested, last_suggested_at, updated_at"
   )
     // Stable order so numbers don't jump between pages: first added = 1.
     .order("created_at", { ascending: true })
     .order("id", { ascending: true })
-    .range(offset, offset + PER_PAGE - 1);
+    .range(offset, offset + LISTINGS_PER_PAGE - 1);
 
   const filtered = Boolean(status || type || q);
   const today = new Date().toISOString().slice(0, 10);

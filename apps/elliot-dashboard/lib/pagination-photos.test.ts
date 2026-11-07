@@ -1,17 +1,20 @@
-// Run with: npm test. 12-per-page lists and listing photo helpers.
+// Run with: npm test. 20-per-page lists (12 for listings) and listing photo helpers.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { paginate, pageWindow, PER_PAGE } from "../app/_ui/ui";
+import { paginate, pageWindow, PER_PAGE, LISTINGS_PER_PAGE } from "../app/_ui/ui";
 import { isPhotoFolderLink, listingPhotos, move, photoUrl, removedStoragePaths } from "./listing-photos";
 
-const items = Array.from({ length: 30 }, (_, i) => i + 1);
+const items = Array.from({ length: 50 }, (_, i) => i + 1);
 
-test("paginate: 12 per page, clamped, with offsets for numbering", () => {
-  assert.equal(PER_PAGE, 12);
+test("paginate: 20 per page (listings 12), clamped, with offsets for numbering", () => {
+  assert.equal(PER_PAGE, 20);
+  assert.equal(LISTINGS_PER_PAGE, 12);
   const p1 = paginate(items, undefined);
-  assert.deepEqual([p1.page, p1.pages, p1.offset, p1.items.length, p1.items[0]], [1, 3, 0, 12, 1]);
+  assert.deepEqual([p1.page, p1.pages, p1.offset, p1.items.length, p1.items[0]], [1, 3, 0, 20, 1]);
   const p3 = paginate(items, "3");
-  assert.deepEqual([p3.page, p3.offset, p3.items], [3, 24, [25, 26, 27, 28, 29, 30]]);
+  assert.deepEqual([p3.page, p3.offset, p3.items], [3, 40, [41, 42, 43, 44, 45, 46, 47, 48, 49, 50]]);
+  const l2 = paginate(items, "2", LISTINGS_PER_PAGE);
+  assert.deepEqual([l2.pages, l2.offset, l2.items[0], l2.items.length], [5, 12, 13, 12]);
   assert.equal(paginate(items, "99").page, 3, "past the end -> last page");
   assert.equal(paginate(items, "-4").page, 1);
   assert.equal(paginate(items, "abc").page, 1);

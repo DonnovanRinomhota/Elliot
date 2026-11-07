@@ -73,9 +73,10 @@ export default async function ConversationsPage({
             "Every chat and email thread Elliot has had with your clients."
           )
         }
+        tabs={
+          <FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/conversations" extraParams={extraParams} />
+        }
       />
-
-      <FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/conversations" extraParams={extraParams} />
 
       {visible.length === 0 ? (
         <EmptyState title="No conversations here">Conversations appear as soon as someone writes to Elliot.</EmptyState>

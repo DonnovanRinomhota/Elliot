@@ -4,8 +4,19 @@ import { useEffect, useState, type ReactNode } from "react";
 
 // Keeps a page's title (and its buttons) visible while the page scrolls.
 // Once scrolled, the description is hidden and a hairline appears, so the
-// bar stays small. Mobile sits under the 57px top menu bar.
-export default function StickyHeader({ title, description, actions }: { title: ReactNode; description?: ReactNode; actions?: ReactNode }) {
+// bar stays small. Mobile sits under the top menu bar (about 54px). Status tabs
+// (All / Open / Resolved…) go in `tabs` so they stay visible too.
+export default function StickyHeader({
+  title,
+  description,
+  actions,
+  tabs,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  tabs?: ReactNode;
+}) {
   const [stuck, setStuck] = useState(false);
   useEffect(() => {
     const onScroll = () => setStuck(window.scrollY > 24);
@@ -16,8 +27,11 @@ export default function StickyHeader({ title, description, actions }: { title: R
 
   return (
     <div
-      className={`sticky top-[57px] z-10 -mx-4 mb-6 bg-[#f5f6f8]/95 px-4 backdrop-blur md:top-0 md:-mx-10 md:px-10 ${
-        stuck ? "border-b border-gray-200 py-3" : "border-b border-transparent py-0"
+      className={`sticky top-[54px] z-10 -mx-4 bg-[#f5f6f8] px-4 md:top-0 md:-mx-10 md:px-10 ${
+        tabs
+          ? // The tabs' own bottom line is the divider.
+            `mb-5 pb-0 ${stuck ? "pt-3" : "pt-0"}`
+          : `mb-6 border-b ${stuck ? "border-gray-200 py-3" : "border-transparent py-0"}`
       }`}
     >
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -27,6 +41,7 @@ export default function StickyHeader({ title, description, actions }: { title: R
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
+      {tabs && <div className={stuck ? "mt-2" : "mt-5"}>{tabs}</div>}
     </div>
   );
 }
