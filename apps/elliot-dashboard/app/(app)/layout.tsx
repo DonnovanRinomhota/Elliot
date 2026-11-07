@@ -226,7 +226,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <main className="min-w-0 flex-1">
         {adminView && (
-          <div className="mx-3 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brass/25 bg-brass-soft px-4 py-2.5 text-[13px] text-brass-dark md:ml-6 md:mr-3">
+          <div className="mx-3 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brass/25 bg-brass-soft px-4 py-2.5 text-[13px] text-brass-dark md:ml-6 md:mr-6">
             <span>
               You&apos;re viewing <strong className="font-semibold">{tenantName}</strong>&apos;s dashboard as a platform admin. What you change here
               changes for them.
@@ -234,7 +234,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <ExitViewAs />
           </div>
         )}
-        <div className="mx-auto max-w-[1280px] px-4 py-6 md:px-8 md:py-8">{children}</div>
+        <div className="w-full max-w-[1760px] px-4 py-6 md:px-6 md:py-7 lg:px-7">{children}</div>
       </main>
 
       {/* The built-in assistant: opened from the sidebar box, Ctrl/Cmd+K or "/". */}

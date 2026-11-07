@@ -7,6 +7,7 @@ import ChatControls from "./chat-controls";
 import AutoRefresh from "../../auto-refresh";
 import ContactPanel from "./contact-panel";
 import { PageHeader, Panel, StatusBadge, formatDate, humanize } from "../../../../_ui/ui";
+import BackButton from "@/app/_ui/back-button";
 
 export default async function ConversationDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -72,9 +73,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
 
   return (
     <div>
-      <a href="/dashboard/conversations" className="text-[13px] text-gray-500 no-underline hover:text-ink">
-        Conversations
-      </a>
+      <BackButton fallback="/dashboard/conversations" />
       <PageHeader
         title={contactName}
         description={

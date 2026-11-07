@@ -16,6 +16,7 @@ export default function MonthCalendar({
   tz,
   hrefFor,
   weekHref,
+  jumpParams = {},
 }: {
   appointments: Appointment[];
   month: string;
@@ -25,6 +26,8 @@ export default function MonthCalendar({
   hrefFor: (month: string) => string;
   /** Link to the Calendar page for the week of a day. */
   weekHref: (day: string) => string;
+  /** The page's other settings, kept when jumping to a month. */
+  jumpParams?: Record<string, string>;
 }) {
   const weeks = monthGrid(month);
   const byDay = groupByDay(appointments, tz);
@@ -49,6 +52,19 @@ export default function MonthCalendar({
               This month
             </a>
           )}
+          {/* Jump to any month, past or future. */}
+          <form action="/dashboard/appointments" className="ml-2 flex items-center gap-1.5">
+            {Object.entries(jumpParams).map(([k, v]) => (
+              <input key={k} type="hidden" name={k} value={v} />
+            ))}
+            <label htmlFor="jump-month" className="sr-only">
+              Go to month
+            </label>
+            <input id="jump-month" type="month" name="month" defaultValue={month} className="h-8 px-2.5 text-[13px]" />
+            <button type="submit" className={`${btn.secondary} ${btn.small}`}>
+              Go
+            </button>
+          </form>
         </div>
         <p className="m-0 text-[13px] text-gray-600">
           <span className="tabular text-ink">{inMonth.length}</span> viewing{inMonth.length === 1 ? "" : "s"} this month,{" "}

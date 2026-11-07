@@ -7,7 +7,7 @@ import { DEFAULT_TZ, addDays, dayKey, personName, timeOf } from "@/lib/appointme
 import { listingPhotos } from "@/lib/listing-photos";
 import { resizedPhotoUrl } from "@/lib/google-drive";
 import { AreaLine, Gauge } from "../_ui/charts";
-import { btn, humanize, timeAgo } from "../_ui/ui";
+import { PageHeader, btn, humanize, timeAgo } from "../_ui/ui";
 import { AskElliotButton } from "./dashboard/ask-elliot";
 
 const STAGE_ORDER = ["NEW", "QUALIFYING", "WARM", "HOT", "COLD", "CONVERTED", "LOST"];
@@ -94,11 +94,6 @@ export default async function DashboardPage() {
   const revenue = revenueRows?.[0] ?? null;
   const tz = tenantRow?.timezone || DEFAULT_TZ;
   const today = dayKey(now, tz);
-
-  // ── Greeting ──
-  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: tz }).format(now));
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const firstName = (me?.full_name || user.email || "").split(/[\s@]/)[0];
 
   const todays = ((upcoming ?? []) as any[]).filter((a) => dayKey(a.starts_at, tz) === today);
   const nextViewing = todays.find((a) => new Date(a.ends_at) > now);
@@ -224,28 +219,21 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      {/* Greeting */}
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <p className="m-0 text-[12px] font-medium uppercase tracking-[0.08em] text-gray-400">
-            {now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: tz })}
-          </p>
-          <h1 className="m-0 mt-1 text-[30px] font-semibold leading-tight tracking-[-0.03em] text-ink md:text-[34px]">
-            {greeting}
-            {firstName ? `, ${firstName.charAt(0).toUpperCase()}${firstName.slice(1)}` : ""}
-          </h1>
-          <p className="m-0 mt-1.5 max-w-2xl text-[15px] text-gray-500">{summary}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-[13px] text-gray-600 shadow-sm">
-            <CalendarDays size={15} aria-hidden="true" /> Last 7 days
-          </span>
-          <AskElliotButton compact />
-          <a href="/dashboard/listings/new" className={btn.primary}>
-            + Add listing
-          </a>
-        </div>
-      </header>
+      <PageHeader
+        title="Overview"
+        description={summary}
+        actions={
+          <>
+            <span className="inline-flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-[13px] text-gray-600 shadow-sm">
+              <CalendarDays size={15} aria-hidden="true" /> Last 7 days
+            </span>
+            <AskElliotButton compact />
+            <a href="/dashboard/listings/new" className={btn.primary}>
+              + Add listing
+            </a>
+          </>
+        }
+      />
 
       {statsError && <p className="mb-4 text-[13px] text-alert">Couldn&apos;t load the figures: {statsError.message}</p>}
 
@@ -290,11 +278,7 @@ export default async function DashboardPage() {
                   <a href={q.href} className="flex items-center gap-3 border-b border-gray-50 py-2.5 no-underline hover:bg-gray-50/60">
                     <Icon size={16} strokeWidth={1.75} aria-hidden="true" className="text-gray-400" />
                     <span className="flex-1 text-[13.5px] text-gray-700">{q.label}</span>
-                    <span
-                      className={`tabular min-w-[26px] rounded-full px-2 text-center text-[12.5px] font-semibold leading-6 ${
-                        q.count === 0 ? "text-gray-300" : q.tone === "alert" ? "bg-alert-soft text-alert-dark" : q.tone === "brass" ? "bg-brass-soft text-brass-dark" : "bg-accent-soft text-accent-dark"
-                      }`}
-                    >
+                    <span className={`tabular min-w-[26px] rounded-full px-2 text-center text-[12.5px] font-semibold leading-6 ${q.count === 0 ? "text-gray-300" : "bg-gray-100 text-ink"}`}>
                       {q.count}
                     </span>
                     <ChevronRight size={14} aria-hidden="true" className="text-gray-300" />

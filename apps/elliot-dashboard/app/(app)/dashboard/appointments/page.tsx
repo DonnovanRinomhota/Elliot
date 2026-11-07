@@ -127,6 +127,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
           tz={tz}
           hrefFor={(m) => href({ month: m === today.slice(0, 7) ? undefined : m })}
           weekHref={(day) => `/dashboard/calendar?week=${day}&agent=${agent && agent !== "none" ? agent : "all"}`}
+          jumpParams={{ ...keep, ...(activeStatus !== "all" ? { status: activeStatus } : {}) }}
         />
       </div>
     );

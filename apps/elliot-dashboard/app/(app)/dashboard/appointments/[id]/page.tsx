@@ -21,6 +21,7 @@ import AgentPicker from "./agent-picker";
 import ChangeListing from "./change-listing";
 import ListingPicker from "./listing-picker";
 import PhotoGallery from "./photo-gallery";
+import BackButton from "@/app/_ui/back-button";
 
 // Everything an agent needs before a viewing: the property (photos, address,
 // map, key facts), when, who the client is, and who's going.
@@ -57,9 +58,7 @@ export default async function AppointmentPage({ params }: { params: { id: string
 
   return (
     <div>
-      <a href="/dashboard/appointments" className="text-[13px] text-gray-500 no-underline hover:text-ink">
-        Appointments
-      </a>
+      <BackButton fallback="/dashboard/appointments" />
       <PageHeader
         title={`Viewing with ${client}`}
         description={

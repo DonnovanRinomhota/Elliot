@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import PasswordInput from "../_ui/password-input";
 
 type Mode = "sign-in" | "create-business";
 
@@ -135,8 +136,7 @@ export default function LoginPage() {
             />
           </Field>
           <Field label="Password">
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -174,8 +174,7 @@ export default function LoginPage() {
             />
           </Field>
           <Field label="Password">
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

@@ -21,8 +21,9 @@ export default function NavLink({
 
   const badgeClass = {
     neutral: "bg-gray-100 text-gray-600",
-    danger: "bg-alert text-white",
-    warning: "bg-brass-soft text-brass-dark",
+    // Counts are plain black: the number matters, not the colour.
+    danger: "bg-gray-100 text-ink",
+    warning: "bg-gray-100 text-ink",
   }[badgeTone];
 
   return (
