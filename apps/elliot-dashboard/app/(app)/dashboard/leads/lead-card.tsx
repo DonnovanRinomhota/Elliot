@@ -26,7 +26,7 @@ const CLOSED_STATUSES = ["CONVERTED", "LOST"];
 const STAGE_CONTROL: Record<string, string> = {
   HOT: "border-alert/40 bg-alert-soft text-alert-dark",
   WARM: "border-brass/40 bg-brass-soft text-brass-dark",
-  CONVERTED: "border-ink/30 bg-ink-soft text-ink",
+  CONVERTED: "border-accent/30 bg-accent-soft text-accent-dark",
 };
 
 type ScoreReason = { label: string; points: number; met: boolean };

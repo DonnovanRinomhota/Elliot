@@ -93,7 +93,7 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
           {rows.length ? "Try a different search or status." : "Add your first agency with Add agency above."}
         </EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-x-auto card">
           <table className="w-full min-w-[980px] border-collapse text-left text-[13px]">
             <thead>
               <tr className="border-b border-gray-200 text-[12px] text-gray-500">
@@ -195,7 +195,7 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
                     type="button"
                     onClick={() => setPage(p)}
                     aria-current={p === current ? "page" : undefined}
-                    className={`tabular h-8 min-w-8 rounded-md px-2.5 ${p === current ? "bg-ink font-medium text-white" : "text-gray-600 hover:bg-ink-soft"}`}
+                    className={`tabular h-8 min-w-8 rounded-full px-2.5 ${p === current ? "bg-accent font-medium text-white" : "text-gray-600 hover:bg-ink-soft"}`}
                   >
                     {p}
                   </button>

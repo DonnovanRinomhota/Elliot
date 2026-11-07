@@ -58,7 +58,7 @@ export default function OnboardingForm() {
 
   if (result?.success) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-5">
+      <div className="card p-5">
         <div className="mb-3 text-sm font-medium text-ink">
           Tenant &quot;{result.name}&quot; created (slug: {result.slug})
         </div>
@@ -88,7 +88,7 @@ export default function OnboardingForm() {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="card p-5">
       <div className="mb-4">
         <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Business name</label>
         <input
@@ -156,7 +156,7 @@ export default function OnboardingForm() {
       <button
         onClick={handleSubmit}
         disabled={busy || !name.trim() || !slug.trim()}
-        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? "Creating…" : "Create tenant"}
       </button>

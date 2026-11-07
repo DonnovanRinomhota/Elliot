@@ -63,7 +63,7 @@ export default function MonthCalendar({
       </div>
 
       {/* Desktop month grid */}
-      <div className="hidden overflow-hidden rounded-lg border border-gray-200 bg-white md:block">
+      <div className="hidden overflow-hidden card md:block">
         <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50 text-[12px] font-medium text-gray-500">
           {WEEKDAYS.map((d) => (
             <div key={d} className="px-2 py-2">
@@ -82,7 +82,7 @@ export default function MonthCalendar({
                   <div className="mb-1 flex items-center justify-between">
                     <span
                       className={`tabular inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] ${
-                        isToday ? "bg-ink font-semibold text-white" : outside ? "text-gray-400" : "text-gray-700"
+                        isToday ? "bg-accent font-semibold text-white" : outside ? "text-gray-400" : "text-gray-700"
                       }`}
                     >
                       {Number(day.slice(8))}
@@ -108,12 +108,12 @@ export default function MonthCalendar({
       {/* Phone: days with viewings */}
       <div className="md:hidden">
         {daysWithViewings.length === 0 ? (
-          <p className="rounded-lg border border-gray-200 bg-white px-4 py-6 text-center text-[13px] text-gray-500">No viewings this month.</p>
+          <p className="card px-4 py-6 text-center text-[13px] text-gray-500">No viewings this month.</p>
         ) : (
           <ul className="m-0 grid list-none gap-3 p-0">
             {daysWithViewings.map((day) => (
-              <li key={day} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-                <div className={`border-b border-gray-100 px-4 py-2 text-[13px] font-medium ${day === today ? "bg-ink text-white" : "bg-gray-50 text-ink"}`}>
+              <li key={day} className="overflow-hidden card">
+                <div className={`border-b border-gray-100 px-4 py-2 text-[13px] font-medium ${day === today ? "bg-accent text-white" : "bg-gray-50 text-ink"}`}>
                   {day === today ? "Today, " : ""}
                   {dayLabel(day)}
                 </div>

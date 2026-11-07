@@ -136,7 +136,7 @@ export default async function ListingsPage({
           </EmptyState>
         )
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-x-auto card">
           <table className="w-full min-w-[900px] border-collapse text-left text-[13px]">
             <thead>
               <tr className="border-b border-gray-200 text-[12px] text-gray-500">

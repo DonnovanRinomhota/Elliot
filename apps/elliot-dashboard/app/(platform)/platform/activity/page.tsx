@@ -23,7 +23,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: { p
       {!events?.length ? (
         <EmptyState title="Nothing recorded yet">Changes you make in the control panel will show up here.</EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-x-auto card">
           <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
             <thead>
               <tr className="border-b border-gray-200 text-[12px] text-gray-500">

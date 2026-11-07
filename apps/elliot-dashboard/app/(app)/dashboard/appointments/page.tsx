@@ -76,13 +76,13 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
   ];
 
   const viewSwitch = (
-    <div className="inline-flex rounded-md border border-gray-300 bg-white p-0.5" role="group" aria-label="View">
+    <div className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 shadow-sm" role="group" aria-label="View">
       {(["list", "calendar"] as const).map((v) => (
         <a
           key={v}
           href={href({ view: v === "calendar" ? "calendar" : undefined, page: undefined, month: undefined })}
           aria-current={view === v ? "page" : undefined}
-          className={`rounded px-3 py-1.5 text-[13px] font-medium no-underline ${view === v ? "bg-ink text-white" : "text-ink-600 hover:bg-ink-soft"}`}
+          className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium no-underline ${view === v ? "bg-ink text-white" : "text-ink-600 hover:bg-ink-soft"}`}
         >
           {v === "list" ? "List" : "Calendar"}
         </a>
@@ -155,7 +155,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
         <h2 className="m-0 mb-2 text-[14px] font-semibold text-ink">
           {title} <span className="tabular font-normal text-gray-400">{total}</span>
         </h2>
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-hidden card">
           <div className={`hidden border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 ${APPOINTMENT_GRID}`}>
             <span>#</span>
             <span>When</span>

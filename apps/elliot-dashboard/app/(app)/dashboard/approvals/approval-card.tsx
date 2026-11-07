@@ -120,7 +120,7 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
   const isPending = draft.status === "pending";
 
   return (
-    <article className={`rounded-lg border border-gray-200 bg-white ${isPending ? "" : "opacity-90"}`}>
+    <article className={`card ${isPending ? "" : "opacity-90"}`}>
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
         <div className="min-w-0">
           <div className="text-[12.5px] text-gray-500">

@@ -200,7 +200,7 @@ function Section({ title, count, rows, offset, empty }: { title: string; count: 
       {rows.length === 0 ? (
         <EmptyState title={empty} />
       ) : (
-        <ul className="m-0 list-none overflow-hidden rounded-lg border border-gray-200 bg-white p-0">
+        <ul className="m-0 list-none overflow-hidden card p-0">
           {rows.map((r, i) => (
             <li key={r.id} className="border-t border-gray-100 first:border-t-0">
               <a href={`/dashboard/conversations/${r.id}`} className="block px-4 py-3.5 no-underline hover:bg-gray-50 sm:px-5">

@@ -9,14 +9,14 @@ import StickyHeader from "./sticky-header";
 
 // ── Buttons (class strings, so <a>, <button> and <summary> can all use them) ──
 
-const BTN = "inline-flex items-center justify-center gap-1.5 rounded-md text-[13px] font-medium no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+const BTN = "inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-medium no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 export const btn = {
-  primary: `${BTN} h-9 bg-ink px-3.5 text-white hover:bg-ink-800`,
-  secondary: `${BTN} h-9 border border-gray-300 bg-white px-3.5 text-ink hover:border-ink-400 hover:bg-ink-soft`,
-  danger: `${BTN} h-9 border border-alert/30 bg-white px-3.5 text-alert hover:bg-alert-soft`,
-  ghost: `${BTN} h-9 px-2.5 text-ink-600 hover:bg-ink-soft hover:text-ink`,
+  primary: `${BTN} h-9 bg-ink px-4 text-white shadow-sm hover:bg-ink-800`,
+  secondary: `${BTN} h-9 border border-gray-200 bg-white px-4 text-ink shadow-sm hover:border-gray-300 hover:bg-gray-50`,
+  danger: `${BTN} h-9 border border-alert/30 bg-white px-4 text-alert hover:bg-alert-soft`,
+  ghost: `${BTN} h-9 px-3 text-ink-600 hover:bg-gray-100 hover:text-ink`,
   /** Low-emphasis destructive action (e.g. Reject next to a primary button). */
-  dangerGhost: `${BTN} h-9 px-2.5 text-alert hover:bg-alert-soft`,
+  dangerGhost: `${BTN} h-9 px-3 text-alert hover:bg-alert-soft`,
   small: "!h-8 !px-3 !text-[12.5px]",
 };
 
@@ -82,14 +82,14 @@ export function Panel({
   flush?: boolean;
 }) {
   return (
-    <section className={`rounded-lg border border-gray-200 bg-white ${className}`}>
+    <section className={`card ${className}`}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-5 py-3.5">
-          {title && <h2 className="m-0 text-[14px] font-semibold text-ink">{title}</h2>}
+        <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
+          {title && <h2 className="m-0 text-[15px] font-semibold tracking-[-0.01em] text-ink">{title}</h2>}
           {action}
         </div>
       )}
-      <div className={flush ? "" : "p-5"}>{children}</div>
+      <div className={flush ? "pt-2" : "p-5"}>{children}</div>
     </section>
   );
 }
@@ -101,14 +101,14 @@ export type Tone = "neutral" | "muted" | "ink" | "brass" | "alert";
 const TONE: Record<Tone, string> = {
   neutral: "bg-gray-100 text-gray-700",
   muted: "bg-transparent text-gray-500 ring-1 ring-inset ring-gray-200",
-  ink: "bg-ink-soft text-ink",
+  ink: "bg-accent-soft text-accent-dark",
   brass: "bg-brass-soft text-brass-dark",
   alert: "bg-alert-soft text-alert-dark",
 };
 
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 text-[12px] font-medium ${TONE[tone]}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12px] font-medium ${TONE[tone]}`}>
       {children}
     </span>
   );
@@ -145,7 +145,7 @@ export function StatusBadge({ kind, value }: { kind: keyof typeof STATUS_TONES; 
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-10 text-center">
+    <div className="rounded-[18px] border border-dashed border-gray-300 bg-white px-6 py-10 text-center">
       <p className="m-0 text-[14px] font-medium text-ink">{title}</p>
       {children && <div className="mx-auto mt-1 max-w-md text-[13px] text-gray-500">{children}</div>}
     </div>
@@ -251,7 +251,7 @@ export function Pagination({
     const qs = q.toString();
     return `${basePath}${qs ? `?${qs}` : ""}`;
   };
-  const cell = "inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2.5 text-[13px] no-underline";
+  const cell = "inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2.5 text-[13px] no-underline";
   return (
     <nav aria-label="Pages" className="mt-4 flex flex-wrap items-center justify-between gap-3">
       <span className="tabular text-[13px] text-gray-500">
@@ -260,7 +260,7 @@ export function Pagination({
       {pages > 1 && (
         <div className="flex flex-wrap items-center gap-1">
           {page > 1 ? (
-            <a href={href(page - 1)} className={`${cell} border border-gray-300 bg-white text-ink hover:bg-ink-soft`}>
+            <a href={href(page - 1)} className={`${cell} border border-gray-200 bg-white text-ink hover:bg-gray-50`}>
               Previous
             </a>
           ) : (
@@ -276,14 +276,14 @@ export function Pagination({
                 key={p}
                 href={href(p)}
                 aria-current={p === page ? "page" : undefined}
-                className={`${cell} tabular ${p === page ? "bg-ink font-medium text-white" : "text-gray-600 hover:bg-ink-soft hover:text-ink"}`}
+                className={`${cell} tabular ${p === page ? "bg-accent font-medium text-white" : "text-gray-600 hover:bg-ink-soft hover:text-ink"}`}
               >
                 {p}
               </a>
             )
           )}
           {page < pages ? (
-            <a href={href(page + 1)} className={`${cell} border border-gray-300 bg-white text-ink hover:bg-ink-soft`}>
+            <a href={href(page + 1)} className={`${cell} border border-gray-200 bg-white text-ink hover:bg-gray-50`}>
               Next
             </a>
           ) : (

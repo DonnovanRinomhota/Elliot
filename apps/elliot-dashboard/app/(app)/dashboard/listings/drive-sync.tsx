@@ -86,14 +86,14 @@ export default function DriveSync({
   const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
 
   return (
-    <section className="mb-4 rounded-lg border border-gray-200 bg-white px-5 py-4 text-[13px]" aria-live="polite">
+    <section className="mb-4 card px-5 py-4 text-[13px]" aria-live="polite">
       {running ? (
         <div className="grid gap-2">
           <p className="m-0 text-ink">
             Getting photos from Google Drive: <span className="tabular">{done}</span> of <span className="tabular">{total}</span> listings…
           </p>
           <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
-            <div className="h-full bg-ink transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
           </div>
           <p className="m-0 text-[12.5px] text-gray-500">Keep this page open until it finishes. About 1,000 listings take 5 to 10 minutes.</p>
         </div>

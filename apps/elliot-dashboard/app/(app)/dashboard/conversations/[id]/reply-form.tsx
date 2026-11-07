@@ -87,7 +87,7 @@ export default function ReplyForm({
   }
 
   return (
-    <section className="mt-6 rounded-lg border border-gray-200 bg-white">
+    <section className="mt-6 card">
       <h2 className="m-0 border-b border-gray-200 px-5 py-3.5 text-[14px] font-semibold text-ink">Reply yourself</h2>
       <div className="grid gap-3 p-5">
         <p className="m-0 text-[13px] text-gray-500">

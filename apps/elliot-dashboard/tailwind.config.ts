@@ -1,14 +1,28 @@
 import type { Config } from "tailwindcss";
 
-// Elliot dashboard palette -- four colours, each with one job:
-//   ink    navy: text, primary actions, active navigation, charts
-//   gray   cool greys: backgrounds, borders, secondary text (Tailwind's own scale)
-//   brass  "waiting on you": pending approvals, warm leads, highlights
-//   alert  signal red: escalations, hot leads, destructive actions, errors
-// Nothing else. Success states use ink, not green.
-const ink = { DEFAULT: "#13223A", 800: "#1C2F4D", 600: "#3B4D6B", 400: "#7D8BA3", 200: "#C9D1DE", soft: "#EDF0F5" };
-const brass = { DEFAULT: "#9A7328", dark: "#7A5A1C", soft: "#F6EFE1" };
-const alert = { DEFAULT: "#B42318", dark: "#912018", soft: "#FCEDEB" };
+// Elliot dashboard palette (light, blue). Each colour has one job:
+//   ink     near-black navy: text, primary buttons
+//   accent  bright blue: selection, active navigation, charts, highlights
+//   gray    cool greys: page background, borders, secondary text
+//   brass   amber, "waiting on you": approvals, warm leads, warnings
+//   alert   red: escalations, hot leads, destructive actions, errors
+// ink-soft is the light blue tint used for hovers, active rows and blue badges.
+const ink = { DEFAULT: "#0F172A", 800: "#1E293B", 600: "#475467", 400: "#98A2B3", 200: "#D0D5DD", soft: "#EEF3FE" };
+const accent = { DEFAULT: "#2563EB", dark: "#1D4ED8", light: "#60A5FA", soft: "#EEF3FE", 100: "#DCE7FD" };
+const brass = { DEFAULT: "#D97706", dark: "#B45309", soft: "#FEF4E4" };
+const alert = { DEFAULT: "#DC2626", dark: "#B91C1C", soft: "#FEEFEF" };
+const gray = {
+  50: "#F8F9FB",
+  100: "#F1F3F7",
+  200: "#E6E9EF",
+  300: "#D5DAE2",
+  400: "#98A2B3",
+  500: "#667085",
+  600: "#475467",
+  700: "#344054",
+  800: "#1D2939",
+  900: "#101828",
+};
 
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}"], // includes app/_ui
@@ -16,16 +30,22 @@ const config: Config = {
     extend: {
       colors: {
         ink,
+        accent,
         brass,
         alert,
-        // Legacy names from the first dashboard design, mapped onto the new
+        gray,
+        // Legacy names from the first dashboard design, mapped onto the
         // palette so any leftover class still lands on a palette colour.
-        pulse: { DEFAULT: ink.DEFAULT, soft: ink.soft, dark: ink.DEFAULT },
+        pulse: { DEFAULT: accent.DEFAULT, soft: accent.soft, dark: accent.dark },
         amber: { DEFAULT: brass.DEFAULT, soft: brass.soft, dark: brass.dark },
         coral: { DEFAULT: alert.DEFAULT, soft: alert.soft, dark: alert.dark },
       },
       fontFamily: {
-        sans: ['"IBM Plex Sans"', "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        sans: ['"Inter Variable"', "Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+      },
+      boxShadow: {
+        card: "0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.03)",
+        lift: "0 12px 32px -12px rgba(16, 24, 40, 0.18)",
       },
     },
   },

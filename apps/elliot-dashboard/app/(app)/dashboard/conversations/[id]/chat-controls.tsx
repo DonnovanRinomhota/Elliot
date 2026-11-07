@@ -48,7 +48,7 @@ export default function ChatControls({
 
   if (!handledByMe) {
     return (
-      <section className="rounded-lg border border-gray-200 bg-white px-5 py-3.5 shadow-[0_-4px_16px_rgba(19,34,58,0.08)]">
+      <section className="card px-5 py-3.5 !shadow-[0_-4px_16px_rgba(16,24,40,0.10)]">
         <div className="flex flex-wrap items-center justify-between gap-3 md:flex-nowrap">
           <div className="min-w-0 md:flex-1">
             <h2 className="m-0 text-[14px] font-semibold text-ink">
@@ -74,7 +74,7 @@ export default function ChatControls({
   }
 
   return (
-    <section className="rounded-lg border border-ink/20 bg-white shadow-[0_-4px_16px_rgba(19,34,58,0.08)]">
+    <section className="rounded-[18px] border border-accent/25 bg-white shadow-[0_-4px_16px_rgba(16,24,40,0.10)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-2.5">
         <h2 className="m-0 text-[14px] font-semibold text-ink">You&apos;re handling this chat. Elliot is paused.</h2>
         <button type="button" disabled={busy} onClick={() => call("hand_back_conversation", { p_conversation_id: conversationId })} className={`${btn.secondary} ${btn.small}`}>
