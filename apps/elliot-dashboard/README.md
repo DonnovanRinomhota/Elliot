@@ -8,8 +8,9 @@ except onboarding is scoped to the logged-in user's own tenant via RLS.
 1. `npm install`
 2. Create `.env.local` with:
    - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase project settings → API)
-   - `ADMIN_EMAILS` (comma-separated, no `NEXT_PUBLIC_` prefix -- gates `/dashboard/onboarding`; see `lib/admin.ts`)
-   - `SUPABASE_SERVICE_ROLE_KEY` (server-only; used once, by self-serve signup -- see `lib/supabase/admin.ts`)
+   - `ADMIN_EMAILS` (comma-separated, no `NEXT_PUBLIC_` prefix -- gates the control panel `/platform` and `/dashboard/onboarding`; see `lib/admin.ts`)
+   - `SUPABASE_SERVICE_ROLE_KEY` (server-only; self-serve signup, the control panel, team invites and the widget's `/api/widget/messages` -- see `lib/supabase/admin.ts`)
+   - Optional: `AI_PRICE_INPUT_PER_MTOK` / `AI_PRICE_OUTPUT_PER_MTOK` (USD per million tokens, defaults 3 / 15) for the control panel's AI cost -- see `docs/control-panel-listings-inbox.md`
    - Server-only, for the internal n8n webhooks (see `lib/n8n-webhook.ts` and
      `docs/workflow-specs/internal-webhook-auth.md`):
      - `ELLIOT_WEBHOOK_SECRET` (same value as the n8n credential `Elliot

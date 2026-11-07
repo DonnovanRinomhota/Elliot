@@ -14,6 +14,8 @@
  *                        is no way to get a real AI-authored opening line before
  *                        the visitor has said something.
  *   data-accent       -- accent color (hex), default "#111111"
+ *   data-api-base     -- where to poll for team replies (defaults to the
+ *                        origin this script was loaded from, i.e. the dashboard)
  *
  * Deliberately vanilla JS, no build step, no framework runtime shipped to the
  * host page -- this file is the whole widget. It renders into a Shadow DOM so
@@ -48,6 +50,16 @@
   }
 
   var WEBHOOK_URL = scriptEl.dataset.webhookUrl || DEFAULT_WEBHOOK_URL;
+  // Team replies (live takeover from the dashboard) are fetched from the
+  // dashboard, which is also where this script is served from.
+  var API_BASE = scriptEl.dataset.apiBase || (function () {
+    try {
+      return new URL(scriptEl.src).origin;
+    } catch (e) {
+      return "";
+    }
+  })();
+  var POLL_MS = 4000;
   var TITLE = scriptEl.dataset.title || "Chat with us";
   var GREETING = scriptEl.dataset.greeting || "Hi! How can I help you today?";
   var ACCENT = scriptEl.dataset.accent || "#111111";
@@ -99,6 +111,8 @@
     ".msg{max-width:80%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}" +
     ".msg.user{align-self:flex-end;background:" + ACCENT + ";color:#fff;border-bottom-right-radius:3px}" +
     ".msg.assistant{align-self:flex-start;background:#fff;color:#111;border:1px solid #e5e5e5;border-bottom-left-radius:3px}" +
+    ".msg.agent{align-self:flex-start;background:#fff;color:#111;border:1px solid " + ACCENT + ";border-bottom-left-radius:3px}" +
+    ".note{align-self:center;font-size:11px;color:#777;padding:2px 0}" +
     ".msg.error{align-self:flex-start;background:#fdecea;color:#7c2d20;border:1px solid #f3c6c0}" +
     ".typing{align-self:flex-start;display:flex;gap:3px;padding:10px 12px}" +
     ".typing span{width:6px;height:6px;border-radius:50%;background:#999;display:inline-block;animation:elliot-bounce 1.2s infinite}" +
@@ -139,6 +153,57 @@
   var isSending = false;
   var hasGreeted = false;
 
+  function addNote(text) {
+    var div = document.createElement("div");
+    div.className = "note";
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // ---- Team replies: poll while the chat is open ----
+  var seenAgentIds = {};
+  var lastAgentAt = new Date(Date.now() - 60 * 1000).toISOString();
+  var humanActive = false;
+  var pollTimer = null;
+
+  function poll() {
+    if (!API_BASE || !conversationId || !isOpen) return;
+    var url =
+      API_BASE + "/api/widget/messages?tenant=" + encodeURIComponent(TENANT) +
+      "&conversation_id=" + encodeURIComponent(conversationId) +
+      "&after=" + encodeURIComponent(lastAgentAt);
+    fetch(url)
+      .then(function (res) {
+        return res.ok ? res.json() : null;
+      })
+      .then(function (data) {
+        if (!data) return;
+        if (data.human_active && !humanActive) {
+          addNote((data.agent_name ? data.agent_name + " from the team" : "A member of the team") + " has joined the chat.");
+        }
+        humanActive = !!data.human_active;
+        (data.messages || []).forEach(function (m) {
+          if (seenAgentIds[m.id]) return;
+          seenAgentIds[m.id] = true;
+          addMessage("agent", m.content);
+          if (m.created_at > lastAgentAt) lastAgentAt = m.created_at;
+        });
+      })
+      .catch(function () {
+        /* offline or blocked: try again next tick */
+      });
+  }
+  function startPolling() {
+    if (pollTimer) return;
+    poll();
+    pollTimer = setInterval(poll, POLL_MS);
+  }
+  function stopPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
   function addMessage(role, text) {
     var div = document.createElement("div");
     div.className = "msg " + role;
@@ -174,10 +239,12 @@
       hasGreeted = true;
     }
     textareaEl.focus();
+    startPolling();
   }
   function closePanel() {
     isOpen = false;
     panel.classList.remove("open");
+    stopPolling();
   }
 
   bubble.addEventListener("click", function () {
@@ -221,9 +288,16 @@
         }
         if (data.reply) {
           addMessage("assistant", data.reply);
+        } else if (data.human) {
+          // A team member is handling this chat; their reply arrives by polling.
+          if (!humanActive) {
+            humanActive = true;
+            addNote("A member of the team will reply here.");
+          }
         } else {
           addMessage("error", "Sorry, something went wrong. Please try again.");
         }
+        startPolling();
       })
       .catch(function (err) {
         hideTyping();

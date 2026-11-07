@@ -1,0 +1,125 @@
+{
+  "name": "31 - Daily Summary Email",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "d2d98dc7-d4a7-4575-844a-660cd9c7dbcd",
+      "name": "Every Morning at 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Runs once a day (about 30 executions a month). Time zone comes from the workflow settings (Europe/Warsaw)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from get_daily_digests();",
+        "options": {}
+      },
+      "id": "f0c6974e-73f8-4d24-b05f-cddb0f4ee5d3",
+      "name": "Load Summaries",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "alwaysOutputData": false,
+      "notes": "One row per (agency, person) who gets the summary: admins by default, others if switched on in Team. Agencies can switch it off in Settings."
+    },
+    {
+      "parameters": {
+        "jsCode": "const DASHBOARD_URL = 'https://elliot-real-estate-five.vercel.app';\nconst d = $json;\nconst n = (x) => Number(x || 0);\nconst plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;\nconst lines = [];\nlines.push(`Good morning ${d.recipient_name},`);\nlines.push('');\nlines.push(`In the last 24 hours Elliot had ${plural(n(d.conversations_count), 'conversation', 'conversations')}, ` +\n  `captured ${plural(n(d.new_leads_count), 'new lead', 'new leads')} and booked ${plural(n(d.viewings_booked_count), 'viewing', 'viewings')}.`);\nconst today = d.viewings_today || [];\nlines.push('');\nif (today.length) {\n  lines.push(`Viewings today (${today.length}):`);\n  today.forEach(v => lines.push(`  ${v.time}  ${v.name}${v.notes ? ' -- ' + v.notes : ''}`));\n} else {\n  lines.push('No viewings booked for today.');\n}\nconst hot = d.hot_leads || [];\nif (hot.length) {\n  lines.push('');\n  lines.push(`Hot leads waiting for a call (${n(d.hot_leads_count)}):`);\n  hot.forEach(h => lines.push(`  ${h.name}${h.phone ? ', ' + h.phone : ''}${h.email ? ', ' + h.email : ''}`));\n}\nconst todo = [];\nif (n(d.open_escalations)) todo.push(plural(n(d.open_escalations), 'conversation needs a person', 'conversations need a person'));\nif (n(d.pending_approvals)) todo.push(plural(n(d.pending_approvals), 'email is waiting for approval', 'emails are waiting for approval'));\nif (todo.length) {\n  lines.push('');\n  lines.push('Needs you: ' + todo.join(', ') + '.');\n}\nlines.push('');\nlines.push(`Open the dashboard: ${DASHBOARD_URL}`);\nlines.push('');\nlines.push('You get this because daily summaries are on for you in Elliot (Team page).');\nconst subject = `[Elliot] ${d.tenant_name}: ${plural(n(d.new_leads_count), 'new lead', 'new leads')}, ${plural(today.length, 'viewing', 'viewings')} today`;\nconst raw =\n  `To: ${d.recipient_email}\\r\\n` +\n  `Subject: ${subject}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  lines.join('\\n');\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nreturn { json: { recipient_email: d.recipient_email, raw_message: encoded } };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "091cc626-452c-4df9-a12e-0f3ff8382afe",
+      "name": "Build Summary Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "options": {}
+      },
+      "id": "ed5c5cd9-f23c-4d27-b2f9-68fff464fb78",
+      "name": "Send via Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        0
+      ],
+      "continueOnFail": true,
+      "notes": "Same shared Gmail credential as 15/20/24 -- select it after import. continueOnFail so one bad address doesn't stop the other summaries."
+    }
+  ],
+  "connections": {
+    "Every Morning at 08:00": {
+      "main": [
+        [
+          {
+            "node": "Load Summaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Summaries": {
+      "main": [
+        [
+          {
+            "node": "Build Summary Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Summary Email": {
+      "main": [
+        [
+          {
+            "node": "Send via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Warsaw"
+  },
+  "active": false
+}

@@ -183,19 +183,18 @@ is a deliberately simple stopgap for a single operator, not a real
 permission system; revisit if more than one person ever needs this level
 of access.
 
-## OPEN — Human takeover only works for email conversations
-The dashboard's conversation detail page can send a reply as a human
-(`0023_manual_email_draft_rpc.sql`, `reply-form.tsx`) for `email`-channel
-conversations with a known contact email. It does *not* work for
-`chat_widget` conversations, and can't yet, even though the widget itself
-(`apps/web-chat-widget`) is now built: the `chat` webhook
-(`01-main-ai-agent.json`'s trigger) is a one-shot synchronous
-request/response -- a visitor sends one message, gets one reply in the
-same HTTP call, and nothing is left listening afterward for a human reply
-to interrupt. Supporting takeover on chat_widget conversations needs some
-kind of persistent connection on the widget side (polling or Supabase
-Realtime) so it can receive a message that didn't come from its own
-request. Not started. Human takeover doesn't work for `whatsapp`-channel
+## PARTLY RESOLVED (Nov 2026) — Human takeover: email and website chat work, WhatsApp doesn't
+Email conversations: reply as a human (`0023_manual_email_draft_rpc.sql`,
+`reply-form.tsx`). Website chat (`chat_widget`): **Take over this chat**
+on the conversation page (0027 `take_over_conversation` /
+`send_human_chat_message` / `hand_back_conversation`). Workflow 01 stays
+quiet while `assigned_human` is set, and the widget polls
+`/api/widget/messages` for team replies while it's open. See
+`docs/control-panel-listings-inbox.md`. Not covered: the Elliot-web
+marketing site's own chat component (it doesn't poll), and the visitor only
+sees team replies while the chat window is open.
+
+Still open: human takeover doesn't work for `whatsapp`-channel
 conversations either, for a related but different reason: nothing in
 workflow 28 or the dashboard sends an outbound WhatsApp message except
 through an approved `whatsapp_drafts` row -- there's no "reply as a

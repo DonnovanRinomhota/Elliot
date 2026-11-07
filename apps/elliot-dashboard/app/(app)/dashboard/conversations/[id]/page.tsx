@@ -1,13 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getMembership } from "@/lib/tenant";
 import ReplyForm from "./reply-form";
+import ChatControls from "./chat-controls";
+import AutoRefresh from "../../auto-refresh";
 import { Panel, StatusBadge, formatDate, humanize } from "../../../../_ui/ui";
 
 export default async function ConversationDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const me = await getMembership(supabase, user.id);
 
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
-    .select("id, channel, status, created_at, contact:contacts(id, name, email, phone)")
+    .select("id, channel, status, created_at, assigned_human, handler:tenant_users!conversations_assigned_human_fkey(full_name, email), contact:contacts(id, name, email, phone)")
     .eq("id", params.id)
     .single();
 
@@ -40,12 +49,17 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   // has a real send pipeline (workflow 17 -> 15), so that's the only channel
   // this supports today. See KNOWN_ISSUES.md.
   const canReplyAsHuman = conversation.channel === "email" && !!contact?.email;
+  // Website chat: a person can take over live (0027 + the widget's polling).
+  const isLiveChat = conversation.channel === "chat_widget";
+  const handler = conversation.handler as unknown as { full_name: string | null; email: string } | null;
+  const handledByMe = Boolean(me && conversation.assigned_human === me.id);
+  const handlerName = conversation.assigned_human && !handledByMe ? handler?.full_name || handler?.email?.split("@")[0] || "A colleague" : null;
 
   const contactName = contact?.name || contact?.email || "Unknown contact";
   const ROLE_LABEL: Record<string, string> = {
     user: contactName,
     assistant: "Elliot",
-    human_agent: "You",
+    human_agent: "Team",
     system: "System",
   };
   const messageTime = (iso: string) =>
@@ -67,6 +81,13 @@ export default async function ConversationDetailPage({ params }: { params: { id:
             {msgError && <p className="m-0 mb-3 text-[13px] text-alert">Couldn&apos;t load messages: {msgError.message}</p>}
             <ol className="m-0 grid list-none gap-4 p-0">
               {messages?.map((m: any) => {
+                if (m.role === "system") {
+                  return (
+                    <li key={m.id} className="text-center text-[12px] text-gray-500">
+                      {m.content} · {messageTime(m.created_at)}
+                    </li>
+                  );
+                }
                 const isOutbound = m.role === "assistant" || m.role === "human_agent";
                 const isHuman = m.role === "human_agent";
                 return (
@@ -98,7 +119,13 @@ export default async function ConversationDetailPage({ params }: { params: { id:
           {canReplyAsHuman && (
             <ReplyForm conversationId={conversation.id} contactId={contact!.id} toEmail={contact!.email!} defaultSubject="" />
           )}
-          {!canReplyAsHuman && conversation.channel !== "email" && (
+          {isLiveChat && (
+            <>
+              {conversation.assigned_human && <AutoRefresh seconds={4} />}
+              <ChatControls conversationId={conversation.id} handledByMe={handledByMe} handlerName={handlerName} canTakeOver={Boolean(me)} />
+            </>
+          )}
+          {!canReplyAsHuman && !isLiveChat && conversation.channel !== "email" && (
             <p className="mb-0 mt-3 text-[13px] text-gray-500">
               You can&apos;t reply to {humanize(conversation.channel).toLowerCase()} conversations from here yet. There&apos;s
               no live connection to deliver the reply through.

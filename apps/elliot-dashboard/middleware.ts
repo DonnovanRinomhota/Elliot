@@ -28,7 +28,8 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard");
+  const isDashboardRoute =
+    request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/platform");
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
 
   if (isDashboardRoute && !user) {
@@ -49,5 +50,5 @@ export async function middleware(request: NextRequest) {
 // silently falls back to matching every route instead of erroring, so this
 // is worth getting right rather than "cleaning up" later).
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/forgot-password", "/reset-password"],
+  matcher: ["/dashboard/:path*", "/platform/:path*", "/platform", "/login", "/forgot-password", "/reset-password"],
 };

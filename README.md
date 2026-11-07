@@ -145,14 +145,23 @@ operating surface:
   not an approximation. Raw qualification answers are still viewable via a
   toggle.
 - **Human takeover** (`/dashboard/conversations/[id]`) — reply as a human
-  directly from the dashboard, on `email`-channel conversations with a
-  known contact email (see `KNOWN_ISSUES.md` for why chat_widget isn't
-  supported). Reuses the existing draft-approval send pipeline
+  directly from the dashboard. Email conversations reuse the draft
+  pipeline; website chats can be taken over live (Elliot pauses, the
+  widget shows the team's replies). Email replies reuse the existing draft-approval send pipeline
   (`create_manual_email_draft` → workflow 17 → 15) rather than a separate
   send path, and correctly tags the message as `human_agent` (not
   `assistant`) in the conversation log.
 - **Tenant onboarding UI** (`/dashboard/onboarding`) — a form wrapping
   workflow 19, instead of calling the webhook by hand.
+- **Control panel** (`/platform`, platform admins) — every agency's
+  account state (trial, active, past due…), usage, AI cost and health;
+  billing dates; "open their dashboard"; activity log.
+- **Listings** (`/dashboard/listings`) — the agency's properties, with CSV
+  import. Elliot searches them (`search_listings` tool) and never invents one.
+- **Team** (`/dashboard/team`) — invites, roles, round-robin lead
+  assignment, who gets alerts and the daily summary.
+- **Inbox** (`/dashboard/inbox`) — chats that need a person and live
+  website chats, refreshing itself; works on a phone.
 - **Knowledge base upload UI** (`/dashboard/knowledge`) — a form wrapping
   workflow 08's ingestion webhook. Plain text only; no PDF/website parsing
   yet, matching what the backend actually does.
@@ -166,9 +175,11 @@ tooling rather than agent capabilities:
   database triggers, migration `0026`)
 - `29` auto-enrol follow-ups — puts quiet leads into the tenant's auto-enrol sequence
 - `30` cancel appointment — cancels and removes the Google Calendar event
+- `31` daily summary email — 08:00 summary for each agency's admins
 
 Setting up the Nov 2026 fix pack (env vars, imports, smoke test):
-`docs/client-ready-setup.md`.
+`docs/client-ready-setup.md`. Then the control panel, listings, team,
+inbox and daily summary: `docs/control-panel-listings-inbox.md`.
 
 See their specs in `docs/workflow-specs/`.
 

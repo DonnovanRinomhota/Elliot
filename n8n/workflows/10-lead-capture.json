@@ -113,31 +113,6 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "select * from insert_escalation($1, $2, $3, $4, $5);",
-        "options": {
-          "queryReplacement": "={{ [\n  $('Upsert Lead').first().json.tenant_id || $('When Executed by Another Workflow').first().json.tenant_id,\n  $('When Executed by Another Workflow').first().json.conversation_id,\n  'other',\n  'high',\n  `Hot lead: score ${$json.score}, contact ${$('When Executed by Another Workflow').first().json.contact?.email || $('When Executed by Another Workflow').first().json.contact?.name || 'unknown'}, timeline: ${$('When Executed by Another Workflow').first().json.qualification_answers?.timeline || 'unknown'}`\n] }}"
-        }
-      },
-      "id": "e81416fc-57ee-448b-96cd-96bc8f6ba5a1",
-      "name": "Insert Escalation",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        1120,
-        0
-      ],
-      "notesInFlow": true,
-      "credentials": {
-        "postgres": {
-          "id": "TfAL8Z0epZ1Tqiib",
-          "name": "Elliot Postgres (service role)"
-        }
-      },
-      "notes": "REQUIRES: check/confirm actual escalations table column names before running -- this is a best-guess based on table name only, not a verified schema. Set the Postgres credential manually after import."
-    },
-    {
-      "parameters": {
         "jsCode": "// Normalize output shape for the Main Agent's tool_result formatting.\n// IMPORTANT: return contact_id so the agent can pass a real UUID to\n// book_appointment. Read it from Score Lead (which carries the upserted\n// contact id), falling back to Upsert Lead if needed.\nconst leadResult = $('Upsert Lead').first().json;\nconst scored = $('Score Lead').first().json;\nconst trigger = $('When Executed by Another Workflow').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    lead_id: leadResult.id,\n    contact_id: scored.contact_id || null,\n    status: leadResult.status,\n    score: leadResult.score,\n    contact_email: trigger.contact?.email || null\n  }\n}];"
       },
       "id": "21e0450f-aadf-4e8d-bd06-f4be9da97243",
@@ -148,6 +123,92 @@
         1120,
         192
       ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SET_ME_TO_24_ESCALATE_TO_HUMAN",
+          "mode": "list",
+          "cachedResultName": "24 - Escalate To Human"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Upsert Lead').first().json.tenant_id || $('When Executed by Another Workflow').first().json.tenant_id }}",
+            "conversation_id": "={{ $('When Executed by Another Workflow').first().json.conversation_id }}",
+            "reason": "hot_lead",
+            "priority": "high",
+            "context_summary": "={{ (() => { const t = $('When Executed by Another Workflow').first().json; const c = t.contact || {}; const q = t.qualification_answers || {}; return ['Hot lead (score ' + $json.score + ').', 'Name: ' + (c.name || 'not given') + '. Email: ' + (c.email || 'not given') + '. Phone: ' + (c.phone || 'not given') + '.', q.property_type ? 'Looking for: ' + q.property_type + '.' : null, q.budget ? 'Budget: ' + q.budget + '.' : null, q.timeline ? 'Timeline: ' + q.timeline + '.' : null, q.intent_signal ? 'Signal: ' + q.intent_signal + '.' : null].filter(Boolean).join(' '); })() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "context_summary",
+              "displayName": "context_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "c72ebfd5-521b-4d0d-9509-9a354979862f",
+      "name": "Escalate Hot Lead (24)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        0
+      ],
+      "continueOnFail": true,
+      "notes": "TODO after import: open this node and pick '24 - Escalate To Human' from the dropdown (placeholder id, same one-time step as in 01). continueOnFail: the lead is already saved; an alert problem must not fail lead capture."
     }
   ],
   "pinData": {},
@@ -200,7 +261,7 @@
       "main": [
         [
           {
-            "node": "Insert Escalation",
+            "node": "Escalate Hot Lead (24)",
             "type": "main",
             "index": 0
           },

@@ -18,7 +18,10 @@ Run in order — each file is numbered and depends on the ones before it.
 Every file in this folder runs in number order (0001 through the highest);
 the list above only shows the first eight and the latest.
 `db/seed/test_0026_auto_sync_and_enrolment.sql` is a scenario test for
-0026 -- run it on a scratch database only, it inserts test data.
+0026, and `db/seed/test_0027_platform_listings_team_inbox.sql` for 0027
+(control panel, listings, team, takeover, daily summary) -- run them on a
+scratch database only. The 0027 test wraps itself in a transaction and
+rolls back; it ends with "0027 checks passed".
 
 ## How to apply
 

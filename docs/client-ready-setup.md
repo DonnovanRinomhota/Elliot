@@ -1,5 +1,9 @@
 # Client-ready fix pack: setup checklist
 
+> **Next step after this checklist:** the control panel, listings, team,
+> inbox and daily summary have their own setup:
+> [`control-panel-listings-inbox.md`](control-panel-listings-inbox.md).
+
 Everything in this pack is code that's already in the repo. These are the
 manual steps to switch it on, in order. Steps 1–3 are required; step 4 only
 if the client is getting WhatsApp.

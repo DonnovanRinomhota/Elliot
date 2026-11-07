@@ -105,11 +105,18 @@ Production showed no runtime errors over the deploys and tests.
 - ✅ **Structured lead-scoring reasoning** (`/dashboard/leads`) -- each
   lead shows *why* it scored what it did, mirroring
   `10-lead-capture.json`'s actual scoring logic exactly.
-- 🟡 **Human takeover** (`/dashboard/conversations/[id]`) -- works for
-  `email`-channel conversations with a known contact email. Doesn't work
-  for `chat_widget` conversations and can't until the widget above exists
-  *and* has some persistent connection (polling/Realtime) to receive a
-  message that didn't come from its own request. See `KNOWN_ISSUES.md`.
+- ✅ **Human takeover** (`/dashboard/conversations/[id]`) -- email
+  replies, and live takeover of website chats (Elliot pauses, the widget
+  polls for team replies). WhatsApp takeover still to do. See
+  `docs/control-panel-listings-inbox.md`.
+- ✅ **Control panel** (`/platform`) -- every agency's account state,
+  usage, AI cost, health; manual billing dates; "open their dashboard";
+  activity log.
+- ✅ **Listings** (`/dashboard/listings`) -- properties with CSV import;
+  Elliot searches them with the `search_listings` tool.
+- ✅ **Team, inbox, alerts, daily summary** -- invites, roles, round-robin
+  lead assignment, escalation emails to the lead's owner, Inbox page,
+  08:00 summary email (workflow 31).
 - ✅ **Tenant onboarding UI** (`/dashboard/onboarding`) -- form wrapping
   workflow 19 exists and works. Route is gated to admins listed in
   `ADMIN_EMAILS` (`lib/admin.ts`), now enforced server-side too: the form

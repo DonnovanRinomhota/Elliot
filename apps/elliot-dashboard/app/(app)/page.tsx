@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getMembership } from "@/lib/tenant";
 import { PageHeader, Panel, btn, humanize, timeAgo } from "../_ui/ui";
 
 type ActivityItem = {
@@ -16,6 +18,10 @@ const CHANNEL_SHADES = ["#13223A", "#7D8BA3", "#C9D1DE", "#3B4D6B"];
 
 export default async function DashboardPage() {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
   // Real aggregated stats via the Postgres function (0021) -- not
   // client-computed, and specifically not a naive join for response time
@@ -54,6 +60,12 @@ export default async function DashboardPage() {
     { data: leadStatuses },
     { data: recentConversations },
     { count: pendingApprovals },
+    { data: hotLeads },
+    { data: upcoming },
+    { count: openEscalations },
+    { count: myChats },
+    { data: tenantRow },
+    me,
   ] = await Promise.all([
     supabase
       .from("escalations")
@@ -81,7 +93,31 @@ export default async function DashboardPage() {
       .select("channel, created_at")
       .gte("created_at", sevenDaysAgo.toISOString()),
     supabase.from("email_drafts").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    // "Needs you now": hot leads, today's viewings, open handovers, chats you're handling.
+    supabase
+      .from("leads")
+      .select("id, updated_at, assigned_to, owner:tenant_users(full_name, email), contact:contacts(name, email, phone)")
+      .eq("status", "HOT")
+      .order("updated_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("appointments")
+      .select("id, starts_at, notes, contact:contacts(name, phone)")
+      .eq("status", "confirmed")
+      .gte("starts_at", new Date(Date.now() - 14 * 3600 * 1000).toISOString())
+      .lte("starts_at", new Date(Date.now() + 26 * 3600 * 1000).toISOString())
+      .order("starts_at"),
+    supabase.from("escalations").select("id", { count: "exact", head: true }).neq("status", "resolved"),
+    supabase.from("conversations").select("id", { count: "exact", head: true }).not("assigned_human", "is", null),
+    supabase.from("tenants").select("timezone").maybeSingle(),
+    getMembership(supabase, user.id),
   ]);
+
+  // Today's viewings in the agency's own time zone.
+  const tz = tenantRow?.timezone || "Europe/Warsaw";
+  const dayKey = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: tz });
+  const todayKey = dayKey(new Date());
+  const todaysViewings = (upcoming ?? []).filter((a: any) => dayKey(new Date(a.starts_at)) === todayKey);
 
   const activity: ActivityItem[] = [
     ...(escalations ?? []).map((e: any) => ({
@@ -177,14 +213,14 @@ export default async function DashboardPage() {
     { label: "Answered without help", value: stats?.auto_resolved_count, href: "/dashboard/approvals?status=auto_sent&days=7" },
   ];
 
-  const escalationCount = Number(stats?.escalations_count ?? 0);
   const approvalCount = Number(pendingApprovals ?? 0);
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
   return (
     <div>
       <PageHeader
         title="Overview"
-        description="What Elliot has handled in the last 7 days."
+        description={null}
         actions={
           <a href="/dashboard/leads" className={btn.secondary}>
             View leads
@@ -194,38 +230,114 @@ export default async function DashboardPage() {
 
       {statsError && <p className="mb-4 text-[13px] text-alert">Couldn&apos;t load the figures: {statsError.message}</p>}
 
-      {(escalationCount > 0 || approvalCount > 0) && (
-        <div className="mb-6 grid gap-3 sm:grid-cols-2">
-          {escalationCount > 0 && (
-            <a
-              href="/dashboard/escalations"
-              className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 border-l-[3px] border-l-alert bg-white px-5 py-4 no-underline hover:bg-gray-50"
-            >
-              <span>
-                <span className="block text-[14px] font-medium text-ink">
-                  {escalationCount} escalation{escalationCount === 1 ? "" : "s"} this week
-                </span>
-                <span className="text-[13px] text-gray-500">Conversations Elliot handed to a person.</span>
-              </span>
-              <span className="text-[13px] font-medium text-alert">Review</span>
+      <p className="-mt-3 mb-6 max-w-3xl text-[15px] leading-relaxed text-ink">
+        {stats ? (
+          <>
+            In the last 7 days Elliot had <strong className="font-semibold">{plural(Number(stats.conversations_count), "conversation")}</strong>,
+            captured <strong className="font-semibold">{plural(Number(stats.new_leads_count), "new lead")}</strong> and booked{" "}
+            <strong className="font-semibold">{plural(Number(stats.appointments_booked_count), "viewing")}</strong>
+            {Number(stats.conversations_count) > 0 && stats.auto_resolve_rate != null && (
+              <>, answering {stats.auto_resolve_rate}% of chats without help</>
+            )}
+            .
+          </>
+        ) : (
+          "Your figures will appear here once Elliot starts talking to visitors."
+        )}
+      </p>
+
+      <section aria-label="Needs you now" className="mb-6 grid gap-6 lg:grid-cols-3">
+        <Panel
+          title={`Hot leads to call${(hotLeads ?? []).length ? ` (${(hotLeads ?? []).length}${(hotLeads ?? []).length === 5 ? "+" : ""})` : ""}`}
+          action={
+            <a href="/dashboard/leads?status=HOT" className="text-[13px] text-gray-500 hover:text-ink">
+              All hot leads
             </a>
+          }
+          flush
+        >
+          {(hotLeads ?? []).length === 0 ? (
+            <p className="m-0 px-5 py-4 text-[13px] text-gray-500">No hot leads right now.</p>
+          ) : (
+            <ul className="m-0 list-none p-0">
+              {(hotLeads ?? []).map((l: any) => (
+                <li key={l.id} className="border-t border-gray-100 px-5 py-3 first:border-t-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-[13.5px] font-medium text-ink">{l.contact?.name || l.contact?.email || "Unknown contact"}</span>
+                    <span className="whitespace-nowrap text-[12px] text-gray-400">{timeAgo(l.updated_at)}</span>
+                  </div>
+                  <div className="text-[12.5px] text-gray-600">
+                    {l.contact?.phone ? (
+                      <a href={`tel:${l.contact.phone.replace(/\s/g, "")}`} className="text-ink">
+                        {l.contact.phone}
+                      </a>
+                    ) : (
+                      l.contact?.email || "No phone given"
+                    )}
+                    {l.assigned_to && (
+                      <span className="text-gray-400">
+                        {" "}
+                        · {me && l.assigned_to === me.id ? "yours" : l.owner?.full_name || l.owner?.email?.split("@")[0]}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
-          {approvalCount > 0 && (
-            <a
-              href="/dashboard/approvals"
-              className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 border-l-[3px] border-l-brass bg-white px-5 py-4 no-underline hover:bg-gray-50"
-            >
-              <span>
-                <span className="block text-[14px] font-medium text-ink">
-                  {approvalCount} email{approvalCount === 1 ? "" : "s"} waiting for approval
-                </span>
-                <span className="text-[13px] text-gray-500">Drafted by Elliot, sent once you approve.</span>
-              </span>
-              <span className="text-[13px] font-medium text-brass-dark">Review</span>
+        </Panel>
+
+        <Panel
+          title={`Viewings today (${todaysViewings.length})`}
+          action={
+            <a href="/dashboard/appointments" className="text-[13px] text-gray-500 hover:text-ink">
+              Calendar
             </a>
+          }
+          flush
+        >
+          {todaysViewings.length === 0 ? (
+            <p className="m-0 px-5 py-4 text-[13px] text-gray-500">Nothing booked for today.</p>
+          ) : (
+            <ul className="m-0 list-none p-0">
+              {todaysViewings.map((a: any) => (
+                <li key={a.id} className="grid grid-cols-[52px_1fr] gap-3 border-t border-gray-100 px-5 py-3 first:border-t-0">
+                  <span className="tabular text-[13.5px] font-medium text-ink">
+                    {new Date(a.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: tz })}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13.5px] text-ink">{a.contact?.name || "Unknown contact"}</span>
+                    {a.notes && <span className="block truncate text-[12.5px] text-gray-500">{a.notes}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
-      )}
+        </Panel>
+
+        <Panel title="Waiting on you" flush>
+          <ul className="m-0 list-none p-0">
+            {[
+              { label: "Chats that need a person", count: Number(openEscalations ?? 0), href: "/dashboard/inbox", tone: "alert" },
+              { label: "Emails waiting for approval", count: approvalCount, href: "/dashboard/approvals", tone: "brass" },
+              { label: "Chats a person is handling", count: Number(myChats ?? 0), href: "/dashboard/inbox", tone: "ink" },
+            ].map((row) => (
+              <li key={row.label} className="border-t border-gray-100 first:border-t-0">
+                <a href={row.href} className="flex items-center justify-between gap-3 px-5 py-3 no-underline hover:bg-gray-50">
+                  <span className="text-[13.5px] text-gray-700">{row.label}</span>
+                  <span
+                    className={`tabular text-[18px] font-semibold ${
+                      row.count === 0 ? "text-gray-300" : row.tone === "alert" ? "text-alert" : row.tone === "brass" ? "text-brass-dark" : "text-ink"
+                    }`}
+                  >
+                    {row.count}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      </section>
 
       <section aria-label="Last 7 days" className="mb-6 grid grid-cols-2 overflow-hidden rounded-lg border border-gray-200 bg-white lg:grid-cols-4">
         {kpis.map((k, i) => (
