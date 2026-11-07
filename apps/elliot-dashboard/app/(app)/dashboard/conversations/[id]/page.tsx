@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getMembership } from "@/lib/tenant";
+import { getCurrentTenantId, getMembership } from "@/lib/tenant";
+import { contactLabel, withoutRepeats } from "@/lib/contacts";
 import ReplyForm from "./reply-form";
 import ChatControls from "./chat-controls";
 import AutoRefresh from "../../auto-refresh";
-import { Panel, StatusBadge, formatDate, humanize } from "../../../../_ui/ui";
+import ContactPanel from "./contact-panel";
+import { PageHeader, Panel, StatusBadge, formatDate, humanize } from "../../../../_ui/ui";
 
 export default async function ConversationDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -12,7 +14,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const me = await getMembership(supabase, user.id);
+  const [me, tenantId] = await Promise.all([getMembership(supabase, user.id), getCurrentTenantId(supabase)]);
 
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
@@ -55,7 +57,10 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   const handledByMe = Boolean(me && conversation.assigned_human === me.id);
   const handlerName = conversation.assigned_human && !handledByMe ? handler?.full_name || handler?.email?.split("@")[0] || "A colleague" : null;
 
-  const contactName = contact?.name || contact?.email || "Unknown contact";
+  const contactName = contactLabel(contact, conversation.channel);
+  // Older chats can hold the same visitor message several times (fixed in
+  // workflow 01; migration 0031 removes the copies). Never show them twice.
+  const shown = withoutRepeats((messages ?? []) as { id: string; role: string; content: string; created_at: string }[]);
   const ROLE_LABEL: Record<string, string> = {
     user: contactName,
     assistant: "Elliot",
@@ -70,17 +75,22 @@ export default async function ConversationDetailPage({ params }: { params: { id:
       <a href="/dashboard/conversations" className="text-[13px] text-gray-500 no-underline hover:text-ink">
         Conversations
       </a>
-      <div className="mb-6 mt-1 flex flex-wrap items-center gap-3">
-        <h1 className="m-0 text-[22px] font-semibold tracking-[-0.01em] text-ink">{contactName}</h1>
-        <StatusBadge kind="conversation" value={conversation.status} />
-      </div>
+      <PageHeader
+        title={contactName}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <StatusBadge kind="conversation" value={conversation.status} />
+            <span>{humanize(conversation.channel)}</span>
+          </span>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0">
           <Panel title="Messages">
             {msgError && <p className="m-0 mb-3 text-[13px] text-alert">Couldn&apos;t load messages: {msgError.message}</p>}
             <ol className="m-0 grid list-none gap-4 p-0">
-              {messages?.map((m: any) => {
+              {shown.map((m) => {
                 if (m.role === "system") {
                   return (
                     <li key={m.id} className="text-center text-[12px] text-gray-500">
@@ -111,7 +121,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
                 );
               })}
             </ol>
-            {(!messages || messages.length === 0) && !msgError && (
+            {shown.length === 0 && !msgError && (
               <p className="m-0 text-[13px] text-gray-500">No messages in this conversation.</p>
             )}
           </Panel>
@@ -133,23 +143,18 @@ export default async function ConversationDetailPage({ params }: { params: { id:
           )}
         </div>
 
-        <aside>
-          <Panel title="Contact">
-            <dl className="m-0 grid gap-3 text-[13px]">
-              {[
-                ["Name", contact?.name],
-                ["Email", contact?.email],
-                ["Phone", contact?.phone],
-                ["Channel", humanize(conversation.channel)],
-                ["Started", formatDate(conversation.created_at, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })],
-              ].map(([label, value]) => (
-                <div key={label as string}>
-                  <dt className="text-gray-500">{label}</dt>
-                  <dd className="m-0 break-words text-ink">{value || <span className="text-gray-400">Not given</span>}</dd>
-                </div>
-              ))}
-            </dl>
-          </Panel>
+        {/* Stays in view while the messages scroll (desktop; it sits under them on a phone). */}
+        <aside className="lg:sticky lg:top-20 lg:self-start">
+          <ContactPanel
+            tenantId={tenantId}
+            conversationId={conversation.id}
+            channel={conversation.channel}
+            contact={contact}
+            facts={[
+              ["Channel", humanize(conversation.channel)],
+              ["Started", formatDate(conversation.created_at, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })],
+            ]}
+          />
         </aside>
       </div>
     </div>

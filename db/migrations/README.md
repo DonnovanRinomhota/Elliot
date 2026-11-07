@@ -25,7 +25,8 @@ rolls back; it ends with "0027 checks passed". Same for
 `test_0028_listings_available_from.sql` ("0028 checks passed") and
 `test_0029_listing_photos.sql` ("0029 checks passed"; needs Supabase's
 storage schema, which every Supabase project has) and
-`test_0030_appointment_listing_and_agent.sql` ("0030 checks passed").
+`test_0030_appointment_listing_and_agent.sql` ("0030 checks passed") and
+`test_0031_chat_contacts.sql` ("0031 checks passed").
 
 ## How to apply
 

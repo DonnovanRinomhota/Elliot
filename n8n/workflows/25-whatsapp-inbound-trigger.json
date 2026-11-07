@@ -282,7 +282,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "insert into contacts (tenant_id, phone, name, source)\nvalues ($1, $2, $3, 'whatsapp')\non conflict (tenant_id, phone)\ndo update set phone = excluded.phone,\n              name = coalesce(contacts.name, excluded.name)\nreturning *;",
+        "query": "-- 0031: shared function, matching by phone in any format; the WhatsApp\n-- profile name only fills a blank, so a name the team corrected stays.\n-- Returns the contact row (id, name, email, phone) like the old INSERT ... RETURNING did.\nselect * from upsert_conversation_contact_row($1, null, $3, null, $2, null, 'whatsapp');",
         "options": {
           "queryReplacement": "={{ [ $('Lookup Tenant by Phone Number Id').first().json.tenant_id, $('Extract WhatsApp Fields').first().json.from_wa_id, $('Extract WhatsApp Fields').first().json.contact_name ] }}"
         }
@@ -409,10 +409,22 @@
             "last_inbound_at": "={{ $('Extract WhatsApp Fields').first().json.message_timestamp }}",
             "body": "={{ $('Extract WhatsApp Fields').first().json.body }}",
             "category": "={{ $json.category }}",
-            "confidence": "={{ $json.confidence }}"
+            "confidence": "={{ $json.confidence }}",
+            "contact_name": "={{ $('Upsert Contact').first()?.json?.name || '' }}"
           },
           "matchingColumns": [],
-          "schema": [],
+          "schema": [
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": true
         },

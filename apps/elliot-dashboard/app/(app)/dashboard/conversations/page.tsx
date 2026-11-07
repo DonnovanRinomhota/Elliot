@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { contactLabel } from "@/lib/contacts";
 import FolderTabs, { FolderTab } from "../folder-tabs";
 import { EmptyState, PageHeader, Pagination, RowNumber, StatusBadge, humanize, paginate, timeAgo } from "../../../_ui/ui";
 
@@ -11,7 +12,7 @@ export default async function ConversationsPage({
 
   const { data: conversations, error } = await supabase
     .from("conversations")
-    .select("id, channel, status, created_at, contact:contacts(name, email)")
+    .select("id, channel, status, created_at, contact:contacts(name, email, phone)")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -101,7 +102,7 @@ export default async function ConversationsPage({
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[14px] font-medium text-ink">
-                      {c.contact?.name || c.contact?.email || "Unknown contact"}
+                      {contactLabel(c.contact, c.channel)}
                     </span>
                     {c.contact?.name && c.contact?.email && <span className="block truncate text-[12.5px] text-gray-500">{c.contact.email}</span>}
                   </span>

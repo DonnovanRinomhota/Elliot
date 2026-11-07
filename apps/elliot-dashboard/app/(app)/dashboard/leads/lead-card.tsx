@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { btn, humanize, formatDate } from "../../../_ui/ui";
 import { LEAD_GRID } from "./grid";
+import { contactLabel } from "@/lib/contacts";
 
 type Lead = {
   id: string;
@@ -97,7 +98,7 @@ export default function LeadCard({
   const isClosed = CLOSED_STATUSES.includes(lead.status);
   const reasons = computeScoreReasons(lead);
   const hasAnswers = !!lead.qualification_answers && Object.keys(lead.qualification_answers).length > 0;
-  const name = lead.contact?.name || lead.contact?.email || "Unknown contact";
+  const name = contactLabel(lead.contact);
   const detailsId = `lead-details-${lead.id}`;
 
   // Same row shape workflow 21 inserts: the sweep (20) picks it up from

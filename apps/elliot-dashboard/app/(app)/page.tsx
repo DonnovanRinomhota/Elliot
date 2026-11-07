@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { contactLabel } from "@/lib/contacts";
 import { redirect } from "next/navigation";
 import { getMembership } from "@/lib/tenant";
 import { PageHeader, Panel, btn, humanize, timeAgo } from "../_ui/ui";
@@ -79,12 +80,12 @@ export default async function DashboardPage() {
       .limit(5),
     supabase
       .from("appointments")
-      .select("id, starts_at, created_at, contact:contacts(name, email)")
+      .select("id, starts_at, created_at, contact:contacts(name, email, phone)")
       .order("created_at", { ascending: false })
       .limit(5),
     supabase
       .from("leads")
-      .select("id, status, created_at, contact:contacts(name, email)")
+      .select("id, status, created_at, contact:contacts(name, email, phone)")
       .order("created_at", { ascending: false })
       .limit(5),
     supabase.from("leads").select("status"),
@@ -134,13 +135,13 @@ export default async function DashboardPage() {
     })),
     ...(appointments ?? []).map((a: any) => ({
       kind: "appointment" as const,
-      text: `${a.contact?.name || a.contact?.email || "Unknown contact"}, ${new Date(a.starts_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
+      text: `${contactLabel(a.contact)}, ${new Date(a.starts_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
       createdAt: a.created_at,
       href: `/dashboard/appointments/${a.id}`,
     })),
     ...(leads ?? []).map((l: any) => ({
       kind: "lead" as const,
-      text: `${l.contact?.name || l.contact?.email || "Unknown contact"}, ${humanize(l.status).toLowerCase()}`,
+      text: `${contactLabel(l.contact)}, ${humanize(l.status).toLowerCase()}`,
       createdAt: l.created_at,
       href: `/dashboard/leads?status=${l.status}`,
     })),
@@ -263,7 +264,7 @@ export default async function DashboardPage() {
               {(hotLeads ?? []).map((l: any) => (
                 <li key={l.id} className="border-t border-gray-100 px-5 py-3 first:border-t-0">
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="truncate text-[13.5px] font-medium text-ink">{l.contact?.name || l.contact?.email || "Unknown contact"}</span>
+                    <span className="truncate text-[13.5px] font-medium text-ink">{contactLabel(l.contact)}</span>
                     <span className="whitespace-nowrap text-[12px] text-gray-400">{timeAgo(l.updated_at)}</span>
                   </div>
                   <div className="text-[12.5px] text-gray-600">
@@ -307,7 +308,7 @@ export default async function DashboardPage() {
                       {new Date(a.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: tz })}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-[13.5px] text-ink">{a.contact?.name || "Unknown contact"}</span>
+                      <span className="block truncate text-[13.5px] text-ink">{contactLabel(a.contact)}</span>
                       <span className="block truncate text-[12.5px] text-gray-500">
                         {[
                           a.listing ? [a.listing.title, a.listing.address || a.listing.district].filter(Boolean).join(", ") : a.notes,

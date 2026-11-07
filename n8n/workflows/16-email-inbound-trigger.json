@@ -36,7 +36,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extracts the fields the rest of the Phase 7 chain needs.\n// CONFIRMED real shape (via live test): n8n's Gmail Trigger here returns a\n// pre-parsed email object (MIME-parsed), not the raw Gmail API payload.headers/parts\n// structure originally assumed. Real fields: text, html, subject, from.value[0].address,\n// to.value[0].address, id, threadId.\nconst msg = $json;\n\nconst fromEmail = (msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].address) || '';\nconst toEmail = (msg.to && msg.to.value && msg.to.value[0] && msg.to.value[0].address) || '';\nconst subject = msg.subject || '';\n\n// Prefer plain text; fall back to a crude HTML strip if only html is present.\nlet body = msg.text || '';\nif (!body && msg.html) {\n  body = msg.html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nconst gmailMessageId = msg.id || msg.messageId || '';\nconst gmailThreadId = msg.threadId || gmailMessageId;\n\nreturn [{\n  json: {\n    gmail_message_id: gmailMessageId,\n    gmail_thread_id: gmailThreadId,\n    from_email: fromEmail,\n    to_email: toEmail,\n    subject,\n    body\n  }\n}];"
+        "jsCode": "// Extracts the fields the rest of the Phase 7 chain needs.\n// CONFIRMED real shape (via live test): n8n's Gmail Trigger here returns a\n// pre-parsed email object (MIME-parsed), not the raw Gmail API payload.headers/parts\n// structure originally assumed. Real fields: text, html, subject, from.value[0].address,\n// to.value[0].address, id, threadId.\nconst msg = $json;\n\nconst fromEmail = (msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].address) || '';\n// Display name from the From header (\"Anna Kowalska <anna@...>\"), when there is one.\nconst fromName = ((msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].name) || '').trim();\nconst toEmail = (msg.to && msg.to.value && msg.to.value[0] && msg.to.value[0].address) || '';\nconst subject = msg.subject || '';\n\n// Prefer plain text; fall back to a crude HTML strip if only html is present.\nlet body = msg.text || '';\nif (!body && msg.html) {\n  body = msg.html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nconst gmailMessageId = msg.id || msg.messageId || '';\nconst gmailThreadId = msg.threadId || gmailMessageId;\n\nreturn [{\n  json: {\n    gmail_message_id: gmailMessageId,\n    gmail_thread_id: gmailThreadId,\n    from_email: fromEmail,\n    from_name: fromName,\n    to_email: toEmail,\n    subject,\n    body\n  }\n}];"
       },
       "id": "120df9b8-0e94-4ecf-9da5-6ffc002ba5ad",
       "name": "Extract Email Fields",
@@ -153,9 +153,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "insert into contacts (tenant_id, email)\nvalues ($1, $2)\non conflict (tenant_id, email)\ndo update set email = excluded.email\nreturning *;",
+        "query": "-- 0031: shared function, matching by email (saves the display name if the\n-- contact has none yet).\n-- Returns the contact row (id, name, email, phone) like the old INSERT ... RETURNING did.\nselect * from upsert_conversation_contact_row($1, null, $3, $2, null, null, 'email');",
         "options": {
-          "queryReplacement": "={{ [$('Lookup Tenant by Mailbox').first().json.tenant_id, $('Extract Email Fields').first().json.from_email] }}"
+          "queryReplacement": "={{ [$('Lookup Tenant by Mailbox').first().json.tenant_id, $('Extract Email Fields').first().json.from_email, $('Extract Email Fields').first().json.from_name || ''] }}"
         }
       },
       "id": "ef564099-e992-4b7d-8326-2c9e9d7e6813",
@@ -308,7 +308,8 @@
             "gmail_thread_id": "={{ $('Extract Email Fields').first().json.gmail_thread_id }}",
             "gmail_message_id": "={{ $('Extract Email Fields').first().json.gmail_message_id }}",
             "category": "={{ $json.category }}",
-            "confidence": "={{ $json.confidence }}"
+            "confidence": "={{ $json.confidence }}",
+            "contact_name": "={{ $('Upsert Contact').first()?.json?.name || '' }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -410,6 +411,16 @@
               "display": true,
               "canBeUsedToMatch": true,
               "type": "number",
+              "removed": false
+            },
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
               "removed": false
             }
           ],

@@ -18,9 +18,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "insert into contacts (tenant_id, name, email, phone, company, source)\nvalues ($1, $2, $3, $4, $5, $6)\non conflict (tenant_id, email) do update\n  set name = coalesce(excluded.name, contacts.name),\n      phone = coalesce(excluded.phone, contacts.phone),\n      company = coalesce(excluded.company, contacts.company)\nreturning id;",
+        "query": "-- 0031: one shared function instead of INSERT ... ON CONFLICT (tenant_id, email),\n-- which Postgres rejects for the partial unique index, and which never linked\n-- the contact to the conversation (so chats showed 'Unknown contact').\nselect upsert_conversation_contact($1, nullif($7, '')::uuid, $2, $3, $4, $5, $6) as id;",
         "options": {
-          "queryReplacement": "={{ [$json.tenant_id, $json.contact?.name || null, $json.contact?.email || null, $json.contact?.phone || null, $json.contact?.company || null, $json.source || 'chat_widget'] }}"
+          "queryReplacement": "={{ [$json.tenant_id, $json.contact?.name || '', $json.contact?.email || '', $json.contact?.phone || '', $json.contact?.company || '', $json.source || 'chat_widget', $json.conversation_id || ''] }}"
         }
       },
       "id": "c08c9e4b-96f0-408a-bf6e-c52fe0ea5cd5",

@@ -1,4 +1,5 @@
 import { StatusBadge } from "../../../_ui/ui";
+import { contactLabel } from "@/lib/contacts";
 import { DEFAULT_TZ, dayKey, dayLabel, personName, timeRange, type Appointment } from "@/lib/appointments";
 import { APPOINTMENT_GRID } from "./grid";
 import AppointmentActions from "./appointment-actions";
@@ -12,7 +13,7 @@ export default function AppointmentCard({ appointment, number }: { appointment: 
   const tz = a.timezone || DEFAULT_TZ;
   const isFinal = ["cancelled", "completed", "no_show"].includes(a.status);
   const isCancelled = a.status === "cancelled";
-  const name = a.contact?.name || a.contact?.email || "Unknown contact";
+  const name = contactLabel(a.contact);
   const contactLine = [a.contact?.name ? a.contact?.email : null, a.contact?.phone].filter(Boolean).join(", ");
   const href = `/dashboard/appointments/${a.id}`;
 

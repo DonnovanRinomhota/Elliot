@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { contactLabel } from "@/lib/contacts";
 import { getMembership } from "@/lib/tenant";
 import { Badge, EmptyState, PER_PAGE, PageHeader, Pagination, humanize, paginate, timeAgo, type Tone } from "../../../_ui/ui";
 import AutoRefresh from "../auto-refresh";
@@ -66,7 +67,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
       .limit(50),
   ]);
 
-  const contactName = (c: any) => c?.name || c?.email || "Website visitor";
+  const contactName = (c: any, channel?: string) => contactLabel(c, channel || "chat_widget");
   const rows = new Map<string, Row>();
 
   for (const c of (handled ?? []) as any[]) {
@@ -74,7 +75,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
     rows.set(c.id, {
       id: c.id,
       channel: c.channel,
-      contactName: contactName(c.contact),
+      contactName: contactName(c.contact, c.channel),
       contactPhone: c.contact?.phone ?? null,
       state: { label: mine ? "You're handling" : `${c.handler?.full_name || c.handler?.email?.split("@")[0] || "A colleague"} is handling`, tone: mine ? "ink" : "neutral" },
       detail: null,
@@ -94,7 +95,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
     rows.set(c.id, {
       id: c.id,
       channel: c.channel,
-      contactName: contactName(c.contact),
+      contactName: contactName(c.contact, c.channel),
       contactPhone: c.contact?.phone ?? null,
       state: { label: REASON_LABEL[e.reason] ?? humanize(e.reason), tone: e.priority === "urgent" || e.priority === "high" || e.reason === "hot_lead" ? "alert" : "brass" },
       detail: e.context_summary,
@@ -109,7 +110,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
     .map((c) => ({
       id: c.id,
       channel: c.channel,
-      contactName: contactName(c.contact),
+      contactName: contactName(c.contact, c.channel),
       contactPhone: c.contact?.phone ?? null,
       state: { label: "Elliot is answering", tone: "muted" as Tone },
       detail: null,
