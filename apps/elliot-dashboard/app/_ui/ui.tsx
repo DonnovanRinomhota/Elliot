@@ -1,9 +1,11 @@
 // Shared building blocks for the dashboard's look. Plain components with no
-// hooks, so both server and client components can use them.
+// hooks (the sticky page header is its own small client component), so both
+// server and client components can use them.
 //
 // Colour rules (see tailwind.config.ts): ink for normal emphasis, brass for
 // "waiting on you", alert for urgent/destructive, greys for everything else.
 import type { ReactNode } from "react";
+import StickyHeader from "./sticky-header";
 
 // ── Buttons (class strings, so <a>, <button> and <summary> can all use them) ──
 
@@ -20,6 +22,7 @@ export const btn = {
 
 // ── Page header ──
 
+/** Page title, description and buttons. Stays at the top while the page scrolls. */
 export function PageHeader({
   title,
   description,
@@ -29,15 +32,7 @@ export function PageHeader({
   description?: ReactNode;
   actions?: ReactNode;
 }) {
-  return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="m-0 text-[22px] font-semibold leading-tight tracking-[-0.01em] text-ink">{title}</h1>
-        {description && <p className="mb-0 mt-1 max-w-2xl text-[13.5px] text-gray-500">{description}</p>}
-      </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
-    </div>
-  );
+  return <StickyHeader title={title} description={description} actions={actions} />;
 }
 
 /**
@@ -186,4 +181,116 @@ export function timeAgo(iso: string): string {
   if (hours < 24) return `${hours} h ago`;
   const days = Math.round(hours / 24);
   return days === 1 ? "yesterday" : `${days} days ago`;
+}
+
+// ── Pagination ──
+
+export const PER_PAGE = 12;
+
+/** One page of a list, plus what the Pagination bar needs. Pages start at 1. */
+export function paginate<T>(items: T[], pageParam?: string | null, perPage = PER_PAGE) {
+  const total = items.length;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const requested = Number.parseInt(pageParam || "1", 10);
+  const page = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), pages) : 1;
+  const offset = (page - 1) * perPage;
+  return { items: items.slice(offset, offset + perPage), page, pages, total, offset };
+}
+
+/** Page numbers to show: always first and last, the current one and its neighbours, "…" between. */
+export function pageWindow(page: number, pages: number): (number | "…")[] {
+  const set = new Set([1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages));
+  // A gap of exactly one page shows that page instead of "…".
+  Array.from(set).forEach((n) => {
+    if (set.has(n + 2) && !set.has(n + 1)) set.add(n + 1);
+  });
+  const sorted = Array.from(set).sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) out.push("…");
+    out.push(n);
+  });
+  return out;
+}
+
+/**
+ * "13–24 of 152" with Previous / page numbers / Next. Plain links that keep
+ * the page's other filters (params). Renders nothing for a single page.
+ */
+export function Pagination({
+  page,
+  pages,
+  total,
+  offset,
+  shown,
+  basePath,
+  params = {},
+  noun = "items",
+}: {
+  page: number;
+  pages: number;
+  total: number;
+  offset: number;
+  shown: number;
+  basePath: string;
+  params?: Record<string, string | undefined>;
+  noun?: string;
+}) {
+  if (total === 0) return null;
+  const href = (p: number) => {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v) q.set(k, v);
+    });
+    if (p > 1) q.set("page", String(p));
+    const qs = q.toString();
+    return `${basePath}${qs ? `?${qs}` : ""}`;
+  };
+  const cell = "inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2.5 text-[13px] no-underline";
+  return (
+    <nav aria-label="Pages" className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <span className="tabular text-[13px] text-gray-500">
+        {offset + 1}–{offset + shown} of {total} {noun}
+      </span>
+      {pages > 1 && (
+        <div className="flex flex-wrap items-center gap-1">
+          {page > 1 ? (
+            <a href={href(page - 1)} className={`${cell} border border-gray-300 bg-white text-ink hover:bg-ink-soft`}>
+              Previous
+            </a>
+          ) : (
+            <span className={`${cell} border border-gray-200 text-gray-300`}>Previous</span>
+          )}
+          {pageWindow(page, pages).map((p, i) =>
+            p === "…" ? (
+              <span key={`gap-${i}`} className={`${cell} text-gray-400`}>
+                …
+              </span>
+            ) : (
+              <a
+                key={p}
+                href={href(p)}
+                aria-current={p === page ? "page" : undefined}
+                className={`${cell} tabular ${p === page ? "bg-ink font-medium text-white" : "text-gray-600 hover:bg-ink-soft hover:text-ink"}`}
+              >
+                {p}
+              </a>
+            )
+          )}
+          {page < pages ? (
+            <a href={href(page + 1)} className={`${cell} border border-gray-300 bg-white text-ink hover:bg-ink-soft`}>
+              Next
+            </a>
+          ) : (
+            <span className={`${cell} border border-gray-200 text-gray-300`}>Next</span>
+          )}
+        </div>
+      )}
+    </nav>
+  );
+}
+
+/** Row number shown at the start of numbered lists. */
+export function RowNumber({ n }: { n: number }) {
+  return <span className="tabular text-[12.5px] text-gray-400">{n}</span>;
 }

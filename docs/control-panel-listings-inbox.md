@@ -46,6 +46,16 @@ imported; earlier replies show $0.
 ### Listings (`/dashboard/listings`)
 - Add, edit, delete; status Available / Under offer / Sold / Let / Withdrawn;
   **Available from** date (0028) for rentals advertised before they're free.
+- **Photos** (0029): up to 20 per listing, uploaded from the listing's page
+  (shrunk in the browser to about 1600 px first), reordered with arrows; the
+  first is the cover shown in the list. Stored in the public Supabase Storage
+  bucket `listing-photos` under `<agency id>/<listing id>/`, and only the
+  agency's own users can add or delete files there. A photo can also be a
+  link to an image hosted elsewhere. Listings whose link is a Google Drive or
+  Dropbox folder show "Photo folder" until photos are added: folders can't
+  be shown as pictures.
+- The list is numbered (first added = 1) and shows 12 per page, like every
+  other list in the dashboard.
 - **Import from any file** (Listings → Import):
   - **Excel (.xlsx) and CSV**: the header row is found automatically (even
     under a title or merged cells), and counter/summary rows are dropped. If the
@@ -119,7 +129,10 @@ admin can switch it off for the whole agency.
    Optional check on a scratch database:
    `db/seed/test_0027_platform_listings_team_inbox.sql` (ends with
    "0027 checks passed", rolls everything back).
-   Then `db/migrations/0028_listings_available_from.sql` (same way).
+   Then `db/migrations/0028_listings_available_from.sql` and
+   `db/migrations/0029_listing_photos.sql` (same way). 0029 creates the
+   `listing-photos` storage bucket and its access rules; check it appears
+   under Supabase → Storage.
 2. **Vercel** (dashboard project):
    - `ANTHROPIC_API_KEY`: an Anthropic API key for the "read any file"
      listings import (console.anthropic.com → API keys; can be the same key

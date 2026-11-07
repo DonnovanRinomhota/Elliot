@@ -1,23 +1,24 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { EmptyState, PageHeader, formatDate } from "../../../_ui/ui";
+import { EmptyState, PageHeader, Pagination, formatDate, paginate } from "../../../_ui/ui";
 import { describeEvent } from "@/lib/platform-events";
 
 export const dynamic = "force-dynamic";
 
 // Control-panel and team changes across all agencies (audit_log events
 // written by the dashboard, actor_type 'system').
-export default async function ActivityPage() {
+export default async function ActivityPage({ searchParams }: { searchParams: { page?: string } }) {
   const admin = createAdminClient();
   const { data: events, error } = await admin
     .from("audit_log")
     .select("id, tenant_id, actor_id, event_type, details, created_at, tenant:tenants(name)")
     .or("event_type.like.platform.%,event_type.like.team.%")
     .order("created_at", { ascending: false })
-    .limit(150);
+    .limit(1200);
+  const pg = paginate(events ?? [], searchParams.page);
 
   return (
     <div>
-      <PageHeader title="Activity log" description="Who changed what: plans, statuses, payments, dashboard visits and team changes. Latest 150." />
+      <PageHeader title="Activity log" description="Who changed what: plans, statuses, payments, dashboard visits and team changes." />
       {error && <p className="text-[13px] text-alert">Couldn&apos;t load: {error.message}</p>}
       {!events?.length ? (
         <EmptyState title="Nothing recorded yet">Changes you make in the control panel will show up here.</EmptyState>
@@ -33,7 +34,7 @@ export default async function ActivityPage() {
               </tr>
             </thead>
             <tbody>
-              {events.map((e: any) => (
+              {pg.items.map((e: any) => (
                 <tr key={e.id} className="border-b border-gray-100 last:border-b-0">
                   <td className="whitespace-nowrap px-4 py-3 text-gray-500">
                     {formatDate(e.created_at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -64,6 +65,7 @@ export default async function ActivityPage() {
           </table>
         </div>
       )}
+      <Pagination {...pg} shown={pg.items.length} basePath="/platform/activity" noun="changes" />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import EscalationCard from "./escalation-card";
 import FolderTabs, { FolderTab } from "../folder-tabs";
-import { EmptyState, FilterDescription, PageHeader } from "../../../_ui/ui";
+import { EmptyState, FilterDescription, PageHeader, Pagination, paginate } from "../../../_ui/ui";
 
 // Matches escalation-card.tsx's updateStatus() targets exactly.
 const STATUS_TABS: FolderTab[] = [
@@ -13,7 +13,7 @@ const STATUS_TABS: FolderTab[] = [
 export default async function EscalationsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; days?: string };
+  searchParams: { status?: string; days?: string; page?: string };
 }) {
   const supabase = createClient();
 
@@ -37,6 +37,7 @@ export default async function EscalationsPage({
 
   const activeStatus = tabs.some((t) => t.key === searchParams.status) ? (searchParams.status as string) : "all";
   const visible = activeStatus === "all" ? scoped : scoped.filter((e: any) => e.status === activeStatus);
+  const pg = paginate(visible, searchParams.page);
 
   return (
     <div>
@@ -60,11 +61,18 @@ export default async function EscalationsPage({
         <EmptyState title="Nothing to handle">When Elliot needs a person to step in, the conversation appears here.</EmptyState>
       ) : (
         <ul className="m-0 grid list-none gap-3 p-0">
-          {visible.map((escalation: any) => (
+          {pg.items.map((escalation: any) => (
             <EscalationCard key={escalation.id} escalation={escalation} />
           ))}
         </ul>
       )}
+      <Pagination
+        {...pg}
+        shown={pg.items.length}
+        basePath="/dashboard/escalations"
+        params={{ days: days ? String(days) : undefined, status: activeStatus === "all" ? undefined : activeStatus }}
+        noun="escalations"
+      />
     </div>
   );
 }

@@ -16,7 +16,7 @@ type Appointment = {
   contact: { name: string | null; email: string | null; phone: string | null } | null;
 };
 
-export default function AppointmentCard({ appointment }: { appointment: Appointment }) {
+export default function AppointmentCard({ appointment, number }: { appointment: Appointment; number?: number }) {
   const router = useRouter();
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
@@ -83,6 +83,7 @@ export default function AppointmentCard({ appointment }: { appointment: Appointm
   return (
     <li className="border-t border-gray-200 first:border-t-0">
       <div className={`grid gap-1.5 px-5 py-3.5 ${APPOINTMENT_GRID}`}>
+        <span className="tabular hidden text-[12.5px] text-gray-400 md:block">{number}</span>
         <div className={isFinal ? "text-gray-500" : "text-ink"}>
           <div className="text-[14px] font-medium">{day}</div>
           <div className="tabular text-[12.5px] text-gray-500">

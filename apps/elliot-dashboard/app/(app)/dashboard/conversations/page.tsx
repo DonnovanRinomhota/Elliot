@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import FolderTabs, { FolderTab } from "../folder-tabs";
-import { EmptyState, PageHeader, StatusBadge, humanize, timeAgo } from "../../../_ui/ui";
+import { EmptyState, PageHeader, Pagination, RowNumber, StatusBadge, humanize, paginate, timeAgo } from "../../../_ui/ui";
 
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; days?: string; date?: string };
+  searchParams: { status?: string; days?: string; date?: string; page?: string };
 }) {
   const supabase = createClient();
 
@@ -46,6 +46,7 @@ export default async function ConversationsPage({
   const activeStatus = tabs.some((t) => t.key === searchParams.status) ? (searchParams.status as string) : "all";
   const visible = activeStatus === "all" ? scoped : scoped.filter((c: any) => c.status === activeStatus);
 
+  const pg = paginate(visible, searchParams.page);
   const extraParams: Record<string, string> = {};
   if (days) extraParams.days = String(days);
   if (searchParams.date) extraParams.date = searchParams.date;
@@ -80,19 +81,23 @@ export default async function ConversationsPage({
         <EmptyState title="No conversations here">Conversations appear as soon as someone writes to Elliot.</EmptyState>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-          <div className="hidden grid-cols-[minmax(0,2fr)_140px_120px_140px] gap-4 border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 md:grid">
+          <div className="hidden grid-cols-[36px_minmax(0,2fr)_140px_120px_140px] gap-4 border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 md:grid">
+            <span>#</span>
             <span>Contact</span>
             <span>Channel</span>
             <span>Status</span>
             <span>Started</span>
           </div>
           <ul className="m-0 list-none p-0">
-            {visible.map((c: any) => (
+            {pg.items.map((c: any, i: number) => (
               <li key={c.id} className="border-t border-gray-200 first:border-t-0">
                 <a
                   href={`/dashboard/conversations/${c.id}`}
-                  className="grid gap-1 px-5 py-3.5 no-underline hover:bg-gray-50 md:grid-cols-[minmax(0,2fr)_140px_120px_140px] md:items-center md:gap-4"
+                  className="grid gap-1 px-5 py-3.5 no-underline hover:bg-gray-50 md:grid-cols-[36px_minmax(0,2fr)_140px_120px_140px] md:items-center md:gap-4"
                 >
+                  <span className="hidden md:block">
+                    <RowNumber n={pg.offset + i + 1} />
+                  </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[14px] font-medium text-ink">
                       {c.contact?.name || c.contact?.email || "Unknown contact"}
@@ -110,6 +115,13 @@ export default async function ConversationsPage({
           </ul>
         </div>
       )}
+      <Pagination
+        {...pg}
+        shown={pg.items.length}
+        basePath="/dashboard/conversations"
+        params={{ ...extraParams, status: activeStatus === "all" ? undefined : activeStatus }}
+        noun="conversations"
+      />
     </div>
   );
 }

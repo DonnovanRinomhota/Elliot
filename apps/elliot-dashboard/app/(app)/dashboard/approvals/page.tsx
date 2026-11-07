@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import ApprovalCard from "./approval-card";
 import FolderTabs, { FolderTab } from "../folder-tabs";
-import { EmptyState, FilterDescription, PageHeader } from "../../../_ui/ui";
+import { EmptyState, FilterDescription, PageHeader, Pagination, paginate } from "../../../_ui/ui";
 
 // Real statuses these tables use: "pending" until reviewed, then either
 // approve_*_draft() -> "approved" or reject_*_draft() -> "rejected" (see
@@ -19,7 +19,7 @@ const STATUS_TABS: FolderTab[] = [
 export default async function ApprovalsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; days?: string };
+  searchParams: { status?: string; days?: string; page?: string };
 }) {
   const supabase = createClient();
 
@@ -66,6 +66,7 @@ export default async function ApprovalsPage({
   // on the actionable queue, same as this page always behaved before.
   const activeStatus = tabs.some((t) => t.key === searchParams.status) ? (searchParams.status as string) : "pending";
   const visible = activeStatus === "all" ? scoped : scoped.filter((d: any) => d.status === activeStatus);
+  const pg = paginate(visible, searchParams.page);
 
   return (
     <div>
@@ -91,11 +92,18 @@ export default async function ApprovalsPage({
         </EmptyState>
       ) : (
         <div className="grid gap-4">
-          {visible.map((draft: any) => (
+          {pg.items.map((draft: any) => (
             <ApprovalCard key={draft.id} draft={draft} />
           ))}
         </div>
       )}
+      <Pagination
+        {...pg}
+        shown={pg.items.length}
+        basePath="/dashboard/approvals"
+        params={{ days: days ? String(days) : undefined, status: activeStatus }}
+        noun="drafts"
+      />
     </div>
   );
 }

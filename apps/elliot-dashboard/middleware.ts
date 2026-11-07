@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
   // reachable even when signed in -- someone can land there from an emailed
   // recovery link while already having an active session.
   if (isLoginRoute && user) {
-    return NextResponse.redirect(new URL("/dashboard/approvals", request.url));
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return response;

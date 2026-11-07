@@ -22,7 +22,9 @@ the list above only shows the first eight and the latest.
 (control panel, listings, team, takeover, daily summary) -- run them on a
 scratch database only. The 0027 test wraps itself in a transaction and
 rolls back; it ends with "0027 checks passed". Same for
-`test_0028_listings_available_from.sql` ("0028 checks passed").
+`test_0028_listings_available_from.sql` ("0028 checks passed") and
+`test_0029_listing_photos.sql` ("0029 checks passed"; needs Supabase's
+storage schema, which every Supabase project has).
 
 ## How to apply
 

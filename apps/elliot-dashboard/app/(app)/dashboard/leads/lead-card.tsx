@@ -76,9 +76,12 @@ function computeScoreReasons(lead: Lead): ScoreReason[] {
 
 export default function LeadCard({
   lead,
+  number,
   sequences,
   runningRun,
 }: {
+  /** Position in the list (1, 2, 3...), shown in the first column. */
+  number?: number;
   lead: Lead;
   sequences: StartableSequence[];
   runningRun: RunningRun | null;
@@ -156,6 +159,7 @@ export default function LeadCard({
   return (
     <li className="border-t border-gray-200 first:border-t-0">
       <div className={`grid gap-2 px-5 py-3.5 ${LEAD_GRID}`}>
+        <span className="tabular hidden text-[12.5px] text-gray-400 md:block">{number}</span>
         <div className="min-w-0">
           <div className={`truncate text-[14px] font-medium ${isClosed ? "text-gray-500" : "text-ink"}`}>{name}</div>
           <div className="truncate text-[12.5px] text-gray-500">
