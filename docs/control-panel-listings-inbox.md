@@ -51,9 +51,23 @@ imported; earlier replies show $0.
   first is the cover shown in the list. Stored in the public Supabase Storage
   bucket `listing-photos` under `<agency id>/<listing id>/`, and only the
   agency's own users can add or delete files there. A photo can also be a
-  link to an image hosted elsewhere. Listings whose link is a Google Drive or
-  Dropbox folder show "Photo folder" until photos are added: folders can't
-  be shown as pictures.
+  link to an image hosted elsewhere.
+- **Photos from Google Drive folders**: when a listing's link is a shared
+  Drive folder (as in most agency spreadsheets), Elliot reads the folder with
+  the Google Drive API and shows its photos, with no uploading. The photos
+  stay in Drive; Elliot stores a link to each (`lib/google-drive.ts`).
+  - Runs by itself right after an import, and from the banner on the Listings
+    page ("Get photos from Drive" for listings without photos, "Re-check all
+    folders" after photos were added to folders). Works in batches of 20
+    listings, so 10,000 listings is just a longer progress bar (roughly
+    5-10 minutes per 1,000; keep the page open).
+  - One listing: "Get photos from the Drive folder" on its page.
+  - Takes images in the folder and one level of subfolders, in name order,
+    up to 20. Photos uploaded in Elliot stay first, so a chosen cover stays
+    the cover.
+  - The folder must be shared as "Anyone with the link". Folders that aren't
+    are listed with the fix.
+  - Needs `GOOGLE_DRIVE_API_KEY` in Vercel (see Setup).
 - The list is numbered (first added = 1) and shows 12 per page, like every
   other list in the dashboard.
 - **Import from any file** (Listings → Import):
@@ -138,6 +152,14 @@ admin can switch it off for the whole agency.
      listings import (console.anthropic.com → API keys; can be the same key
      n8n uses). Mark it Sensitive. Optional: `ANTHROPIC_MODEL` (defaults to
      the model workflow 01 uses).
+
+   - `GOOGLE_DRIVE_API_KEY`: lets Elliot read photos from shared Google
+     Drive folders. In Google Cloud Console (the project n8n's Gmail
+     connection uses is fine): APIs & Services → Library → **Google Drive
+     API** → Enable; then Credentials → Create credentials → API key; edit
+     the key → API restrictions → Restrict key → Google Drive API → Save.
+     Leave "Application restrictions" as None (Vercel has no fixed address).
+     Mark it Sensitive in Vercel. Free within Google's normal quota.
 
    Optional:
    - `AI_PRICE_INPUT_PER_MTOK` and `AI_PRICE_OUTPUT_PER_MTOK` if the

@@ -181,6 +181,7 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
           tenantId={tenantId}
           listingId={listingId}
           photos={photos}
+          folderUrl={f.url}
           onChange={(next) => {
             setUploadedNow((u) => Array.from(new Set([...u, ...next.filter((p) => !photos.includes(p) && !/^https?:/i.test(p))])));
             setPhotos(next);

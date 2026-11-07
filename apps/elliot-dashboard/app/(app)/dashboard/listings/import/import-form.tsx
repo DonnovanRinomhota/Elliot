@@ -20,6 +20,8 @@ import {
 } from "@/lib/listings-import";
 import { ACCEPTED, readFileForImport } from "@/lib/file-text";
 import { ErrorText, Notice, Panel, btn } from "../../../../_ui/ui";
+import { driveFolderId } from "@/lib/google-drive";
+import DriveSync from "../drive-sync";
 
 type Row = { line: number; listing: ListingDraft | null; errors: string[] };
 type Review = {
@@ -46,6 +48,9 @@ export default function ImportForm() {
   const [withdrawMissing, setWithdrawMissing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ inserted: number; updated: number; withdrawn: number } | null>(null);
+  // Imported listings whose link is a Google Drive folder: photos are read
+  // from those folders straight after the import.
+  const [driveCount, setDriveCount] = useState(0);
 
   function fail(message: string) {
     setError(message);
@@ -174,6 +179,7 @@ export default function ImportForm() {
     setBusy(false);
     if (e) return setError(e.message);
     setDone(data as { inserted: number; updated: number; withdrawn: number });
+    setDriveCount(good.filter((r) => driveFolderId(r.listing!.url)).length);
     setReview(null);
     setStage("done");
     router.refresh();
@@ -240,6 +246,7 @@ export default function ImportForm() {
           </a>
         </Notice>
       )}
+      {stage === "done" && driveCount > 0 && <DriveSync missingCount={driveCount} folderCount={driveCount} autoStart />}
 
       {stage === "reading" && (
         <Panel>
