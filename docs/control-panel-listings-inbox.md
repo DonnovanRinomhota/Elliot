@@ -44,15 +44,36 @@ workflow 01 and set these in Vercel.** Counting starts once the new 01 is
 imported; earlier replies show $0.
 
 ### Listings (`/dashboard/listings`)
-- Add, edit, delete; status Available / Under offer / Sold / Let / Withdrawn.
-- **Import CSV**: English or Polish column names, commas or semicolons,
-  Polish number formats (`1 250 000`, `48,5`). A preview shows what will be
-  imported and which lines are skipped and why. Rows whose reference already
-  exists update that listing. There's a downloadable template.
-- Elliot's new `search_listings` tool (workflow 01) searches **only
+- Add, edit, delete; status Available / Under offer / Sold / Let / Withdrawn;
+  **Available from** date (0028) for rentals advertised before they're free.
+- **Import from any file** (Listings → Import):
+  - **Excel (.xlsx) and CSV**: the header row is found automatically (even
+    under a title or merged cells), and counter/summary rows are dropped. If the
+    column names are recognisable (English or Polish, or Elliot's template),
+    they're matched directly. Otherwise Claude is shown the headers and about
+    a dozen sample rows (not the whole file) and returns a *recipe*: which
+    column is the price, how to build the title, which codes mean what, which
+    columns are internal and must be left out. Code then applies that recipe to
+    every row (`lib/listings-import.ts`), so a 1,000-row sheet takes one AI
+    call. The person sees how each field was read, the assumptions, and the
+    columns left out, before importing. There's a "Let Elliot read it" button
+    if header matching got it wrong.
+  - **PDF, Word (.docx), text or pasted text**: Claude reads the text in parts
+    of about 6,000 characters and returns the listings it finds. Scanned PDFs
+    and photos can't be read yet.
+  - Everything goes through the same checks as a listing typed in by hand,
+    and a preview. Rows with problems are listed with the row number and reason.
+  - Re-importing updates listings with the same reference. Tick "This file is
+    my full list" to withdraw listings (with a reference) that aren't in the
+    file. Listings added by hand are never touched.
+  - Needs `ANTHROPIC_API_KEY` in Vercel for the AI parts. Files that match by
+    column names work without it.
+- Elliot's `search_listings` tool (workflow 01) searches **only
   Available** listings, with the filters the visitor gave (area, budget,
-  rooms, size, sale/rent, a keyword). The prompt forbids inventing
-  listings. Each time a listing is shown, its *Suggested* count goes up.
+  rooms, size, sale/rent, a keyword, move-in date). The prompt forbids
+  inventing listings. Without a move-in date, only listings free within 60
+  days are offered; Elliot says "available from …" when it isn't free yet.
+  Each time a listing is shown, its *Suggested* count goes up.
 
 ### Team (`/dashboard/team`)
 - Invite by email (Supabase sends the invitation; the link opens
@@ -98,7 +119,14 @@ admin can switch it off for the whole agency.
    Optional check on a scratch database:
    `db/seed/test_0027_platform_listings_team_inbox.sql` (ends with
    "0027 checks passed", rolls everything back).
-2. **Vercel** (dashboard project), optional:
+   Then `db/migrations/0028_listings_available_from.sql` (same way).
+2. **Vercel** (dashboard project):
+   - `ANTHROPIC_API_KEY`: an Anthropic API key for the "read any file"
+     listings import (console.anthropic.com → API keys; can be the same key
+     n8n uses). Mark it Sensitive. Optional: `ANTHROPIC_MODEL` (defaults to
+     the model workflow 01 uses).
+
+   Optional:
    - `AI_PRICE_INPUT_PER_MTOK` and `AI_PRICE_OUTPUT_PER_MTOK` if the
      defaults (3 and 15) don't match the model's price.
    - `ADMIN_EMAILS` and `SUPABASE_SERVICE_ROLE_KEY` must already be set

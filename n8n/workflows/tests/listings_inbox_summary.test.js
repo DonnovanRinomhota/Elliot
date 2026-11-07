@@ -71,6 +71,7 @@ test('01: search_listings is offered, allowed and routed to Search Listings', ()
   const tool = payload.tools.find((t) => t.name === 'search_listings');
   assert.ok(tool, 'tool definition missing');
   assert.deepStrictEqual(tool.input_schema.properties.transaction_type.enum, ['sale', 'rent']);
+  assert.ok(tool.input_schema.properties.move_in_by, 'move_in_by filter missing (0028)');
   assert.strictEqual(payload.tools.length, 6);
 
   const allowed = run(nodeOf(wf01, 'Extract Tool Call').parameters.jsCode, {
@@ -143,9 +144,17 @@ test('01: listing results are turned into text Claude can quote, and usage accum
   assert.match(text, /For sale: 820000 PLN/);
   assert.match(text, /Mokotów, Warszawa, 48 m2, 2 rooms, floor 3/);
   assert.match(text, /Link: https:\/\/x\.test\/a1/);
+  assert.match(text, /Available now/);
   assert.strictEqual(found.usage_input_tokens, 1500);
   assert.strictEqual(found.usage_output_tokens, 150);
   assert.strictEqual(found.tool_turns, 2);
+
+  const later = run(code, {
+    json: { result: { found: true, count: 1, listings: [{ title: 'Single room', transaction_type: 'rent', price: 1700, currency: 'PLN', available_from: '2026-12-01' }] } },
+    nodes,
+  })[0].json;
+  assert.match(later.claude_messages[2].content[0].content, /Available from 2026-12-01 \(not before\)/);
+  assert.match(later.claude_messages[2].content[0].content, /For rent: 1700 PLN/);
 
   const none = run(code, { json: { result: { found: false, count: 0, listings: [] } }, nodes })[0].json;
   assert.match(none.claude_messages[2].content[0].content, /Do not invent any/);

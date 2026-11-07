@@ -43,6 +43,7 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
     features: (listing?.features ?? []).join(", "),
     url: init("url"),
     image_url: init("image_url"),
+    available_from: init("available_from"),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
     };
     for (const k of FIELDS_TEXT) row[k] = f[k].trim() || null;
     row.currency = (row.currency || "PLN").toUpperCase();
+    row.available_from = f.available_from || null;
     for (const k of FIELDS_NUM) {
       if (!f[k].trim()) {
         row[k] = null;
@@ -141,6 +143,10 @@ export default function ListingForm({ tenantId, listing }: { tenantId: string; l
           {input("bedrooms", "Bedrooms", { inputMode: "numeric" })}
           {input("bathrooms", "Bathrooms", { inputMode: "numeric" })}
           {input("floor", "Floor", { inputMode: "numeric" })}
+          <div>
+            {input("available_from", "Available from", { type: "date" })}
+            <p className="mb-0 mt-1 text-[12px] text-gray-500">Leave empty if it&apos;s available now.</p>
+          </div>
         </div>
       </Panel>
 

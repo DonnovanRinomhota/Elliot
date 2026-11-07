@@ -7,7 +7,7 @@ export default function ImportListingsPage() {
       <a href="/dashboard/listings" className="text-[13px] text-gray-500 no-underline hover:text-ink">Listings</a>
       <PageHeader
         title="Import listings"
-        description="Upload a spreadsheet saved as CSV. Rows with a reference you already have update that listing; the rest are added. Nothing is saved until you confirm."
+        description="Upload the listings you already have, in whatever format they're in. Listings you've imported before are updated, not duplicated. Nothing is saved until you confirm."
       />
       <ImportForm />
     </div>

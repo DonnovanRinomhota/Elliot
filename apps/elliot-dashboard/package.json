@@ -9,17 +9,19 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npx --yes tsx --test lib/follow-up-steps.test.ts lib/listings.test.ts lib/platform.test.ts"
+    "test": "npx --yes tsx --test lib/follow-up-steps.test.ts lib/listings.test.ts lib/listings-import.test.ts lib/listings-ai.test.ts lib/platform.test.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.45.4",
     "lucide-react": "^0.383.0",
+    "mammoth": "^1.13.0",
     "next": "^14.2.35",
     "pdfjs-dist": "^6.3.289",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "read-excel-file": "^9.3.14"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
