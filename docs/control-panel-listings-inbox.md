@@ -156,6 +156,35 @@ imported; earlier replies show $0.
   Fixed (*Log User Message* runs once), and 0031 deletes the existing copies
   (same chat, same text, within 10 seconds of the first).
 
+### Look, and the built-in assistant ("Ask Elliot")
+- Light design: grey page, white rounded cards, blue for selections and
+  charts, amber for things waiting on you, red for urgent. Inter font,
+  bundled with the app. Colours live in `tailwind.config.ts`; the card style
+  is `.card` in `app/globals.css`.
+- **Overview**: greeting with what's waiting, *Your queue* (the most urgent
+  item first, then counts), conversations this week, the share of chats
+  Elliot handled without a person, leads received (14 days), viewings
+  booked (30 days), today's viewings, recent activity and the pipeline.
+- **Ask Elliot** (sidebar box, Ctrl/Cmd+K or "/"): answers questions about
+  the agency's own data. **No AI service**: `lib/assistant/parse.ts` turns
+  the question into an intent with plain rules (English and common Polish
+  words), `lib/assistant/run.ts` answers it through the signed-in user's
+  connection (so it only sees their agency), via `POST /api/assistant`.
+  It understands:
+  - what needs me / what's waiting
+  - counts and lists of leads, chats, viewings, handovers, emails to approve,
+    listings and contacts, for today, yesterday, this/last/next week,
+    this/last month, the last N days or a weekday
+  - viewings in a range ("viewings tomorrow", "my viewings this week")
+  - hot leads, viewings without an agent
+  - listing searches: place, price ("under 1m", "900 tys", "between 2m and
+    3m"), rooms ("2 rooms", "3+"), rent or sale (from the words, or from the
+    price), type
+  - people by name, email or phone
+  - "open settings" and other pages
+  Anything else is searched for in people and listings. It can't chat
+  freely or answer questions outside this list.
+
 ### Team (`/dashboard/team`)
 - Invite by email (Supabase sends the invitation; the link opens
   `/reset-password` to choose a password). One person = one agency.

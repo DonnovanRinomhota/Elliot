@@ -163,14 +163,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
               key={ws}
               href={link({ week: ws })}
               aria-current={ws === week ? "true" : undefined}
-              className={`block rounded-lg border bg-white px-3 py-2.5 no-underline hover:border-ink-400 ${ws === week ? "border-ink" : "border-gray-200"}`}
+              className={`block rounded-[18px] border bg-white shadow-card px-3 py-2.5 no-underline hover:border-ink-400 ${ws === week ? "border-accent ring-1 ring-accent" : "border-gray-200"}`}
             >
               <div className="text-[12px] text-gray-500">
                 {ws === weekStart(today) ? "This week" : weekLabel(ws).replace(/ \d{4}$/, "")}
               </div>
               <div className="tabular text-[18px] font-semibold text-ink">{perWeek[i]}</div>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-100" aria-hidden="true">
-                <div className="h-full rounded-full bg-ink" style={{ width: `${(perWeek[i] / busiest) * 100}%` }} />
+                <div className="h-full rounded-full bg-accent" style={{ width: `${(perWeek[i] / busiest) * 100}%` }} />
               </div>
               <div className="mt-1 text-[11.5px] text-gray-500">viewing{perWeek[i] === 1 ? "" : "s"}</div>
             </a>
@@ -192,7 +192,7 @@ function AgentWeek({ days, today, tz, byDay }: { days: string[]; today: string; 
         return (
           <section
             key={day}
-            className={`min-w-0 rounded-lg border bg-white ${isToday ? "border-ink" : "border-gray-200"} ${past ? "opacity-70" : ""}`}
+            className={`min-w-0 rounded-[18px] border bg-white shadow-card ${isToday ? "border-accent ring-1 ring-accent" : "border-gray-200"} ${past ? "opacity-70" : ""}`}
           >
             <h3 className={`m-0 border-b border-gray-100 px-3 py-2 text-[13px] font-medium ${isToday ? "text-ink" : "text-gray-600"}`}>
               {isToday ? "Today" : dayLabel(day, "weekday")} <span className="tabular text-gray-400">{Number(day.slice(8))}</span>
@@ -279,7 +279,7 @@ function TeamWeek({
         {days.map((d) => {
           const list = byDayAll.get(d) ?? [];
           return (
-            <section key={d} className={`rounded-lg border bg-white ${d === today ? "border-ink" : "border-gray-200"}`}>
+            <section key={d} className={`rounded-[18px] border bg-white shadow-card ${d === today ? "border-accent" : "border-gray-200"}`}>
               <h3 className="m-0 border-b border-gray-100 px-3 py-2 text-[13px] font-medium text-ink">
                 {d === today ? "Today, " : ""}
                 {dayLabel(d)}
@@ -309,7 +309,7 @@ function TeamWeek({
         })}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white md:block">
+      <div className="hidden overflow-x-auto card md:block">
         <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-[12px] text-gray-500">
@@ -338,7 +338,7 @@ function TeamWeek({
                     </div>
                   </th>
                   {days.map((d) => (
-                    <td key={d} className={`px-1.5 py-2 ${d === today ? "bg-ink-soft/40" : ""}`}>
+                    <td key={d} className={`px-1.5 py-2 ${d === today ? "bg-accent-soft/60" : ""}`}>
                       <div className="grid gap-1">
                         {(byDay.get(d) ?? []).map((a) => (
                           <ViewingChip key={a.id} appointment={a} tz={tz} showListing />

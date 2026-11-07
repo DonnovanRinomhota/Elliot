@@ -48,7 +48,7 @@ export function ListingLine({ appointment }: { appointment: Pick<Appointment, "l
 }
 
 const CHIP_TONE: Record<string, string> = {
-  confirmed: "border-ink/15 bg-ink-soft text-ink",
+  confirmed: "border-accent/20 bg-accent-soft text-accent-dark",
   rescheduled: "border-brass/30 bg-brass-soft text-brass-dark",
   completed: "border-gray-200 bg-gray-50 text-gray-600",
   no_show: "border-alert/20 bg-alert-soft text-alert",

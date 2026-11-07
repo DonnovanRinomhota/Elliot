@@ -38,7 +38,7 @@ export default function FolderTabs({
               href={href}
               aria-current={active ? "page" : undefined}
               className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2.5 pt-1 text-[13.5px] no-underline transition-colors ${
-                active ? "border-ink font-medium text-ink" : "border-transparent text-gray-500 hover:text-ink"
+                active ? "border-accent font-medium text-ink" : "border-transparent text-gray-500 hover:text-ink"
               }`}
             >
               {tab.label}

@@ -287,7 +287,7 @@ export default function SequenceEditor({
           type="button"
           onClick={save}
           disabled={saving}
-          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save sequence"}
         </button>

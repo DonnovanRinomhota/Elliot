@@ -82,7 +82,7 @@ export default async function ConversationsPage({
       {visible.length === 0 ? (
         <EmptyState title="No conversations here">Conversations appear as soon as someone writes to Elliot.</EmptyState>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-hidden card">
           <div className="hidden grid-cols-[36px_minmax(0,2fr)_140px_120px_140px] gap-4 border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 md:grid">
             <span>#</span>
             <span>Contact</span>

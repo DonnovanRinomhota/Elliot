@@ -93,7 +93,7 @@ export default async function LeadsPage({
       {visible.length === 0 ? (
         <EmptyState title="No leads here">Leads appear as soon as Elliot qualifies someone in a conversation.</EmptyState>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="overflow-hidden card">
           <div className={`hidden border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 ${LEAD_GRID}`}>
             <span>#</span>
             <span>Contact</span>

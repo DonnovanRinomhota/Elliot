@@ -45,7 +45,7 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
     <button
       onClick={onClick}
       disabled={saving}
-      className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {saving ? "Saving…" : saved ? "Saved" : "Save changes"}
     </button>
@@ -54,7 +54,7 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
 
 function Card({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <section className="mb-6 rounded-lg border border-gray-200 bg-white">
+    <section className="mb-6 card">
       <header className="border-b border-gray-100 px-5 py-4">
         <h2 className="m-0 text-[15px] font-semibold text-ink">{title}</h2>
         <p className="m-0 mt-0.5 text-[13px] text-gray-500">{description}</p>

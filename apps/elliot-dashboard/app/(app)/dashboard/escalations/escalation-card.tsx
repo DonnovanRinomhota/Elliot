@@ -71,7 +71,7 @@ export default function EscalationCard({ escalation }: { escalation: Escalation 
 
   return (
     <li
-      className={`rounded-lg border border-gray-200 bg-white ${isOpen ? "border-l-[3px] border-l-alert" : ""} ${
+      className={`card ${isOpen ? "border-l-[3px] border-l-alert" : ""} ${
         escalation.status === "resolved" ? "opacity-80" : ""
       }`}
     >

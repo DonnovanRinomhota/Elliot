@@ -42,7 +42,7 @@ export default async function PlatformPage() {
         </p>
       )}
 
-      <section aria-label="Summary" className="mb-6 grid grid-cols-2 overflow-hidden rounded-lg border border-gray-200 bg-white sm:grid-cols-4 lg:grid-cols-7">
+      <section aria-label="Summary" className="mb-6 grid grid-cols-2 overflow-hidden card sm:grid-cols-4 lg:grid-cols-7">
         {tiles.map((t, i) => (
           <div key={t.label} className={`px-4 py-4 ${i > 0 ? "border-l border-gray-200" : ""} max-lg:[&:nth-child(n+5)]:border-t max-sm:[&:nth-child(n+3)]:border-t max-sm:[&:nth-child(odd)]:border-l-0`}>
             <div

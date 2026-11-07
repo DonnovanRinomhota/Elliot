@@ -50,7 +50,7 @@ export default function PhotoGallery({ photos, title }: { photos: string[]; titl
               onClick={() => setI(j)}
               aria-label={`Show photo ${j + 1}`}
               aria-current={i === j ? "true" : undefined}
-              className={`h-14 w-20 flex-shrink-0 overflow-hidden rounded border-2 ${i === j ? "border-ink" : "border-transparent opacity-75 hover:opacity-100"}`}
+              className={`h-14 w-20 flex-shrink-0 overflow-hidden rounded border-2 ${i === j ? "border-accent" : "border-transparent opacity-75 hover:opacity-100"}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={resizedPhotoUrl(p, 240)} alt="" loading="lazy" className="h-full w-full object-cover" />

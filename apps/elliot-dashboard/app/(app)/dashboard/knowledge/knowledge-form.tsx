@@ -111,7 +111,7 @@ export default function KnowledgeForm({ tenantSlug: _tenantSlug }: { tenantSlug:
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="card p-5">
       <div className="mb-4">
         <label className="mb-1 block text-[12.5px] font-medium text-gray-700">Title</label>
         <input
@@ -193,7 +193,7 @@ export default function KnowledgeForm({ tenantSlug: _tenantSlug }: { tenantSlug:
       <button
         onClick={handleSubmit}
         disabled={busy || !canSubmit}
-        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {extracting ? "Extracting PDF text…" : busy ? "Ingesting…" : "Add to knowledge base"}
       </button>
