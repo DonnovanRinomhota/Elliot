@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npx --yes tsx --test lib/follow-up-steps.test.ts"
+    "test": "npx --yes tsx --test lib/follow-up-steps.test.ts lib/listings.test.ts lib/platform.test.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.3.0",

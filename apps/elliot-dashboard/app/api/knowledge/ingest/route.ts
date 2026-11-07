@@ -17,6 +17,7 @@
 // NEXT_PUBLIC_N8N_INGEST_WEBHOOK_URL until it's renamed.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentTenantId } from "@/lib/tenant";
 import { callInternalWebhook } from "@/lib/n8n-webhook";
 
 // Ingestion embeds every chunk (Voyage) before n8n responds, so give it the
@@ -59,11 +60,9 @@ export async function POST(request: Request) {
   }
 
   // RLS on tenant_users / tenants scopes both reads to the user's own tenant.
-  const { data: tenantUser } = await supabase
-    .from("tenant_users")
-    .select("tenant_id")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
+  // current_tenant_id(): the user's agency, or the one a platform admin is viewing.
+  const currentTenantId = await getCurrentTenantId(supabase);
+  const tenantUser = currentTenantId ? { tenant_id: currentTenantId } : null;
   const { data: tenant } = tenantUser
     ? await supabase.from("tenants").select("slug").eq("id", tenantUser.tenant_id).maybeSingle()
     : { data: null };

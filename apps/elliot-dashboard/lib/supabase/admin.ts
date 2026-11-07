@@ -3,13 +3,16 @@
 //
 // Uses SUPABASE_SERVICE_ROLE_KEY (no NEXT_PUBLIC_ prefix -- deliberately not
 // exposed to the browser) instead of the anon key. The service role bypasses
-// Row-Level Security, which is required exactly once in this app: creating a
-// brand-new tenant + its first tenant_users row during self-serve signup,
-// before that user has any tenant_id RLS could scope them to yet.
+// Row-Level Security, so it's used only where that's the point, each behind
+// its own check:
+//   - self-serve signup (a new user has no tenant yet),
+//   - the platform control panel and "view as" (ADMIN_EMAILS checked first),
+//   - team invites/removal (caller must be an agency admin; needs auth.admin),
+//   - GET /api/widget/messages (public; returns only team replies for one
+//     conversation that matches the agency slug).
 //
-// Do not reuse this client for anything else. Every other read/write in the
-// dashboard should go through the regular anon-key client (lib/supabase/
-// client.ts or server.ts) so RLS keeps doing its job.
+// Everything else in the dashboard goes through the regular anon-key client
+// (lib/supabase/client.ts or server.ts) so RLS keeps doing its job.
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 export function createAdminClient() {

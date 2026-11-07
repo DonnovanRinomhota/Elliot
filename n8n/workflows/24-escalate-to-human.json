@@ -10,22 +10,28 @@
       "name": "When Executed by Another Workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Defense in depth -- 01's tool schema already constrains reason/priority\n// to an enum, but re-validate here rather than trust the caller blindly,\n// same as every other sub-workflow in this codebase.\nconst input = $input.first().json;\nconst validReasons = ['low_confidence', 'customer_requested_human', 'angry_customer', 'legal_issue', 'refund_requested', 'sensitive_info', 'no_trusted_source', 'action_exceeds_permissions', 'other'];\nconst validPriorities = ['low', 'normal', 'high', 'urgent'];\n\nconst reason = validReasons.includes(input.reason) ? input.reason : 'other';\nconst priority = validPriorities.includes(input.priority) ? input.priority : 'normal';\nconst contextSummary = input.context_summary && String(input.context_summary).trim()\n  ? String(input.context_summary).trim()\n  : 'No summary provided by the agent.';\n\nreturn [{ json: { tenant_id: input.tenant_id, conversation_id: input.conversation_id, reason, priority, context_summary: contextSummary } }];"
+        "jsCode": "// Defense in depth -- 01's tool schema already constrains reason/priority\n// to an enum, but re-validate here rather than trust the caller blindly,\n// same as every other sub-workflow in this codebase.\nconst input = $input.first().json;\nconst validReasons = ['low_confidence', 'customer_requested_human', 'angry_customer', 'legal_issue', 'refund_requested', 'sensitive_info', 'no_trusted_source', 'action_exceeds_permissions', 'hot_lead', 'other'];\nconst validPriorities = ['low', 'normal', 'high', 'urgent'];\n\nconst reason = validReasons.includes(input.reason) ? input.reason : 'other';\nconst priority = validPriorities.includes(input.priority) ? input.priority : 'normal';\nconst contextSummary = input.context_summary && String(input.context_summary).trim()\n  ? String(input.context_summary).trim()\n  : 'No summary provided by the agent.';\n\nreturn [{ json: { tenant_id: input.tenant_id, conversation_id: input.conversation_id, reason, priority, context_summary: contextSummary } }];"
       },
       "id": "3879971a-d96d-49d2-a8b6-dffb971123f8",
       "name": "Validate And Default",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [224, 0]
+      "position": [
+        224,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "select\n  insert_escalation($1, $2, $3, $4, $5) as escalation_id,\n  (select escalation_notify_email from ai_config where tenant_id = $1) as notify_email,\n  (select name from tenants where id = $1) as tenant_name;",
+        "query": "select\n  insert_escalation($1, $2, $3, $4, $5) as escalation_id,\n  escalation_recipients($1, $2) as notify_email,\n  (select name from tenants where id = $1) as tenant_name;",
         "options": {
           "queryReplacement": "={{ [$json.tenant_id, $json.conversation_id, $json.reason, $json.priority, $json.context_summary] }}"
         }
@@ -34,23 +40,37 @@
       "name": "Insert Escalation",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [448, 0],
+      "position": [
+        448,
+        0
+      ],
       "notesInFlow": true,
       "credentials": {
-        "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" }
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
       },
-      "notes": "notify_email and tenant_name pulled in the SAME query as the escalation insert -- one round trip, same lesson as everywhere else (a chained Postgres node here would replace $json with only insert_escalation's scalar return value and lose these)."
+      "notes": "notify_email = escalation_recipients(): the agent who owns this visitor's lead (or the whole team if nobody owns it yet), for everyone who has alerts switched on in Team, plus the agency-wide address from Settings. Comma-separated."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
           "conditions": [
             {
               "id": "cond-has-notify",
               "leftValue": "={{ !!$json.notify_email }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -61,17 +81,23 @@
       "name": "Has Notify Email?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [672, 0]
+      "position": [
+        672,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Same raw RFC 2822 base64url pattern as 15/18/20.\nconst d = $json;\nconst subject = `[Elliot] Escalation needs attention -- ${d.reason} (${d.priority})`;\nconst body =\n  `A conversation for ${d.tenant_name} has been escalated to a human.\\n\\n` +\n  `Reason: ${d.reason}\\n` +\n  `Priority: ${d.priority}\\n` +\n  `Summary: ${d.context_summary}\\n\\n` +\n  `Escalation ID: ${d.escalation_id}\\n` +\n  `Conversation ID: ${$('Validate And Default').item.json.conversation_id}`;\nconst raw =\n  `To: ${d.notify_email}\\r\\n` +\n  `Subject: ${subject}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${body}`;\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nreturn [{ json: { ...d, raw_message: encoded } }];"
+        "jsCode": "// Same raw RFC 2822 base64url pattern as 15/18/20.\n// notify_email may hold several comma-separated addresses (see escalation_recipients()).\nconst DASHBOARD_URL = 'https://elliot-real-estate-five.vercel.app'; // change if the dashboard moves to its own domain\nconst d = $json;\nconst input = $('Validate And Default').item.json;\nconst REASON = {\n  hot_lead: 'Hot lead ready to talk',\n  customer_requested_human: 'Visitor asked for a person',\n  angry_customer: 'Upset visitor',\n  legal_issue: 'Legal question',\n  refund_requested: 'Refund request',\n  sensitive_info: 'Sensitive information shared',\n  low_confidence: 'Elliot was not sure of the answer',\n  no_trusted_source: 'No answer in the knowledge base',\n  action_exceeds_permissions: 'Request Elliot is not allowed to handle',\n  other: 'Needs a person',\n};\nconst label = REASON[input.reason] || 'Needs a person';\nconst link = `${DASHBOARD_URL}/dashboard/conversations/${input.conversation_id}`;\nconst subject = `[Elliot] ${label}${input.priority === 'urgent' || input.priority === 'high' ? ' (' + input.priority + ')' : ''}`;\nconst body =\n  `${label} -- ${d.tenant_name}\\n\\n` +\n  `${input.context_summary}\\n\\n` +\n  `Open the conversation (you can take over the chat from there):\\n${link}\\n`;\nconst raw =\n  `To: ${d.notify_email}\\r\\n` +\n  `Subject: ${subject}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${body}`;\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nreturn [{ json: { ...d, raw_message: encoded } }];"
       },
       "id": "597ead79-46d4-466d-8eef-5f7b2ae405ec",
       "name": "Build Notification Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [896, -96]
+      "position": [
+        896,
+        -96
+      ]
     },
     {
       "parameters": {
@@ -88,7 +114,10 @@
       "name": "Send Notification via Gmail",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, -96],
+      "position": [
+        1120,
+        -96
+      ],
       "notes": "Same known limitation as everywhere else in this codebase: one shared Gmail credential, not dynamic per-tenant. continueOnFail:true -- the escalation row is already saved by this point, so a notification failure never loses the escalation itself, only the push alert (it's still visible on the dashboard).",
       "continueOnFail": true
     },
@@ -100,31 +129,86 @@
       "name": "Return Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1344, 0]
+      "position": [
+        1344,
+        0
+      ]
     }
   ],
   "pinData": {},
   "connections": {
     "When Executed by Another Workflow": {
-      "main": [[{ "node": "Validate And Default", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validate And Default",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validate And Default": {
-      "main": [[{ "node": "Insert Escalation", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Insert Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Insert Escalation": {
-      "main": [[{ "node": "Has Notify Email?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Has Notify Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Notify Email?": {
       "main": [
-        [{ "node": "Build Notification Email", "type": "main", "index": 0 }],
-        [{ "node": "Return Result", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Build Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Build Notification Email": {
-      "main": [[{ "node": "Send Notification via Gmail", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Notification via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Send Notification via Gmail": {
-      "main": [[{ "node": "Return Result", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,

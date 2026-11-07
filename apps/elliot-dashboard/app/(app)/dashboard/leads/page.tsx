@@ -18,14 +18,14 @@ const STATUS_TABS: FolderTab[] = [
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; days?: string };
+  searchParams: { status?: string; days?: string; owner?: string };
 }) {
   const supabase = createClient();
 
   const [{ data: leads, error }, { data: sequences }, { data: runningRuns }] = await Promise.all([
     supabase
       .from("leads")
-      .select("id, tenant_id, status, score, qualification_answers, created_at, contact:contacts(name, email, phone)")
+      .select("id, tenant_id, status, score, qualification_answers, created_at, assigned_to, owner:tenant_users(full_name, email), contact:contacts(name, email, phone)")
       .order("created_at", { ascending: false }),
     // For "Start follow-up": only active sequences can take new leads.
     supabase.from("follow_up_sequences").select("id, name, steps").eq("is_active", true).order("created_at"),
@@ -47,7 +47,11 @@ export default async function LeadsPage({
 
   const days = searchParams.days ? Number(searchParams.days) : null;
   const cutoff = days ? Date.now() - days * 24 * 60 * 60 * 1000 : null;
-  const scoped = cutoff ? (leads ?? []).filter((l: any) => new Date(l.created_at).getTime() >= cutoff) : leads ?? [];
+  const owner = searchParams.owner || null;
+  const byDate = cutoff ? (leads ?? []).filter((l: any) => new Date(l.created_at).getTime() >= cutoff) : leads ?? [];
+  // ?owner= comes from the Team page's "open leads" figure.
+  const scoped = owner ? byDate.filter((l: any) => l.assigned_to === owner && !["CONVERTED", "LOST"].includes(l.status)) : byDate;
+  const ownerRow: any = owner ? (scoped[0] as any)?.owner : null;
 
   const tabs: FolderTab[] = [
     { key: "all", label: "All", count: scoped.length, tone: "neutral" },
@@ -62,7 +66,14 @@ export default async function LeadsPage({
       <PageHeader
         title="Leads"
         description={
-          days ? (
+          owner ? (
+            <>
+              {scoped.length} open lead{scoped.length === 1 ? "" : "s"} owned by {ownerRow?.full_name || ownerRow?.email || "this person"}.{" "}
+              <a href="/dashboard/leads" className="text-ink underline">
+                Show all
+              </a>
+            </>
+          ) : days ? (
             <>
               {scoped.length} lead{scoped.length === 1 ? "" : "s"} from the last {days} days.{" "}
               <a href="/dashboard/leads" className="text-ink underline">
@@ -75,7 +86,7 @@ export default async function LeadsPage({
         }
       />
 
-      <FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/leads" extraParams={days ? { days: String(days) } : {}} />
+      <FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/leads" extraParams={{ ...(days ? { days: String(days) } : {}), ...(owner ? { owner } : {}) }} />
 
       {visible.length === 0 ? (
         <EmptyState title="No leads here">Leads appear as soon as Elliot qualifies someone in a conversation.</EmptyState>

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentTenantId } from "@/lib/tenant";
 import KnowledgeForm from "./knowledge-form";
 import { PageHeader } from "../../../_ui/ui";
 
@@ -11,11 +12,9 @@ export default async function KnowledgePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: tenantUser } = await supabase
-    .from("tenant_users")
-    .select("tenant_id")
-    .eq("auth_user_id", user.id)
-    .single();
+  // current_tenant_id(): the user's agency, or the one a platform admin is viewing.
+  const currentTenantId = await getCurrentTenantId(supabase);
+  const tenantUser = currentTenantId ? { tenant_id: currentTenantId } : null;
 
   if (!tenantUser) {
     return <p className="text-sm text-alert">No tenant found for this account.</p>;

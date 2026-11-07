@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
+import { getAdminView } from "@/lib/tenant";
 import SignOutButton from "./dashboard/sign-out-button";
 import NavLink from "./dashboard/nav-link";
+import ExitViewAs from "./dashboard/exit-view-as";
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -13,7 +15,10 @@ import {
   Settings,
   BookOpen,
   Repeat,
-  PlusCircle,
+  Inbox,
+  Home,
+  UserCog,
+  Building2,
 } from "lucide-react";
 
 // Auth-gated layout for every real dashboard route (/ , /dashboard/*).
@@ -30,15 +35,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
-  const { data: tenantUser } = await supabase
-    .from("tenant_users")
-    .select("tenant_id, email, role")
-    .eq("auth_user_id", user.id)
-    .single();
-
-  const { data: tenant } = tenantUser
-    ? await supabase.from("tenants").select("name").eq("id", tenantUser.tenant_id).single()
-    : { data: null };
+  // RLS returns only the agency this session is looking at: the user's own,
+  // or the one a platform admin chose with "Open their dashboard".
+  const [{ data: tenantUser }, { data: tenant }, adminView] = await Promise.all([
+    supabase.from("tenant_users").select("tenant_id, email, role").eq("auth_user_id", user.id).maybeSingle(),
+    supabase.from("tenants").select("id, name").maybeSingle(),
+    getAdminView(supabase),
+  ]);
 
   // Badge counts -- RLS scopes both to the logged-in user's tenant automatically,
   // same assumption the rest of the dashboard already relies on.
@@ -63,12 +66,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <div className="mt-5">
         <p className="mb-1 px-2.5 text-[12px] text-gray-400">Needs attention</p>
+        <NavLink href="/dashboard/inbox" icon={<Inbox {...navIcon} />} label="Inbox" badge={openEscalations} badgeTone="danger" />
         <NavLink
           href="/dashboard/escalations"
           icon={<AlertTriangle {...navIcon} />}
           label="Escalations"
-          badge={openEscalations}
-          badgeTone="danger"
         />
         <NavLink
           href="/dashboard/approvals"
@@ -85,13 +87,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <NavLink href="/dashboard/appointments" icon={<Calendar {...navIcon} />} label="Appointments" />
         <NavLink href="/dashboard/conversations" icon={<MessageCircle {...navIcon} />} label="Conversations" />
         <NavLink href="/dashboard/follow-ups" icon={<Repeat {...navIcon} />} label="Follow-ups" />
+      </div>
+
+      <div className="mt-5">
+        <p className="mb-1 px-2.5 text-[12px] text-gray-400">Your agency</p>
+        <NavLink href="/dashboard/listings" icon={<Home {...navIcon} />} label="Listings" />
         <NavLink href="/dashboard/knowledge" icon={<BookOpen {...navIcon} />} label="Knowledge base" />
+        <NavLink href="/dashboard/team" icon={<UserCog {...navIcon} />} label="Team" />
       </div>
 
       {isAdmin && (
         <div className="mt-5">
           <p className="mb-1 px-2.5 text-[12px] text-gray-400">Platform</p>
-          <NavLink href="/dashboard/onboarding" icon={<PlusCircle {...navIcon} />} label="New tenant" />
+          <NavLink href="/platform" icon={<Building2 {...navIcon} />} label="Control panel" />
         </div>
       )}
     </>
@@ -149,6 +157,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
 
       <main className="min-w-0 flex-1">
+        {adminView && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brass/25 bg-brass-soft px-4 py-2.5 text-[13px] text-brass-dark md:px-10">
+            <span>
+              You&apos;re viewing <strong className="font-semibold">{tenantName}</strong>&apos;s dashboard as a platform admin. What you change here
+              changes for them.
+            </span>
+            <ExitViewAs />
+          </div>
+        )}
         <div className="mx-auto max-w-[1200px] px-4 py-6 md:px-10 md:py-9">{children}</div>
       </main>
     </div>
