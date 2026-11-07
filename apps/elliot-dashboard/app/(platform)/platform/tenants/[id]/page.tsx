@@ -11,6 +11,7 @@ import { Badge, Panel, formatDate, humanize, timeAgo } from "../../../../_ui/ui"
 import TenantForm from "./tenant-form";
 import ViewAsButton from "./view-as-button";
 import { describeEvent } from "@/lib/platform-events";
+import BackButton from "@/app/_ui/back-button";
 
 export const dynamic = "force-dynamic";
 
@@ -74,9 +75,7 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
 
   return (
     <div>
-      <a href="/platform" className="text-[13px] text-gray-500 no-underline hover:text-ink">
-        Agencies
-      </a>
+      <BackButton fallback="/platform" />
       <div className="mb-6 mt-1 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="m-0 text-[22px] font-semibold tracking-[-0.01em] text-ink">{tenant.name}</h1>

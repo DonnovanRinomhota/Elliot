@@ -27,7 +27,7 @@ export default function StickyHeader({
 
   return (
     <div
-      className={`sticky top-[54px] z-10 -mx-4 bg-[#eef1f6] px-4 md:top-0 md:-mx-10 md:px-10 ${
+      className={`sticky top-[54px] z-10 -mx-4 bg-[#eef1f6] px-4 md:top-0 md:-mx-6 md:px-6 lg:-mx-7 lg:px-7 ${
         tabs
           ? // The tabs' own bottom line is the divider.
             `mb-5 pb-0 ${stuck ? "pt-3" : "pt-0"}`

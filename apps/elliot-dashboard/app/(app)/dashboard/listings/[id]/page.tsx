@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentTenantId } from "@/lib/tenant";
 import { PageHeader, timeAgo } from "../../../../_ui/ui";
 import ListingForm from "../listing-form";
+import BackButton from "@/app/_ui/back-button";
 
 export default async function EditListingPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -13,7 +14,7 @@ export default async function EditListingPage({ params }: { params: { id: string
   if (!listing || !tenantId) notFound();
   return (
     <div>
-      <a href="/dashboard/listings" className="text-[13px] text-gray-500 no-underline hover:text-ink">Listings</a>
+      <BackButton fallback="/dashboard/listings" />
       <PageHeader
         title={listing.title}
         description={

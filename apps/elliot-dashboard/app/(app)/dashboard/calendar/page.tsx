@@ -24,9 +24,24 @@ import { ListingLine, ListingThumb, ViewingChip } from "../appointments/viewing-
 
 const WEEKS_AHEAD = 6;
 
+const STATUS_FILTERS = [
+  { value: "", label: "All except cancelled" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "completed", label: "Completed" },
+  { value: "no_show", label: "No-show" },
+  { value: "rescheduled", label: "Rescheduled" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
 // Week by week: one agent's viewings (their own by default), or the whole
-// team side by side. Cancelled viewings are left out.
-export default async function CalendarPage({ searchParams }: { searchParams: { week?: string; agent?: string } }) {
+// team side by side. Jump to any date, past or future; filter by status or
+// search for a client or property. Cancelled viewings are left out unless
+// asked for.
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: { week?: string; agent?: string; status?: string; q?: string };
+}) {
   const supabase = createClient();
   const {
     data: { user },
@@ -60,6 +75,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
           ? "me"
           : "all";
   const agentId = agent === "me" ? membership!.id : agent;
+  const status = STATUS_FILTERS.some((f) => f.value === searchParams.status) ? searchParams.status || "" : "";
+  const q = (searchParams.q || "").trim().slice(0, 80);
 
   // This week plus the next few, for the "coming weeks" strip.
   const until = addDays(week, 7 * WEEKS_AHEAD);
@@ -67,28 +84,37 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
   let query = supabase
     .from("appointments")
     .select(APPOINTMENT_SELECT)
-    .neq("status", "cancelled")
     .gte("starts_at", bounds.from)
     .lt("starts_at", bounds.to)
     .order("starts_at");
+  query = status ? query.eq("status", status) : query.neq("status", "cancelled");
   if (agentId === "none") query = query.is("agent_id", null);
   else if (agentId !== "all") query = query.eq("agent_id", agentId);
   const { data, error } = await query;
 
+  // Client or property search: name, email, phone, listing title, reference, street or area.
+  const needle = q.toLowerCase();
+  const matches = (a: Appointment) =>
+    !needle ||
+    [a.contact?.name, a.contact?.email, a.contact?.phone, a.listing?.title, a.listing?.reference, a.listing?.address, a.listing?.district, a.listing?.city, a.notes]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(needle));
   const rows = ((data ?? []) as unknown as Appointment[]).filter((a) => {
     const k = dayKey(a.starts_at, tz);
-    return k >= week && k < until;
+    return k >= week && k < until && matches(a);
   });
   const thisWeek = rows.filter((a) => dayKey(a.starts_at, tz) < addDays(week, 7));
   const byDay = groupByDay(thisWeek, tz);
 
   const link = (p: { week?: string; agent?: string }) => {
-    const q = new URLSearchParams();
+    const params = new URLSearchParams();
     const w = p.week ?? week;
-    if (w !== weekStart(today)) q.set("week", w);
+    if (w !== weekStart(today)) params.set("week", w);
     const ag = p.agent ?? agent;
-    if (ag !== (isMember ? "me" : "all")) q.set("agent", ag);
-    const qs = q.toString();
+    if (ag !== (isMember ? "me" : "all")) params.set("agent", ag);
+    if (status) params.set("status", status);
+    if (q) params.set("q", q);
+    const qs = params.toString();
     return `/dashboard/calendar${qs ? `?${qs}` : ""}`;
   };
 
@@ -121,6 +147,37 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
         actions={<AgentSelect options={agentOptions} value={agent} basePath="/dashboard/calendar" label="Show" />}
       />
 
+      {/* Filters: jump to any date, status, client or property. Plain form, works without JavaScript. */}
+      <form action="/dashboard/calendar" className="card mb-4 flex flex-wrap items-end gap-3 px-4 py-3">
+        {agent !== (isMember ? "me" : "all") && <input type="hidden" name="agent" value={agent} />}
+        <label className="grid gap-1 text-[12px] font-medium text-gray-500">
+          Go to date
+          <input type="date" name="week" defaultValue={week} className="h-9 px-3 text-[13px]" />
+        </label>
+        <label className="grid gap-1 text-[12px] font-medium text-gray-500">
+          Status
+          <select name="status" defaultValue={status} className="h-9 px-3 text-[13px]">
+            {STATUS_FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid min-w-[200px] flex-1 gap-1 text-[12px] font-medium text-gray-500">
+          Client or property
+          <input name="q" defaultValue={q} placeholder="Name, phone, street, area or reference" className="h-9 px-3 text-[13px]" />
+        </label>
+        <button type="submit" className={btn.primary}>
+          Apply
+        </button>
+        {(status || q || week !== weekStart(today)) && (
+          <a href={`/dashboard/calendar${agent !== (isMember ? "me" : "all") ? `?agent=${agent}` : ""}`} className={btn.ghost}>
+            Clear
+          </a>
+        )}
+      </form>
+
       {error && <p className="mb-4 text-[13px] text-alert">Couldn&apos;t load viewings: {error.message}</p>}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -139,7 +196,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
           )}
         </div>
         <p className="m-0 text-[13px] text-gray-600">
-          <span className="tabular text-ink">{thisWeek.length}</span> viewing{thisWeek.length === 1 ? "" : "s"} this week
+          <span className="tabular text-ink">{thisWeek.length}</span> {status === "cancelled" ? "cancelled " : ""}viewing{thisWeek.length === 1 ? "" : "s"}{" "}
+          {week === weekStart(today) ? "this week" : week < weekStart(today) ? "that week" : "in this week"}
+          {q && <> matching &ldquo;{q}&rdquo;</>}
           {agent === "all" && thisWeek.some((a) => !a.agent) && (
             <>
               , <span className="font-medium text-brass-dark">{thisWeek.filter((a) => !a.agent).length} without an agent</span>
@@ -156,7 +215,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: { w
       )}
 
       <section className="mt-8" aria-label="Coming weeks">
-        <h2 className="m-0 mb-2 text-[14px] font-semibold text-ink">Coming weeks</h2>
+        <h2 className="m-0 mb-2 text-[14px] font-semibold text-ink">{week === weekStart(today) ? "Coming weeks" : `6 weeks from ${weekLabel(week).replace(/ \d{4}$/, "")}`}</h2>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {weekStarts.map((ws, i) => (
             <a

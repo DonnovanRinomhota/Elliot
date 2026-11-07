@@ -18,7 +18,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
   return (
     <div className="min-h-screen">
       <header className="border-b border-ink-800 bg-ink text-white">
-        <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 md:px-8">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 md:px-8">
           <div className="flex items-center gap-2.5">
             <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-[14px] font-semibold text-ink">
               E
@@ -35,11 +35,11 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             </a>
           </div>
         </div>
-        <div className="mx-auto max-w-[1280px] px-4 md:px-8">
+        <div className="mx-auto max-w-[1600px] px-4 md:px-8">
           <PlatformTabs />
         </div>
       </header>
-      <main className="mx-auto max-w-[1280px] px-4 py-6 md:px-8 md:py-8">{children}</main>
+      <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-8 md:py-8">{children}</main>
     </div>
   );
 }

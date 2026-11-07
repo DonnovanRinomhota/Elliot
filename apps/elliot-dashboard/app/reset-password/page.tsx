@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import PasswordInput from "../_ui/password-input";
 
 // Supabase's browser client has detectSessionInUrl on by default, so when
 // the user arrives here from the emailed recovery link it automatically
@@ -107,23 +108,23 @@ export default function ResetPasswordPage() {
         {ready && !done && (
           <form onSubmit={handleSubmit}>
             <label className="mb-1 block text-[13px] font-medium text-gray-700">New password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              className="mb-4 h-10 w-full px-3"
+              wrapperClassName="mb-4"
+              className="h-10 w-full px-3"
             />
 
             <label className="mb-1 block text-[13px] font-medium text-gray-700">Confirm new password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
-              className="mb-4 h-10 w-full px-3"
+              wrapperClassName="mb-4"
+              className="h-10 w-full px-3"
             />
 
             {error && <p className="mb-3 mt-0 text-[13px] text-alert" role="alert">{error}</p>}
