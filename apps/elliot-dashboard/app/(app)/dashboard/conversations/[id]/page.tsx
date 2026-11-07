@@ -132,7 +132,10 @@ export default async function ConversationDetailPage({ params }: { params: { id:
           {isLiveChat && (
             <>
               {conversation.assigned_human && <AutoRefresh seconds={4} />}
-              <ChatControls conversationId={conversation.id} handledByMe={handledByMe} handlerName={handlerName} canTakeOver={Boolean(me)} />
+              {/* Pinned to the bottom of the screen while the messages scroll. */}
+              <div className="sticky bottom-0 z-10 -mx-2 mt-6 bg-gradient-to-t from-[#f5f6f8] from-70% to-transparent px-2 pb-4 pt-3">
+                <ChatControls conversationId={conversation.id} handledByMe={handledByMe} handlerName={handlerName} canTakeOver={Boolean(me)} />
+              </div>
             </>
           )}
           {!canReplyAsHuman && !isLiveChat && conversation.channel !== "email" && (
