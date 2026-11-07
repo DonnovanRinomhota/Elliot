@@ -1,5 +1,6 @@
-// Listing fields, labels and CSV import parsing. Pure functions, unit tested
-// in lib/listings.test.ts.
+// Listing fields, labels, CSV parsing and number parsing. Pure functions,
+// unit tested in lib/listings.test.ts. Turning a file into listings lives in
+// lib/listings-import.ts.
 
 export const LISTING_STATUSES = ["available", "under_offer", "sold", "let", "withdrawn"] as const;
 export const TRANSACTION_TYPES = ["sale", "rent"] as const;
@@ -155,98 +156,7 @@ export function parseNumber(raw: string | undefined | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const pick = <T extends string>(raw: string, allowed: readonly T[], synonyms: Record<string, T>): T | null => {
-  const k = norm(raw);
-  if (!k) return null;
-  if ((allowed as readonly string[]).includes(k)) return k as T;
-  return synonyms[k] ?? null;
-};
-
-const STATUS_SYNONYMS: Record<string, ListingStatus> = {
-  active: "available", forsale: "available", dostepne: "available", dostępne: "available", aktywna: "available", aktywne: "available",
-  underoffer: "under_offer", reserved: "under_offer", rezerwacja: "under_offer", zarezerwowane: "under_offer",
-  sprzedane: "sold", wynajete: "let", wynajęte: "let", rented: "let", wycofane: "withdrawn", inactive: "withdrawn",
-};
-const TRANSACTION_SYNONYMS: Record<string, TransactionType> = {
-  buy: "sale", sell: "sale", forsale: "sale", sprzedaz: "sale", sprzedaż: "sale",
-  rental: "rent", letting: "rent", forrent: "rent", tolet: "rent", wynajem: "rent", najem: "rent",
-};
-const PROPERTY_SYNONYMS: Record<string, PropertyType> = {
-  flat: "apartment", mieszkanie: "apartment", apartament: "apartment",
-  dom: "house", bungalow: "house", detached: "house", semidetached: "house",
-  land: "plot", dzialka: "plot", działka: "plot",
-  office: "commercial", shop: "commercial", lokal: "commercial", lokaluzytkowy: "commercial", biuro: "commercial",
-  pokoj: "room", pokój: "room",
-};
-
-export type ParsedRow = { line: number; listing: ListingInput | null; errors: string[] };
-
-export function parseListingsCsv(text: string): { rows: ParsedRow[]; missingTitle: boolean; mapped: string[] } {
-  const table = parseCsv(text);
-  if (table.length === 0) return { rows: [], missingTitle: true, mapped: [] };
-  const map = mapHeaders(table[0]);
-  const cell = (r: string[], f: keyof ListingInput) => {
-    const i = map[f];
-    return i === undefined ? "" : (r[i] ?? "").trim();
-  };
-
-  const rows: ParsedRow[] = table.slice(1).map((r, idx) => {
-    const errors: string[] = [];
-    const title = cell(r, "title");
-    if (!title) errors.push("Missing title");
-
-    const statusRaw = cell(r, "status");
-    const status = statusRaw ? pick(statusRaw, LISTING_STATUSES, STATUS_SYNONYMS) : "available";
-    if (!status) errors.push(`Unknown status "${statusRaw}"`);
-
-    const txRaw = cell(r, "transaction_type");
-    const transaction_type = txRaw ? pick(txRaw, TRANSACTION_TYPES, TRANSACTION_SYNONYMS) : "sale";
-    if (!transaction_type) errors.push(`Unknown sale/rent value "${txRaw}"`);
-
-    const ptRaw = cell(r, "property_type");
-    const property_type = ptRaw ? pick(ptRaw, PROPERTY_TYPES, PROPERTY_SYNONYMS) ?? "other" : "apartment";
-
-    const num = (f: keyof ListingInput, label: string, integer = false) => {
-      const raw = cell(r, f);
-      if (!raw) return null;
-      const n = parseNumber(raw);
-      if (n == null) {
-        errors.push(`${label} "${raw}" is not a number`);
-        return null;
-      }
-      return integer ? Math.round(n) : n;
-    };
-
-    const listing: ListingInput = {
-      reference: cell(r, "reference") || null,
-      title,
-      status: status ?? "available",
-      transaction_type: transaction_type ?? "sale",
-      property_type,
-      price: num("price", "Price"),
-      currency: (cell(r, "currency") || "PLN").toUpperCase().replace("ZŁ", "PLN").replace("ZL", "PLN"),
-      city: cell(r, "city") || null,
-      district: cell(r, "district") || null,
-      address: cell(r, "address") || null,
-      area_m2: num("area_m2", "Area"),
-      rooms: num("rooms", "Rooms", true),
-      bedrooms: num("bedrooms", "Bedrooms", true),
-      bathrooms: num("bathrooms", "Bathrooms", true),
-      floor: num("floor", "Floor", true),
-      description: cell(r, "description") || null,
-      features: cell(r, "features")
-        .split(/[|,;]/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-      url: cell(r, "url") || null,
-      image_url: cell(r, "image_url") || null,
-    };
-    return { line: idx + 2, listing: errors.length ? null : listing, errors };
-  });
-
-  return { rows, missingTitle: map.title === undefined, mapped: Object.keys(map) };
-}
-
 export const CSV_TEMPLATE =
-  "reference,title,status,transaction,property_type,price,currency,city,district,address,area_m2,rooms,bedrooms,bathrooms,floor,features,url,description\n" +
-  'W-101,2-room flat with balcony,available,sale,apartment,820000,PLN,Warszawa,Mokotów,ul. Puławska 10,48,2,1,1,3,"balcony|lift",https://example.com/w-101,"Bright flat near the metro."\n';
+  "reference,title,status,transaction,property_type,price,currency,city,district,address,area_m2,rooms,bedrooms,bathrooms,floor,available_from,features,url,description\n" +
+  'W-101,2-room flat with balcony,available,sale,apartment,820000,PLN,Warszawa,Mokotów,ul. Puławska 10,48,2,1,1,3,,"balcony|lift",https://example.com/w-101,"Bright flat near the metro."\n' +
+  'R-204,Single room in a shared flat,available,rent,room,1700,PLN,Warszawa,Mokotów,ul. Batorego 29,12,1,1,,2,2026-12-01,"balcony",https://example.com/r-204,"Room in a 4-room flat, 5 minutes from Pole Mokotowskie metro. Bills included."\n';

@@ -210,7 +210,8 @@ declare r jsonb;
 begin
   r := import_listings('[{"reference":"A-1","title":"2-room flat, renovated","price":830000,"city":"Warszawa","district":"Mokotów","rooms":2,"features":["balcony","lift"]},
                          {"title":"New house","property_type":"house","price":1900000,"city":"Piaseczno"}]');
-  if r <> '{"inserted": 1, "updated": 1}'::jsonb then raise exception 'import result %', r; end if;
+  -- (0028 added a "withdrawn" count to the result, so compare the fields.)
+  if (r->>'inserted')::int <> 1 or (r->>'updated')::int <> 1 then raise exception 'import result %', r; end if;
   if (select price from listings where reference = 'A-1') <> 830000 then raise exception 'import did not update A-1'; end if;
   if (select count(*) from listings where title = 'New house' and tenant_id = 'aaaaaaaa-0000-0000-0000-000000000001') <> 1 then
     raise exception 'import did not insert into own agency';

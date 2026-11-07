@@ -32,7 +32,7 @@ export default async function ListingsPage({
   let query = supabase
     .from("listings")
     .select(
-      "id, reference, title, status, transaction_type, property_type, price, currency, city, district, area_m2, rooms, times_suggested, last_suggested_at, updated_at"
+      "id, reference, title, status, transaction_type, property_type, price, currency, city, district, area_m2, rooms, available_from, times_suggested, last_suggested_at, updated_at"
     )
     .order("updated_at", { ascending: false })
     .limit(500);
@@ -48,6 +48,7 @@ export default async function ListingsPage({
   ]);
 
   const filtered = Boolean(status || type || q);
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div>
@@ -147,6 +148,11 @@ export default async function ListingsPage({
                   </td>
                   <td className="px-4 py-3">
                     <Badge tone={STATUS_TONE[l.status as ListingStatus]}>{STATUS_LABEL[l.status as ListingStatus]}</Badge>
+                    {l.status === "available" && l.available_from && l.available_from > today && (
+                      <div className="mt-0.5 text-[12px] text-gray-500">
+                        from {new Date(`${l.available_from}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
+                      </div>
+                    )}
                   </td>
                   <td className="tabular px-4 py-3 text-right">
                     <span className="text-ink">{l.times_suggested}</span>
