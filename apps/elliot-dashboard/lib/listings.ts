@@ -49,6 +49,18 @@ export type ListingInput = {
   image_url: string | null;
 };
 
+/**
+ * Where a client can see a property: the agency's own page for it when it has
+ * one, otherwise Elliot's public property page with the photos (/p/<id>). A
+ * Google Drive or Dropbox folder isn't a property page, so it gets ours.
+ * Workflows 01 and 12 use the same rule when Elliot sends links.
+ */
+export function propertyLink(id: string, url: string | null | undefined, base = ""): string {
+  const own = (url || "").trim();
+  if (/^https?:\/\//i.test(own) && !/drive\.google\.com|dropbox\.com/i.test(own)) return own;
+  return `${base.replace(/\/$/, "")}/p/${id}`;
+}
+
 export function formatPrice(price: number | string | null, currency: string, transaction: string): string {
   if (price == null || price === "") return "Price on request";
   const n = Number(price);
