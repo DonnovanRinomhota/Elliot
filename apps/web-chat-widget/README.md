@@ -21,7 +21,7 @@ A client adds one line to their own site:
 
 ```html
 <script
-  src="https://elliot-real-estate-five.vercel.app/widget.js"
+  src="https://app.getelliot.eu/widget.js"
   data-tenant="their-tenant-slug"
   async
 ></script>

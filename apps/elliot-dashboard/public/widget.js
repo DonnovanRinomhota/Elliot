@@ -2,7 +2,7 @@
  * Elliot embeddable chat widget.
  *
  * Usage (on a client's own website):
- *   <script src="https://elliot-real-estate-five.vercel.app/widget.js" data-tenant="acme-realty" async></script>
+ *   <script src="https://app.getelliot.eu/widget.js" data-tenant="acme-realty" async></script>
  *
  * Optional data attributes on the same <script> tag:
  *   data-webhook-url  -- override the chat webhook endpoint (defaults to production)

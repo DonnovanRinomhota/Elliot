@@ -53,7 +53,7 @@ function test(name, fn) {
 const wf01 = load('01-main-ai-agent.json');
 const wf12 = load('12-book-appointment.json');
 const wf24 = load('24-escalate-to-human.json');
-const DASH = 'https://elliot-real-estate-five.vercel.app';
+const DASH = 'https://app.getelliot.eu';
 
 const prompt = (channel = 'chat_widget') =>
   run(nodeOf(wf01, 'Build Claude Request').parameters.jsCode, {
@@ -119,7 +119,7 @@ test('01: Elliot hears whether the confirmation email went out, with the propert
     success: true, appointment_id: 'a1', starts_at: 's', ends_at: 'e', status: 'confirmed',
     listing_title: 'Studio', listing_address: 'Płochocińska 16A/72', listing_link: `${DASH}/p/L1`, confirmation_sent_to: 'don@x.pl',
   });
-  assert.match(sent, /Property link: https:\/\/elliot-real-estate-five\.vercel\.app\/p\/L1\./);
+  assert.match(sent, /Property link: https:\/\/app\.getelliot\.eu\/p\/L1\./);
   assert.match(sent, /A confirmation email was sent to don@x\.pl\./);
   const none = resultText('book_appointment', { success: true, appointment_id: 'a1', starts_at: 's', ends_at: 'e', status: 'confirmed' });
   assert.match(none, /No confirmation email was sent \(no email address on file\)\. Do not say one is coming\./);
@@ -154,7 +154,7 @@ test('12: the conversation and the listing\'s own page are looked up and stored'
     nodes: { 'When Executed by Another Workflow': { starts_at: 's', ends_at: 'e' } },
   }));
   assert.match(ev.description, /Client phone: \+48601/);
-  assert.match(ev.description, /Booked by Elliot on WhatsApp: https:\/\/elliot-real-estate-five\.vercel\.app\/dashboard\/conversations\/conv/);
+  assert.match(ev.description, /Booked by Elliot on WhatsApp: https:\/\/app\.getelliot\.eu\/dashboard\/conversations\/conv/);
 
   const out = run(nodeOf(wf12, 'Format Results').parameters.jsCode, {
     json: { id: 'a1', starts_at: 's', ends_at: 'e', status: 'confirmed', listing_id: 'L1' },
@@ -202,7 +202,7 @@ test('12: a confirmation email goes to the client when there is an email; the bo
   assert.match(m.body, /2200 PLN \/ month · 27\.5 m² · 1 room/);
   assert.match(m.body, /Address: {2}Płochocińska 16A\/72, Białołęka, Warszawa/);
   assert.match(m.body, /Agent: {4}Ola Nowak/);
-  assert.match(m.body, /Photos and details: https:\/\/elliot-real-estate-five\.vercel\.app\/p\/L1/);
+  assert.match(m.body, /Photos and details: https:\/\/app\.getelliot\.eu\/p\/L1/);
   assert.match(m.body, /Dzień dobry Don,/);
   assert.match(m.body, /Termin: {3}środa, 11 listopada 2026, 14:00–15:00/);
   assert.match(m.body, /Zdjęcia i szczegóły: https/);
