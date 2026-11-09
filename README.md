@@ -6,7 +6,7 @@
 
 ## Live links
 
-- **Dashboard (production):** https://elliot-real-estate-five.vercel.app
+- **Dashboard (production):** https://app.getelliot.eu
 - **Vercel project:** https://vercel.com/elliot-1b82/elliot-real-estate — deployments, env vars, build logs
 - **GitHub repo:** https://github.com/DonnovanRinomhota/Elliot
 - **n8n instance:** https://makodevops.app.n8n.cloud — workflow editor, executions, credentials

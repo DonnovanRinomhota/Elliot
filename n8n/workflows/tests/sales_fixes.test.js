@@ -43,7 +43,7 @@ function test(name, fn) {
 
 const wf01 = load('01-main-ai-agent.json');
 const wf12 = load('12-book-appointment.json');
-const DASH = 'https://elliot-real-estate-five.vercel.app';
+const DASH = 'https://app.getelliot.eu';
 
 const prompt = (visitor, channel = 'chat_widget') =>
   run(nodeOf(wf01, 'Build Claude Request').parameters.jsCode, {
