@@ -116,7 +116,7 @@ test('10: lead capture saves the contact through the shared function and links t
   assert.deepStrictEqual(p, ['t', 'Anna', 'a@x.pl', '', '', 'chat_widget', 'conv']);
 });
 
-test('16: the email sender\'s display name is saved and passed to the draft', () => {
+test('16: the email sender\'s display name is saved', () => {
   const wf = load('16-email-inbound-trigger.json');
   const out = run(nodeOf(wf, 'Extract Email Fields').parameters.jsCode, {
     json: { from: { value: [{ address: 'anna@x.pl', name: ' Anna Kowalska ' }] }, to: { value: [{ address: 'office@agency.pl' }] }, subject: 'Flat', text: 'Hello', id: 'm1', threadId: 't1' },
@@ -132,9 +132,7 @@ test('16: the email sender\'s display name is saved and passed to the draft', ()
     nodes: { 'Lookup Tenant by Mailbox': { tenant_id: 't' }, 'Extract Email Fields': { from_email: 'anna@x.pl', from_name: 'Anna Kowalska' } },
   });
   assert.deepStrictEqual(p, ['t', 'anna@x.pl', 'Anna Kowalska']);
-  const draft = nodeOf(wf, 'Execute: Draft Email Reply').parameters.workflowInputs.value.contact_name;
-  assert.strictEqual(expr(draft, { nodes: { 'Upsert Contact': { id: 'c', name: 'Anna' } } }), 'Anna');
-  assert.strictEqual(expr(draft, { nodes: { 'Upsert Contact': { id: 'c', name: null } } }), '');
+  // 0035: emails go to Elliot (01) instead of a draft; see email_instant.test.js.
 });
 
 test('25: WhatsApp contacts are matched by phone in any format; saved with a +', () => {

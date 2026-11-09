@@ -55,6 +55,8 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   // Website chat and WhatsApp: a person can take over live (0027 + the
   // widget's polling; WhatsApp replies go out through workflow 32).
   const isLiveChat = conversation.channel === "chat_widget" || conversation.channel === "whatsapp";
+  // Email (0035): Elliot answers emails itself, so the team can pause it here too.
+  const isAutoEmail = conversation.channel === "email";
   const handler = conversation.handler as unknown as { full_name: string | null; email: string } | null;
   const handledByMe = Boolean(me && conversation.assigned_human === me.id);
   const handlerName = conversation.assigned_human && !handledByMe ? handler?.full_name || handler?.email?.split("@")[0] || "A colleague" : null;
@@ -128,6 +130,17 @@ export default async function ConversationDetailPage({ params }: { params: { id:
             )}
           </Panel>
 
+          {isAutoEmail && (
+            <div className="mt-6">
+              <ChatControls
+                conversationId={conversation.id}
+                handledByMe={handledByMe}
+                handlerName={handlerName}
+                canTakeOver={Boolean(me)}
+                channel="email"
+              />
+            </div>
+          )}
           {canReplyAsHuman && (
             <ReplyForm conversationId={conversation.id} contactId={contact!.id} toEmail={contact!.email!} defaultSubject="" />
           )}

@@ -23,7 +23,7 @@
       "type": "n8n-nodes-base.gmailTrigger",
       "typeVersion": 1.2,
       "position": [
-        -1104,
+        -1600,
         64
       ],
       "credentials": {
@@ -36,44 +36,31 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extracts the fields the rest of the Phase 7 chain needs.\n// CONFIRMED real shape (via live test): n8n's Gmail Trigger here returns a\n// pre-parsed email object (MIME-parsed), not the raw Gmail API payload.headers/parts\n// structure originally assumed. Real fields: text, html, subject, from.value[0].address,\n// to.value[0].address, id, threadId.\nconst msg = $json;\n\nconst fromEmail = (msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].address) || '';\n// Display name from the From header (\"Anna Kowalska <anna@...>\"), when there is one.\nconst fromName = ((msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].name) || '').trim();\nconst toEmail = (msg.to && msg.to.value && msg.to.value[0] && msg.to.value[0].address) || '';\nconst subject = msg.subject || '';\n\n// Prefer plain text; fall back to a crude HTML strip if only html is present.\nlet body = msg.text || '';\nif (!body && msg.html) {\n  body = msg.html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n}\n\nconst gmailMessageId = msg.id || msg.messageId || '';\nconst gmailThreadId = msg.threadId || gmailMessageId;\n\nreturn [{\n  json: {\n    gmail_message_id: gmailMessageId,\n    gmail_thread_id: gmailThreadId,\n    from_email: fromEmail,\n    from_name: fromName,\n    to_email: toEmail,\n    subject,\n    body\n  }\n}];"
+        "jsCode": "// n8n's Gmail Trigger (simple: false) gives a parsed email: text, html,\n// subject, from / to / cc .value[], id (Gmail's id), threadId, messageId\n// (the email's own Message-ID, used to thread our reply) and headers.\n// 0035: every recipient is checked against the agency's mailbox (not just\n// the first \"To\"), automatic emails are skipped (no-reply senders,\n// newsletters, out-of-office), and only the new part of a reply goes to\n// Elliot -- not the whole quoted conversation underneath.\nconst msg = $json;\nconst addrs = (f) => ((f && f.value) || []).map((v) => String(v.address || '').trim().toLowerCase()).filter(Boolean);\nconst fromEmail = addrs(msg.from)[0] || '';\nconst fromName = String((msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].name) || '').trim();\nconst recipients = [...new Set([...addrs(msg.to), ...addrs(msg.cc), ...addrs(msg.bcc)])];\n\nfunction header(name) {\n  const h = msg.headers;\n  let v = '';\n  try {\n    if (h && typeof h.get === 'function') v = h.get(name);\n    else if (h) v = h[name] ?? h[name.toLowerCase()];\n  } catch (e) { v = ''; }\n  if (!v && Array.isArray(msg.headerLines)) {\n    const line = msg.headerLines.find((l) => String(l.key || '').toLowerCase() === name.toLowerCase());\n    if (line) v = String(line.line || '').replace(/^[^:]*:\\s*/, '');\n  }\n  if (v == null) return '';\n  return typeof v === 'object' ? (v.value || v.text || JSON.stringify(v)) : String(v);\n}\n\nlet text = String(msg.text || '');\nif (!text.trim() && msg.html) {\n  text = String(msg.html)\n    .replace(/<(br|\\/p|\\/div|\\/li|\\/tr)\\b[^>]*>/gi, '\\n')\n    .replace(/<[^>]*>/g, ' ')\n    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\")\n    .replace(/[ \\t]+/g, ' ');\n}\ntext = text.replace(/\\r\\n/g, '\\n');\n// Only the new part of a reply: cut at \"On ... wrote:\" / \"W dniu ... pisze:\" /\n// \"-----Original Message-----\", and drop quoted lines.\nconst cut = text.search(/\\n[ \\t]*(On\\s[^\\n]{0,200}(\\n[^\\n]{0,200})?\\swrote:|W dniu\\s[^\\n]{0,200}(\\n[^\\n]{0,200})?\\s(pisze|napisał\\(a\\)|napisała|napisał):|-{2,}\\s*(Original Message|Wiadomość oryginalna|Forwarded message))/i);\nif (cut > 0) text = text.slice(0, cut);\nconst body = text.split('\\n').filter((l) => !/^\\s*>/.test(l)).join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim().slice(0, 4000);\nconst subject = String(msg.subject || '').trim();\n\nconst autoSubmitted = header('auto-submitted').toLowerCase();\nconst precedence = header('precedence').toLowerCase();\nlet skip = null;\nif (!fromEmail) skip = 'no_sender';\nelse if (/^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|bounce)/i.test(fromEmail.split('@')[0])) skip = 'automatic_sender';\nelse if (autoSubmitted && autoSubmitted !== 'no') skip = 'auto_submitted';\nelse if (/bulk|list|junk/.test(precedence) || header('list-unsubscribe') || header('list-id')) skip = 'mailing_list';\nelse if (!body && !subject) skip = 'empty';\n\nconst rfcId = String(msg.messageId || '').trim();\nreturn [{\n  json: {\n    skip: !!skip,\n    reason: skip,\n    gmail_message_id: msg.id || '',\n    gmail_thread_id: msg.threadId || msg.id || '',\n    rfc_message_id: /^<.+>$/.test(rfcId) ? rfcId : (rfcId ? `<${rfcId}>` : ''),\n    from_email: fromEmail,\n    from_name: fromName,\n    to_email: recipients[0] || '',\n    recipients,\n    subject,\n    body,\n    // What Elliot reads: the subject is often the whole question.\n    message: subject && !/^(re|odp|fw|fwd|pd)\\s*:/i.test(subject) ? `Subject: ${subject}\\n\\n${body || subject}` : (body || subject)\n  }\n}];"
       },
       "id": "120df9b8-0e94-4ecf-9da5-6ffc002ba5ad",
       "name": "Extract Email Fields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -880,
+        -1380,
         64
       ]
     },
     {
       "parameters": {
-        "operation": "select",
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public",
-          "cachedResultName": "public",
-          "cachedResultUrl": ""
-        },
-        "table": "ai_config",
-        "where": {
-          "values": [
-            {
-              "column": "connected_gmail_address",
-              "value": "={{ $json.to_email }}"
-            }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "-- 0035: the agency whose connected Gmail address is ANY of the recipients\n-- (To, Cc, Bcc), ignoring case -- not only the first \"To\". Always outputs, so\n-- an email for an unknown mailbox reaches 'Log Unmatched Mailbox'.\nselect ac.tenant_id, ac.connected_gmail_address, t.slug as tenant_slug, t.name as tenant_name\nfrom ai_config ac\njoin tenants t on t.id = ac.tenant_id and t.status = 'active'\nwhere lower(btrim(ac.connected_gmail_address)) = any($1::text[])\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.recipients || []).replace(/^\\[/, '{').replace(/\\]$/, '}') ] }}"
+        }
       },
       "id": "f82e125d-7e80-472e-b9c8-a9e50ced705d",
       "name": "Lookup Tenant by Mailbox",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -656,
+        -940,
         64
       ],
       "credentials": {
@@ -82,7 +69,8 @@
           "name": "Elliot Postgres (service role)"
         }
       },
-      "notes": "TODO: confirm the real column name/table storing each tenant's connected Gmail address -- assumed ai_config.connected_gmail_address here. Add it via migration if it doesn't exist yet. This is what lets one shared trigger workflow serve every tenant without cloning."
+      "notes": "TODO: confirm the real column name/table storing each tenant's connected Gmail address -- assumed ai_config.connected_gmail_address here. Add it via migration if it doesn't exist yet. This is what lets one shared trigger workflow serve every tenant without cloning.",
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -90,16 +78,17 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.tenant_id }}",
-              "rightValue": "",
+              "id": "cond-tenant-found",
+              "leftValue": "={{ !!$json.tenant_id }}",
+              "rightValue": true,
               "operator": {
-                "type": "string",
-                "operation": "notEmpty"
+                "type": "boolean",
+                "operation": "equals"
               }
             }
           ],
@@ -110,9 +99,9 @@
       "id": "601a7d29-31b0-43e4-9070-922928ceb6ac",
       "name": "If Tenant Found",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [
-        -448,
+        -720,
         64
       ],
       "notes": "No-match branch should log/alert rather than silently drop -- TODO: wire the false branch to a simple logging step (or Slack alert) so misrouted mail doesn't vanish silently."
@@ -123,16 +112,17 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
-              "leftValue": "={{ $('Extract Email Fields').first().json.from_email }}",
-              "rightValue": "={{ $json.connected_gmail_address }}",
+              "id": "cond-not-self",
+              "leftValue": "={{ $('Extract Email Fields').first().json.from_email !== String($json.connected_gmail_address || '').trim().toLowerCase() }}",
+              "rightValue": true,
               "operator": {
-                "type": "string",
-                "operation": "notEquals"
+                "type": "boolean",
+                "operation": "equals"
               }
             }
           ],
@@ -143,9 +133,9 @@
       "id": "bdc03023-3a3a-4609-b8cb-c009b2dc8536",
       "name": "If Not Self-Sent",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [
-        -224,
+        -500,
         64
       ],
       "notes": "Loop-prevention: skips processing if the sender IS the tenant's own connected mailbox (e.g. Elliot's own sent replies landing back in a shared/CC'd inbox). TODO: verify this is sufficient in your actual Gmail setup -- if the mailbox is a shared alias, you may need a header-based marker instead (e.g. a custom X-Elliot-Sent header stamped by 15) for a more reliable check."
@@ -163,8 +153,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        -16,
-        -32
+        -60,
+        64
       ],
       "credentials": {
         "postgres": {
@@ -187,8 +177,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        32,
-        224
+        160,
+        64
       ],
       "credentials": {
         "postgres": {
@@ -200,356 +190,368 @@
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "d8BdZ5LChDnL52Bg",
-          "mode": "id",
-          "cachedResultUrl": "/workflow/d8BdZ5LChDnL52Bg"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "tenant_id": "={{ $('Lookup Tenant by Mailbox').first().json.tenant_id }}",
-            "from_email": "={{ $('Extract Email Fields').first().json.from_email }}",
-            "subject": "={{ $('Extract Email Fields').first().json.subject }}",
-            "body": "={{ $('Extract Email Fields').first().json.body }}",
-            "gmail_thread_id": "={{ $('Extract Email Fields').first().json.gmail_thread_id }}",
-            "gmail_message_id": "={{ $('Extract Email Fields').first().json.gmail_message_id }}"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
           },
-          "matchingColumns": [],
-          "schema": [
+          "conditions": [
             {
-              "id": "tenant_id",
-              "displayName": "tenant_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "from_email",
-              "displayName": "from_email",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "subject",
-              "displayName": "subject",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "body",
-              "displayName": "body",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "gmail_thread_id",
-              "displayName": "gmail_thread_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
-            },
-            {
-              "id": "gmail_message_id",
-              "displayName": "gmail_message_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string"
+              "id": "cond-should-process",
+              "leftValue": "={{ $json.skip === false }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
+          "combinator": "and"
         },
         "options": {}
       },
-      "id": "a407880a-152a-4809-9b43-f7d1986f9128",
-      "name": "Execute: Classify Email",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
+      "id": "68cd620d-83c7-5131-b9df-b7b4ffe4f570",
+      "name": "Should Process?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
       "position": [
-        224,
+        -1160,
         64
-      ],
-      "notes": "TODO: set real workflow ID for 13 - Classify Email."
+      ]
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "JQapNVb4y1mB8EjA",
-          "mode": "id",
-          "cachedResultUrl": "/workflow/JQapNVb4y1mB8EjA"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "tenant_id": "={{ $('Lookup Tenant by Mailbox').first().json.tenant_id }}",
-            "conversation_id": "={{ $('Get or Create Conversation (Email)').first()?.json?.id || null }}",
-            "contact_id": "={{ $('Upsert Contact').first()?.json?.id || null }}",
-            "from_email": "={{ $('Extract Email Fields').first().json.from_email }}",
-            "subject": "={{ $('Extract Email Fields').first().json.subject }}",
-            "body": "={{ $('Extract Email Fields').first().json.body }}",
-            "gmail_thread_id": "={{ $('Extract Email Fields').first().json.gmail_thread_id }}",
-            "gmail_message_id": "={{ $('Extract Email Fields').first().json.gmail_message_id }}",
-            "category": "={{ $json.category }}",
-            "confidence": "={{ $json.confidence }}",
-            "contact_name": "={{ $('Upsert Contact').first()?.json?.name || '' }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "tenant_id",
-              "displayName": "tenant_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "conversation_id",
-              "displayName": "conversation_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "contact_id",
-              "displayName": "contact_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "from_email",
-              "displayName": "from_email",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "subject",
-              "displayName": "subject",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "body",
-              "displayName": "body",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "gmail_thread_id",
-              "displayName": "gmail_thread_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "gmail_message_id",
-              "displayName": "gmail_message_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "category",
-              "displayName": "category",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            },
-            {
-              "id": "confidence",
-              "displayName": "confidence",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "number",
-              "removed": false
-            },
-            {
-              "id": "contact_name",
-              "displayName": "contact_name",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "-- An email reached Gmail but no agency has any of its recipients as its\n-- connected address (Settings -> Gmail address). Logged, not silently dropped.\ninsert into audit_log (tenant_id, actor_type, actor_id, event_type, details)\nvalues (null, 'system', 'workflow_16', 'email_unmatched_mailbox', $1::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ recipients: $('Extract Email Fields').first().json.recipients, from: $('Extract Email Fields').first().json.from_email, subject: $('Extract Email Fields').first().json.subject }) ] }}"
+        }
       },
-      "id": "94fc6012-9ea6-4d7b-8071-fd84cbb5357c",
-      "name": "Execute: Draft Email Reply",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
-      "position": [
-        448,
-        64
-      ],
-      "notes": "TODO: set real workflow ID for 14 - Draft Email Reply."
-    },
-    {
-      "parameters": {
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public",
-          "cachedResultName": "public",
-          "cachedResultUrl": ""
-        },
-        "table": {
-          "__rl": true,
-          "value": "messages",
-          "mode": "list",
-          "cachedResultName": "messages"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "tenant_id": "={{ $('Lookup Tenant by Mailbox').first().json.tenant_id }}",
-            "conversation_id": "={{ $json.id }}",
-            "role": "user",
-            "content": "={{ $('Extract Email Fields').first().json.body }}"
-          },
-          "matchingColumns": [
-            "id"
-          ],
-          "schema": [
-            {
-              "id": "id",
-              "displayName": "id",
-              "required": false,
-              "defaultMatch": true,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "tenant_id",
-              "displayName": "tenant_id",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "conversation_id",
-              "displayName": "conversation_id",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "role",
-              "displayName": "role",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "content",
-              "displayName": "content",
-              "required": true,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "tool_calls",
-              "displayName": "tool_calls",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "object",
-              "canBeUsedToMatch": true,
-              "removed": false
-            },
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "dateTime",
-              "canBeUsedToMatch": true,
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
+      "id": "95507fb0-ad3b-5f6e-b0ab-2e3c13232b02",
+      "name": "Log Unmatched Mailbox",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
+      "typeVersion": 2.5,
       "position": [
-        256,
-        224
+        -500,
+        280
       ],
-      "id": "67912c35-ef07-4f1b-b144-eaeaf8d382c9",
-      "name": "Insert Inbound Message",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Each email is answered once, even if Gmail hands it over again (0032/0035).\nselect claim_whatsapp_message($1, 'gmail:' || $2) as is_new;",
+        "options": {
+          "queryReplacement": "={{ [ $('Lookup Tenant by Mailbox').first().json.tenant_id, $('Extract Email Fields').first().json.gmail_message_id ] }}"
+        }
+      },
+      "id": "fc1bb7dc-365b-525c-995f-bf1d89531dad",
+      "name": "Claim Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -280,
+        64
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-is-new",
+              "leftValue": "={{ $json.is_new === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cbf6b63a-94b6-5fef-8d46-362ff0d1bbed",
+      "name": "Is New Message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -170,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Hands the email to Elliot (workflow 01, the same agent as WhatsApp and the\n// website chat): answers from the knowledge base, listings with links,\n// viewings booked with a confirmation email, hand-over to the team.\n// Elliot's address: worked out from this n8n's own address, or pasted below.\nconst ELLIOT_CHAT_WEBHOOK_URL = 'PASTE_ELLIOT_CHAT_WEBHOOK_URL_HERE';\n\nfunction setting(name, pasted) {\n  try { if ($vars && $vars[name]) return String($vars[name]); } catch (e) {}\n  try { if ($env && $env[name]) return String($env[name]); } catch (e) {}\n  return String(pasted || '').startsWith('PASTE_') ? '' : String(pasted || '');\n}\n\nconst f = $('Extract Email Fields').first().json;\nconst tenant = $('Lookup Tenant by Mailbox').first().json;\nconst contact = $('Upsert Contact').first().json || {};\nconst conversationId = $input.first().json.id;\n\nlet url = setting('ELLIOT_CHAT_WEBHOOK_URL', ELLIOT_CHAT_WEBHOOK_URL);\nif (!url) {\n  let resume = '';\n  try { resume = String($execution.resumeUrl || ''); } catch (e) {}\n  const at = resume.indexOf('/webhook-waiting/');\n  if (at > 0) url = resume.slice(0, at) + '/webhook/chat';\n}\nif (!url) {\n  throw new Error(\"Can't work out Elliot's address: paste the chat webhook URL (workflow 01's Production URL) into ELLIOT_CHAT_WEBHOOK_URL in this node.\");\n}\n\nreturn [{ json: {\n  chat_url: url,\n  request: {\n    tenant_slug: tenant.tenant_slug,\n    message: f.message,\n    conversation_id: conversationId,\n    channel: 'email',\n    contact: { name: contact.name || f.from_name || null, email: f.from_email }\n  }\n} }];"
+      },
+      "id": "bb9b09fb-656e-5128-8d95-1d92d4005f91",
+      "name": "Build Elliot Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.chat_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "df8bcf73-d99d-5292-9ee8-b658eec18025",
+      "name": "Ask Elliot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        64
+      ],
+      "notes": "Calls workflow 01 (Elliot) at its chat webhook. Workflow 01 must be published."
+    },
+    {
+      "parameters": {
+        "jsCode": "// What Elliot (workflow 01) answered: { reply }, or { human: true } when a\n// team member has taken the conversation over (then nothing is sent; they\n// reply from the dashboard). If Elliot failed, the client still gets a short\n// holding reply and the failure is logged.\nconst FALLBACK = \"Thank you for your message. Someone from our team will get back to you shortly.\";\nconst r = $input.first().json;\nconst status = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nconst req = $('Build Elliot Request').first().json.request;\nconst base = { conversation_id: req.conversation_id };\nif (!(status >= 200 && status < 300) || !body || typeof body !== 'object') {\n  return [{ json: { ...base, reply: FALLBACK, human: false, elliot_error: `Elliot answered with HTTP ${status || 'no response'}` } }];\n}\nif (body.human === true) return [{ json: { ...base, reply: '', human: true, elliot_error: null } }];\nconst reply = String(body.reply || '').trim();\nreturn [{ json: { ...base, reply: reply || FALLBACK, human: false, elliot_error: reply ? null : 'Elliot returned an empty reply' } }];"
+      },
+      "id": "f1e382d0-c7d5-5717-9808-c63a2ddd3c9c",
+      "name": "Read Elliot Answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-has-reply",
+              "leftValue": "={{ !!($json.reply && $json.reply.trim()) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e7eeae8a-ec3a-550a-b9ea-5c138c54d2db",
+      "name": "Has Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Elliot's answer as a reply in the same Gmail thread: \"Re:\" subject,\n// In-Reply-To / References set to the client's Message-ID, plain text\n// (Elliot's Markdown turned into clean text), UTF-8 throughout.\nfunction toPlain(text) {\n  let t = String(text || '').replace(/\\r\\n/g, '\\n');\n  t = t.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, (m, label, url) => (label.trim() === url ? url : `${label.trim()}: ${url}`));\n  t = t.replace(/\\*\\*(.+?)\\*\\*/g, '$1').replace(/__(.+?)__/g, '$1');\n  t = t.replace(/^#{1,6}\\s+/gm, '');\n  t = t.replace(/^(\\s*)\\*\\s+/gm, '$1- ');\n  return t.replace(/\\n{3,}/g, '\\n\\n').trim();\n}\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst f = $('Extract Email Fields').first().json;\nconst tenant = $('Lookup Tenant by Mailbox').first().json;\nconst answer = $input.first().json;\nconst base = f.subject || 'Your enquiry';\nconst subject = /^(re|odp)\\s*:/i.test(base) ? base : `Re: ${base}`;\nconst text = toPlain(answer.reply) + '\\n';\nconst headers = [\n  `To: ${f.from_email}`,\n  `Subject: =?UTF-8?B?${b64(subject)}?=`,\n  f.rfc_message_id ? `In-Reply-To: ${f.rfc_message_id}` : null,\n  f.rfc_message_id ? `References: ${f.rfc_message_id}` : null,\n  'MIME-Version: 1.0',\n  'Content-Type: text/plain; charset=UTF-8',\n  'Content-Transfer-Encoding: base64',\n].filter(Boolean);\nconst raw = headers.join('\\r\\n') + '\\r\\n\\r\\n' + b64(text);\nreturn [{ json: {\n  tenant_id: tenant.tenant_id,\n  conversation_id: answer.conversation_id,\n  to: f.from_email,\n  subject,\n  text,\n  thread_id: f.gmail_thread_id,\n  raw_message: Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '')\n} }];"
+      },
+      "id": "8f84dd7f-887d-5052-b7ce-0ab768259311",
+      "name": "Build Reply Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message, threadId: $json.thread_id || undefined }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "cf802735-4ff6-5dc0-bcc7-7c9b736b808c",
+      "name": "Send Reply via Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1480,
+        -40
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UEVuaDdqEf2Zd7CE",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "The agency's connected Gmail (same credential as the trigger)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gmail answers { id, threadId } when it sent the email, or { error } when\n// it didn't (connection expired, quota...).\nconst r = $input.first().json;\nconst status = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nconst apiError = body && typeof body === 'object' ? body.error : null;\nconst ok = status >= 200 && status < 300 && !apiError && !!(body && body.id);\nconst sent = $('Build Reply Email').first().json;\nlet error = null;\nif (!ok) {\n  error = apiError\n    ? `${apiError.message || 'Gmail refused the email'}${apiError.code ? ` (code ${apiError.code})` : ''}`\n    : `Gmail answered with HTTP ${status || 'no response'}`;\n}\nreturn [{ json: { ok, error, status, tenant_id: sent.tenant_id, conversation_id: sent.conversation_id, to: sent.to, gmail_id: (body && body.id) || null } }];"
+      },
+      "id": "50ead952-79ee-50c3-90cf-c3e474ba758f",
+      "name": "Check Send Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-send-failed",
+              "leftValue": "={{ $json.ok === false }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a71e2810-fb29-5478-9924-8161f76d4432",
+      "name": "Send Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select log_reply_send_failure($1, $2::uuid, 'email', $3, $4::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.conversation_id, $json.error, JSON.stringify({ status: $json.status, to: $json.to }) ] }}"
+        }
+      },
+      "id": "a3bb27e7-d99a-5e12-a27f-431ea03c1790",
+      "name": "Log Send Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2140,
+        -40
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-elliot-failed",
+              "leftValue": "={{ !!$json.elliot_error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dd4e6621-ccba-5ade-ad01-79748e45fedc",
+      "name": "Elliot Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into audit_log (tenant_id, actor_type, actor_id, event_type, details)\nvalues ($1, 'system', 'workflow_16', 'email_elliot_failed', $2::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [ $('Lookup Tenant by Mailbox').first().json.tenant_id, JSON.stringify({ conversation_id: $json.conversation_id, error: $json.elliot_error }) ] }}"
+        }
+      },
+      "id": "5fc3302e-caae-5712-bd05-071420ed87bc",
+      "name": "Log Elliot Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1260,
+        200
+      ],
       "credentials": {
         "postgres": {
           "id": "TfAL8Z0epZ1Tqiib",
@@ -572,6 +574,17 @@
       ]
     },
     "Extract Email Fields": {
+      "main": [
+        [
+          {
+            "node": "Should Process?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Process?": {
       "main": [
         [
           {
@@ -601,10 +614,39 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Log Unmatched Mailbox",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "If Not Self-Sent": {
+      "main": [
+        [
+          {
+            "node": "Claim Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Message": {
+      "main": [
+        [
+          {
+            "node": "Is New Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Message?": {
       "main": [
         [
           {
@@ -630,29 +672,111 @@
       "main": [
         [
           {
-            "node": "Insert Inbound Message",
+            "node": "Build Elliot Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Execute: Classify Email": {
+    "Build Elliot Request": {
       "main": [
         [
           {
-            "node": "Execute: Draft Email Reply",
+            "node": "Ask Elliot",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Insert Inbound Message": {
+    "Ask Elliot": {
       "main": [
         [
           {
-            "node": "Execute: Classify Email",
+            "node": "Read Elliot Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Elliot Answer": {
+      "main": [
+        [
+          {
+            "node": "Has Reply?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Elliot Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Reply?": {
+      "main": [
+        [
+          {
+            "node": "Build Reply Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reply Email": {
+      "main": [
+        [
+          {
+            "node": "Send Reply via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reply via Gmail": {
+      "main": [
+        [
+          {
+            "node": "Check Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Send Result": {
+      "main": [
+        [
+          {
+            "node": "Send Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Failed?": {
+      "main": [
+        [
+          {
+            "node": "Log Send Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elliot Failed?": {
+      "main": [
+        [
+          {
+            "node": "Log Elliot Failure",
             "type": "main",
             "index": 0
           }
