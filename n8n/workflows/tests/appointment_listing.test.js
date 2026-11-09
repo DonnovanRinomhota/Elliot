@@ -93,8 +93,8 @@ test('12: lookup finds the listing by id or reference and the lead owner', () =>
   assert.match(load.parameters.query, /l\.id::text = \$3 or lower\(l\.reference\) = lower\(\$3\)/);
   assert.match(load.parameters.query, /ld\.assigned_to/);
   const params = expr(load.parameters.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c', listing_id: ' W-1 ' } });
-  assert.deepStrictEqual(params, ['t', 'c', 'W-1', '']);
-  assert.deepStrictEqual(expr(load.parameters.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c' } }), ['t', 'c', '', '']);
+  assert.deepStrictEqual(params, ['t', 'c', 'W-1', '', '']);
+  assert.deepStrictEqual(expr(load.parameters.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c' } }), ['t', 'c', '', '', '']);
 });
 
 test('12: calendar event has the property, address and agent', () => {
@@ -126,7 +126,7 @@ test('12: insert stores the listing; result reports it', () => {
     'Load Tenant + Contact Info': { timezone: 'Europe/Warsaw', listing_id: 'L1', listing_title: 'Flat', listing_address: 'ul. X 1' },
   };
   const params = expr(ins.parameters.options.queryReplacement, { nodes, json: { id: 'gcal1' } });
-  assert.strictEqual(params.length, 9); // 0033: + conversation_id
+  assert.strictEqual(params.length, 10); // 0033: + conversation_id; 0034: + email
   assert.strictEqual(params[5], 'gcal1');
   assert.strictEqual(params[7], 'L1');
   nodes['Load Tenant + Contact Info'] = { timezone: 'UTC' };
