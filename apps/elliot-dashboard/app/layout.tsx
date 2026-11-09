@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Elliot",
   description: "Your AI front office: leads, viewings and conversations in one place.",
+  robots: { index: false, follow: false },
 };
 
 // The true Next.js root layout -- wraps EVERY route including /login.
