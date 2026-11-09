@@ -133,7 +133,53 @@
     },
     {
       "parameters": {
-        "jsCode": "// Meta's Cloud API webhook shape:\n// { entry: [{ changes: [{ value: { metadata: { phone_number_id }, contacts: [{ profile: { name }, wa_id }], messages: [{ from, id, timestamp, type, text: { body } }] } }] }] }\n// The SAME path also receives delivery/read \"statuses\" updates with no \"messages\" key at all --\n// those aren't a customer message and must be skipped, not treated as an empty one.\n// Non-text messages (image/audio/location/etc.) are also not handled yet -- flagged skip so a caller\n// isn't shown a blank reply. Building real media support (download from Meta's media URL, store it,\n// let Claude look at it) is future work, not done here.\nconst body = $json.body || $json;\nconst value = body?.entry?.[0]?.changes?.[0]?.value;\nconst message = value?.messages?.[0];\n\nif (!value || !message) {\n  return [{ json: { skip: true, reason: !value ? 'no_value' : 'no_message_key_(status_update)' } }];\n}\nif (message.type !== 'text') {\n  return [{ json: { skip: true, reason: 'unsupported_message_type', message_type: message.type,\n                     phone_number_id: value.metadata?.phone_number_id, from: message.from } }];\n}\n\nreturn [{ json: {\n  skip: false,\n  phone_number_id: value.metadata?.phone_number_id || '',\n  from_wa_id: message.from || '',\n  contact_name: value.contacts?.[0]?.profile?.name || null,\n  wa_message_id: message.id || '',\n  message_timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),\n  body: message.text?.body || ''\n} }];"
+        "jsCode": "const META_APP_SECRET = 'PASTE_META_APP_SECRET_HERE';\n\n// n8n Cloud Starter has no Variables and blocks $env, so secrets are pasted\n// into this node after import (replace the PASTE_... value below). On plans\n// with Variables, or self-hosted with $env allowed, a variable of the same\n// name wins and the pasted value can stay as the placeholder.\n// Never commit a real secret back to GitHub: keep the placeholder in the repo.\nfunction setting(name, pasted) {\n  try { if ($vars && $vars[name]) return String($vars[name]); } catch (e) {}\n  try { if ($env && $env[name]) return String($env[name]); } catch (e) {}\n  return String(pasted || '').startsWith('PASTE_') ? '' : String(pasted || '');\n}\n\n// Meta signs every webhook POST with X-Hub-Signature-256: an HMAC-SHA256 of\n// the RAW request body, keyed with the Meta App Secret (Meta App Dashboard ->\n// App settings -> Basic). Without this check anyone who finds this URL can\n// POST a forged \"customer message\".\n//\n// \"Raw Body\" is switched on in the WhatsApp Webhook (POST) node (already set\n// in this export) -- that's what puts the exact bytes Meta signed in\n// binary.data. require('crypto') works on n8n Cloud; self-hosted needs\n// NODE_FUNCTION_ALLOW_BUILTIN=crypto.\n//\n// For local testing with hand-written payloads ONLY, a WHATSAPP_SIGNATURE_CHECK\n// variable set to \"off\" skips the check. Never in production.\nconst crypto = require('crypto');\nconst item = $input.first();\nconst json = item.json;\n\nif (setting('WHATSAPP_SIGNATURE_CHECK', 'on').toLowerCase() === 'off') {\n  return [{ json: { ...json, _signature: 'skipped' } }];\n}\n\nconst secret = setting('META_APP_SECRET', META_APP_SECRET);\nconst header = String((json.headers || {})['x-hub-signature-256'] || '');\nif (!secret) return [{ json: { ...json, _signature: 'no_secret_configured' } }];\nif (!header.startsWith('sha256=')) return [{ json: { ...json, _signature: 'missing' } }];\nif (!item.binary || !item.binary.data) return [{ json: { ...json, _signature: 'no_raw_body' } }];\n\nconst raw = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst expected = Buffer.from(crypto.createHmac('sha256', secret).update(raw).digest('hex'), 'utf8');\nconst given = Buffer.from(header.slice('sha256='.length).toLowerCase(), 'utf8');\nconst valid = given.length === expected.length && crypto.timingSafeEqual(given, expected);\n\nreturn [{ json: { ...json, _signature: valid ? 'valid' : 'invalid' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1140,
+        320
+      ],
+      "id": "42ad0946-6979-4f0c-8a49-2f9c16fb4847",
+      "name": "Verify Meta Signature"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-signature-ok",
+              "leftValue": "={{ ['valid', 'skipped'].includes($json._signature) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -916,
+        320
+      ],
+      "id": "c37f1676-52d8-4ea9-9e22-03b386be6c46",
+      "name": "Signature Valid?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta's Cloud API webhook shape:\n// { entry: [{ changes: [{ value: { metadata: { phone_number_id }, contacts: [{ profile: { name }, wa_id }], messages: [{ from, id, timestamp, type, text: { body } }] } }] }] }\n// The SAME path also receives delivery/read \"statuses\" updates with no \"messages\" key at all --\n// those aren't a customer message and are skipped, as are reactions.\n// Text and button replies go to Elliot as they are. Elliot can't open media yet, so a photo,\n// voice note, document or location becomes a short note (\"[Sent a photo: caption]\") and Elliot\n// answers that sensibly (e.g. asks the client to type the question) instead of staying silent.\nconst body = $json.body || $json;\nconst value = body?.entry?.[0]?.changes?.[0]?.value;\nconst message = value?.messages?.[0];\n\nif (!value || !message) {\n  return [{ json: { skip: true, reason: !value ? 'no_value' : 'no_message_key_(status_update)' } }];\n}\n\nconst caption = (m) => (m && m.caption && String(m.caption).trim() ? `: ${String(m.caption).trim()}` : '');\nlet text = '';\nswitch (message.type) {\n  case 'text': text = message.text?.body || ''; break;\n  case 'button': text = message.button?.text || message.button?.payload || ''; break;\n  case 'interactive': {\n    const i = message.interactive || {};\n    text = i.button_reply?.title || i.list_reply?.title || '';\n    break;\n  }\n  case 'image': text = `[Sent a photo${caption(message.image)}]`; break;\n  case 'video': text = `[Sent a video${caption(message.video)}]`; break;\n  case 'document': {\n    const d = message.document || {};\n    text = `[Sent a document${d.filename ? ` (${d.filename})` : ''}${caption(d)}]`;\n    break;\n  }\n  case 'audio': text = message.audio?.voice ? '[Sent a voice message]' : '[Sent an audio file]'; break;\n  case 'sticker': text = '[Sent a sticker]'; break;\n  case 'location': {\n    const l = message.location || {};\n    const place = [l.name, l.address].filter(Boolean).join(', ');\n    text = `[Shared a location${place ? `: ${place}` : ''}${l.latitude != null ? ` (${l.latitude}, ${l.longitude})` : ''}]`;\n    break;\n  }\n  case 'contacts': text = '[Shared a contact card]'; break;\n  case 'reaction': return [{ json: { skip: true, reason: 'reaction' } }];\n  default: text = `[Sent a ${message.type || 'message'} that can't be opened here]`;\n}\ntext = String(text).trim();\nif (!text) {\n  return [{ json: { skip: true, reason: 'empty_message', message_type: message.type } }];\n}\n\nreturn [{ json: {\n  skip: false,\n  phone_number_id: value.metadata?.phone_number_id || '',\n  from_wa_id: message.from || '',\n  contact_name: value.contacts?.[0]?.profile?.name || null,\n  wa_message_id: message.id || '',\n  message_type: message.type,\n  message_timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),\n  body: text.slice(0, 4000)\n} }];"
       },
       "id": "29b1e9ff-d74e-4c09-9813-aea51cd49520",
       "name": "Extract WhatsApp Fields",
@@ -179,23 +225,11 @@
     },
     {
       "parameters": {
-        "operation": "select",
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public",
-          "cachedResultName": "public"
-        },
-        "table": "ai_config",
-        "where": {
-          "values": [
-            {
-              "column": "whatsapp_phone_number_id",
-              "value": "={{ $json.phone_number_id }}"
-            }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "-- The agency this WhatsApp number belongs to (Settings -> WhatsApp phone number id),\n-- with its slug, which Elliot (workflow 01) needs. No row = unknown number:\n-- 'If Tenant Found' sends it to the audit log.\nselect ac.tenant_id, ac.whatsapp_phone_number_id, t.slug as tenant_slug, t.name as tenant_name\nfrom ai_config ac\njoin tenants t on t.id = ac.tenant_id\nwhere ac.whatsapp_phone_number_id = $1 and t.status = 'active'\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{ [ $json.phone_number_id ] }}"
+        }
       },
       "id": "af56d21c-6aa1-4d7d-954c-904e3728eb24",
       "name": "Lookup Tenant by Phone Number Id",
@@ -204,7 +238,14 @@
       "position": [
         -172,
         220
-      ]
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -212,16 +253,17 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.tenant_id }}",
-              "rightValue": "",
+              "id": "cond-tenant-found",
+              "leftValue": "={{ !!$json.tenant_id }}",
+              "rightValue": true,
               "operator": {
-                "type": "string",
-                "operation": "notEmpty"
+                "type": "boolean",
+                "operation": "equals"
               }
             }
           ],
@@ -232,7 +274,7 @@
       "id": "d481da57-687d-41e9-b910-45bfd2d76b7d",
       "name": "If Tenant Found",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
+      "typeVersion": 2.2,
       "position": [
         88,
         220
@@ -277,14 +319,20 @@
         348,
         420
       ],
-      "notes": "Improves on 16's known gap (a misconfigured connected_gmail_address silently drops the email with no trace). Here a message for a phone_number_id no tenant has configured is at least logged, not just dropped."
+      "notes": "Improves on 16's known gap (a misconfigured connected_gmail_address silently drops the email with no trace). Here a message for a phone_number_id no tenant has configured is at least logged, not just dropped.",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "executeQuery",
         "query": "-- 0031: shared function, matching by phone in any format; the WhatsApp\n-- profile name only fills a blank, so a name the team corrected stays.\n-- Returns the contact row (id, name, email, phone) like the old INSERT ... RETURNING did.\nselect * from upsert_conversation_contact_row($1, null, $3, null, $2, null, 'whatsapp');",
         "options": {
-          "queryReplacement": "={{ [ $('Lookup Tenant by Phone Number Id').first().json.tenant_id, $('Extract WhatsApp Fields').first().json.from_wa_id, $('Extract WhatsApp Fields').first().json.contact_name ] }}"
+          "queryReplacement": "={{ [ $('Lookup Tenant by Phone Number Id').first().json.tenant_id, '+' + $('Extract WhatsApp Fields').first().json.from_wa_id, $('Extract WhatsApp Fields').first().json.contact_name ] }}"
         }
       },
       "id": "5bf8f29e-2bf4-472b-b78b-1060e61472c5",
@@ -292,10 +340,16 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        348,
+        608,
         220
       ],
-      "notes": "Keeps an existing name rather than overwriting it with WhatsApp's profile name on every message -- a contact who already gave a fuller name via email/chat shouldn't have it clobbered by whatever they set as their WhatsApp display name."
+      "notes": "Keeps an existing name rather than overwriting it with WhatsApp's profile name on every message -- a contact who already gave a fuller name via email/chat shouldn't have it clobbered by whatever they set as their WhatsApp display name.",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -310,147 +364,38 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        608,
-        220
-      ]
-    },
-    {
-      "parameters": {
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public",
-          "cachedResultName": "public"
-        },
-        "table": {
-          "__rl": true,
-          "value": "messages",
-          "mode": "list",
-          "cachedResultName": "messages"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "tenant_id": "={{ $('Lookup Tenant by Phone Number Id').first().json.tenant_id }}",
-            "conversation_id": "={{ $json.id }}",
-            "role": "user",
-            "content": "={{ $('Extract WhatsApp Fields').first().json.body }}"
-          },
-          "matchingColumns": [
-            "id"
-          ],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
-        },
-        "options": {}
-      },
-      "id": "55ccc918-1675-46cd-8f4a-5c2781b33002",
-      "name": "Insert Inbound Message",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "position": [
         868,
         220
-      ]
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "d8BdZ5LChDnL52Bg",
-          "mode": "id",
-          "cachedResultUrl": "/workflow/d8BdZ5LChDnL52Bg"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "tenant_id": "={{ $('Lookup Tenant by Phone Number Id').first().json.tenant_id }}",
-            "from_email": "={{ $('Extract WhatsApp Fields').first().json.from_wa_id }}",
-            "subject": "",
-            "body": "={{ $('Extract WhatsApp Fields').first().json.body }}",
-            "gmail_thread_id": "",
-            "gmail_message_id": ""
-          },
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "-- Meta sometimes delivers the same message twice. Only the first copy\n-- goes on to Elliot, so the client never gets two answers (0032).\nselect claim_whatsapp_message($1, $2) as is_new;",
+        "options": {
+          "queryReplacement": "={{ [ $('Lookup Tenant by Phone Number Id').first().json.tenant_id, $('Extract WhatsApp Fields').first().json.wa_message_id ] }}"
+        }
       },
-      "id": "a0fa7d1b-5574-4d68-bfe9-65f07af48a5f",
-      "name": "Execute: Classify (reused)",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
+      "id": "a62b8471-73aa-5a92-8895-f4814761139f",
+      "name": "Claim Message",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
       "position": [
-        1128,
+        348,
         220
       ],
-      "notes": "Workflow 13 is reused as-is (no WhatsApp-specific classifier) -- its 6 categories and prompt are channel-agnostic in substance, it just calls its input parameter 'from_email' and 'subject'/'gmail_*' regardless of what channel actually sent the message. Passing from_wa_id as from_email and empty strings for the email-only fields works because 13 never uses gmail_thread_id/gmail_message_id itself -- it only classifies subject+body. Cosmetic, not a functional risk."
-    },
-    {
-      "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "10bd75f4382a4938",
-          "mode": "id",
-          "cachedResultUrl": "/workflow/10bd75f4382a4938"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "tenant_id": "={{ $('Lookup Tenant by Phone Number Id').first().json.tenant_id }}",
-            "conversation_id": "={{ $('Get or Create Conversation (WhatsApp)').first()?.json?.id || null }}",
-            "contact_id": "={{ $('Upsert Contact').first()?.json?.id || null }}",
-            "to_wa_id": "={{ $('Extract WhatsApp Fields').first().json.from_wa_id }}",
-            "phone_number_id": "={{ $('Lookup Tenant by Phone Number Id').first().json.whatsapp_phone_number_id }}",
-            "wa_message_id": "={{ $('Extract WhatsApp Fields').first().json.wa_message_id }}",
-            "last_inbound_at": "={{ $('Extract WhatsApp Fields').first().json.message_timestamp }}",
-            "body": "={{ $('Extract WhatsApp Fields').first().json.body }}",
-            "category": "={{ $json.category }}",
-            "confidence": "={{ $json.confidence }}",
-            "contact_name": "={{ $('Upsert Contact').first()?.json?.name || '' }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "contact_name",
-              "displayName": "contact_name",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "canBeUsedToMatch": true,
-              "type": "string",
-              "removed": false
-            }
-          ],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
-        "options": {}
-      },
-      "id": "71a02ca8-8880-4f78-a8d5-7e5509b061a6",
-      "name": "Execute: Draft WhatsApp Reply",
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.2,
-      "position": [
-        1388,
-        220
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const META_APP_SECRET = 'PASTE_META_APP_SECRET_HERE';\n\n// n8n Cloud Starter has no Variables and blocks $env, so secrets are pasted\n// into this node after import (replace the PASTE_... value below). On plans\n// with Variables, or self-hosted with $env allowed, a variable of the same\n// name wins and the pasted value can stay as the placeholder.\n// Never commit a real secret back to GitHub: keep the placeholder in the repo.\nfunction setting(name, pasted) {\n  try { if ($vars && $vars[name]) return String($vars[name]); } catch (e) {}\n  try { if ($env && $env[name]) return String($env[name]); } catch (e) {}\n  return String(pasted || '').startsWith('PASTE_') ? '' : String(pasted || '');\n}\n\n// Meta signs every webhook POST with X-Hub-Signature-256: an HMAC-SHA256 of\n// the RAW request body, keyed with the Meta App Secret (Meta App Dashboard ->\n// App settings -> Basic). Without this check anyone who finds this URL can\n// POST a forged \"customer message\".\n//\n// \"Raw Body\" is switched on in the WhatsApp Webhook (POST) node (already set\n// in this export) -- that's what puts the exact bytes Meta signed in\n// binary.data. require('crypto') works on n8n Cloud; self-hosted needs\n// NODE_FUNCTION_ALLOW_BUILTIN=crypto.\n//\n// For local testing with hand-written payloads ONLY, a WHATSAPP_SIGNATURE_CHECK\n// variable set to \"off\" skips the check. Never in production.\nconst crypto = require('crypto');\nconst item = $input.first();\nconst json = item.json;\n\nif (setting('WHATSAPP_SIGNATURE_CHECK', 'on').toLowerCase() === 'off') {\n  return [{ json: { ...json, _signature: 'skipped' } }];\n}\n\nconst secret = setting('META_APP_SECRET', META_APP_SECRET);\nconst header = String((json.headers || {})['x-hub-signature-256'] || '');\nif (!secret) return [{ json: { ...json, _signature: 'no_secret_configured' } }];\nif (!header.startsWith('sha256=')) return [{ json: { ...json, _signature: 'missing' } }];\nif (!item.binary || !item.binary.data) return [{ json: { ...json, _signature: 'no_raw_body' } }];\n\nconst raw = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst expected = Buffer.from(crypto.createHmac('sha256', secret).update(raw).digest('hex'), 'utf8');\nconst given = Buffer.from(header.slice('sha256='.length).toLowerCase(), 'utf8');\nconst valid = given.length === expected.length && crypto.timingSafeEqual(given, expected);\n\nreturn [{ json: { ...json, _signature: valid ? 'valid' : 'invalid' } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -1140,
-        320
-      ],
-      "id": "42ad0946-6979-4f0c-8a49-2f9c16fb4847",
-      "name": "Verify Meta Signature"
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -458,13 +403,13 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
+            "typeValidation": "loose",
+            "version": 2
           },
           "conditions": [
             {
-              "id": "cond-signature-ok",
-              "leftValue": "={{ ['valid', 'skipped'].includes($json._signature) }}",
+              "id": "cond-is-new",
+              "leftValue": "={{ $json.is_new === true }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -476,14 +421,273 @@
         },
         "options": {}
       },
+      "id": "7c08d7a6-fe06-56f3-b599-b58bd327c234",
+      "name": "Is New Message?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -916,
-        320
+        478,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Hands the message to Elliot (workflow 01, the same agent as the website\n// chat), so WhatsApp gets the same answers: listings, viewings booked with\n// the property, lead capture, hand-over to the team.\n//\n// Elliot's address: by default worked out from this n8n's own address\n// (https://<you>.app.n8n.cloud/webhook/chat). To use another one, paste it\n// below instead of the placeholder, or set an ELLIOT_CHAT_WEBHOOK_URL variable.\nconst ELLIOT_CHAT_WEBHOOK_URL = 'PASTE_ELLIOT_CHAT_WEBHOOK_URL_HERE';\n\nfunction setting(name, pasted) {\n  try { if ($vars && $vars[name]) return String($vars[name]); } catch (e) {}\n  try { if ($env && $env[name]) return String($env[name]); } catch (e) {}\n  return String(pasted || '').startsWith('PASTE_') ? '' : String(pasted || '');\n}\n\nconst f = $('Extract WhatsApp Fields').first().json;\nconst tenant = $('Lookup Tenant by Phone Number Id').first().json;\nconst contact = $('Upsert Contact').first().json || {};\nconst conversationId = $input.first().json.id;\n\nlet url = setting('ELLIOT_CHAT_WEBHOOK_URL', ELLIOT_CHAT_WEBHOOK_URL);\nif (!url) {\n  let resume = '';\n  try { resume = String($execution.resumeUrl || ''); } catch (e) {}\n  const at = resume.indexOf('/webhook-waiting/');\n  if (at > 0) url = resume.slice(0, at) + '/webhook/chat';\n}\nif (!url) {\n  throw new Error(\"Can't work out Elliot's address: paste the chat webhook URL (workflow 01's Production URL) into ELLIOT_CHAT_WEBHOOK_URL in this node.\");\n}\n\nreturn [{ json: {\n  chat_url: url,\n  request: {\n    tenant_slug: tenant.tenant_slug,\n    message: f.body,\n    conversation_id: conversationId,\n    channel: 'whatsapp',\n    contact: { name: contact.name || null, phone: contact.phone || ('+' + f.from_wa_id) }\n  }\n} }];"
+      },
+      "id": "59ecb6d9-c70f-58f5-b15b-71cb187487aa",
+      "name": "Build Elliot Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1128,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.chat_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "300a60c0-cb01-55ff-8e68-bc0ba22081b1",
+      "name": "Ask Elliot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1388,
+        220
       ],
-      "id": "c37f1676-52d8-4ea9-9e22-03b386be6c46",
-      "name": "Signature Valid?"
+      "notes": "Calls workflow 01 (Elliot) at its chat webhook. Workflow 01 must be active."
+    },
+    {
+      "parameters": {
+        "jsCode": "// What Elliot (workflow 01) answered. 01 replies { reply } normally, or\n// { reply: null, human: true } when a team member has taken the chat over\n// (then nothing is sent: the person answers from the dashboard).\n// If Elliot failed, the client still gets a short holding message and the\n// failure is logged, so nobody is left without an answer.\nconst FALLBACK = \"Sorry, I can't answer that right now. Someone from our team will get back to you shortly.\";\nconst r = $input.first().json;\nconst status = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nconst req = $('Build Elliot Request').first().json.request;\nconst base = { conversation_id: req.conversation_id, tenant_slug: req.tenant_slug };\n\nif (!(status >= 200 && status < 300) || !body || typeof body !== 'object') {\n  return [{ json: { ...base, reply: FALLBACK, human: false, elliot_error: `Elliot answered with HTTP ${status || 'no response'}` } }];\n}\nif (body.human === true) {\n  return [{ json: { ...base, reply: '', human: true, elliot_error: null } }];\n}\nconst reply = String(body.reply || '').trim();\nreturn [{ json: { ...base, reply: reply || FALLBACK, human: false, elliot_error: reply ? null : 'Elliot returned an empty reply' } }];"
+      },
+      "id": "9685e051-ee02-5698-9cb5-f22424a7b071",
+      "name": "Read Elliot Answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-has-reply",
+              "leftValue": "={{ !!($json.reply && $json.reply.trim()) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "938fd8e2-57ba-5803-9b31-6a2ddc950e62",
+      "name": "Has Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1908,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Elliot writes for the website chat, which shows Markdown. WhatsApp doesn't:\n// bold is *single asterisks*, there are no [text](link) links or headings,\n// and a message can be at most 4096 characters.\nfunction toWhatsApp(text) {\n  let t = String(text || '').replace(/\\r\\n/g, '\\n');\n  t = t.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, (m, label, url) => (label.trim() === url ? url : `${label.trim()}: ${url}`));\n  t = t.replace(/\\*\\*(.+?)\\*\\*/g, '*$1*');\n  t = t.replace(/__(.+?)__/g, '_$1_');\n  t = t.replace(/^#{1,6}\\s+/gm, '');\n  t = t.replace(/^(\\s*)[-*]\\s+/gm, '$1• ');\n  t = t.replace(/\\n{3,}/g, '\\n\\n').trim();\n  if (t.length > 4096) t = t.slice(0, 4093).trimEnd() + '...';\n  return t;\n}\n\nconst f = $('Extract WhatsApp Fields').first().json;\nconst tenant = $('Lookup Tenant by Phone Number Id').first().json;\nconst answer = $input.first().json;\nreturn [{ json: {\n  tenant_id: tenant.tenant_id,\n  conversation_id: answer.conversation_id,\n  phone_number_id: f.phone_number_id || tenant.whatsapp_phone_number_id,\n  to: f.from_wa_id,\n  text: toWhatsApp(answer.reply)\n} }];"
+      },
+      "id": "4134b99e-b590-5018-807c-96ddf847ad58",
+      "name": "Format for WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2168,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v20.0/' + $json.phone_number_id + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $json.to, type: 'text', text: { preview_url: true, body: $json.text } }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "aeedb5e3-8d3d-5160-970b-ce51bb603c4a",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2428,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_CRED_ID",
+          "name": "WhatsApp Cloud API token"
+        }
+      },
+      "notes": "Set the real credential: an HTTP Header Auth credential named \"WhatsApp Cloud API token\", header name \"Authorization\", value \"Bearer <your Meta system-user access token>\". The same credential as workflow 27; one token covers every agency's number."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta answers { messages: [{ id }] } when it accepted the message, or\n// { error: { message, code } } when it didn't (expired token, number not\n// verified, 24-hour window closed -- code 131047, etc.).\nconst r = $input.first().json;\nconst status = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nconst apiError = body && typeof body === 'object' ? body.error : null;\nconst ok = status >= 200 && status < 300 && !apiError;\nconst sent = $('Format for WhatsApp').first().json;\nlet error = null;\nif (!ok) {\n  error = apiError\n    ? `${apiError.message || 'Meta refused the message'}${apiError.code ? ` (code ${apiError.code})` : ''}`\n    : `WhatsApp API answered with HTTP ${status || 'no response'}`;\n}\nreturn [{ json: {\n  ok,\n  error,\n  status,\n  tenant_id: sent.tenant_id,\n  conversation_id: sent.conversation_id,\n  to: sent.to,\n  wa_message_id: (body && body.messages && body.messages[0] && body.messages[0].id) || null\n} }];"
+      },
+      "id": "499b0c5c-8b39-5c06-ad4e-cc8f3805edc4",
+      "name": "Check Send Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-send-failed",
+              "leftValue": "={{ $json.ok === false }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "df3bf980-ba3e-5559-8eff-f92e3683119d",
+      "name": "Send Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2948,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- An audit_log row, and a note in the conversation so the team sees the\n-- client didn't get the answer (0032).\nselect log_whatsapp_send_failure($1, $2::uuid, $3, $4::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.conversation_id, $json.error, JSON.stringify({ status: $json.status, to: $json.to }) ] }}"
+        }
+      },
+      "id": "d13f5cc3-ef06-5ab9-88e1-2c1c9595efb4",
+      "name": "Log Send Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3208,
+        120
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-elliot-failed",
+              "leftValue": "={{ !!$json.elliot_error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7b0dfb50-aa92-5fbc-bd3e-a6007297701a",
+      "name": "Elliot Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1908,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into audit_log (tenant_id, actor_type, actor_id, event_type, details)\nvalues ($1, 'system', 'workflow_25', 'whatsapp_elliot_failed', $2::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [ $('Lookup Tenant by Phone Number Id').first().json.tenant_id, JSON.stringify({ conversation_id: $json.conversation_id, error: $json.elliot_error }) ] }}"
+        }
+      },
+      "id": "1b254a0c-67f7-54f5-b21c-058484d875bd",
+      "name": "Log Elliot Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2168,
+        360
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -544,6 +748,29 @@
         ]
       ]
     },
+    "Verify Meta Signature": {
+      "main": [
+        [
+          {
+            "node": "Signature Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature Valid?": {
+      "main": [
+        [
+          {
+            "node": "Extract WhatsApp Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
     "Extract WhatsApp Fields": {
       "main": [
         [
@@ -581,7 +808,7 @@
       "main": [
         [
           {
-            "node": "Upsert Contact",
+            "node": "Claim Message",
             "type": "main",
             "index": 0
           }
@@ -589,6 +816,28 @@
         [
           {
             "node": "Log Unmatched Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Message": {
+      "main": [
+        [
+          {
+            "node": "Is New Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Message?": {
+      "main": [
+        [
+          {
+            "node": "Upsert Contact",
             "type": "main",
             "index": 0
           }
@@ -610,56 +859,115 @@
       "main": [
         [
           {
-            "node": "Insert Inbound Message",
+            "node": "Build Elliot Request",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Insert Inbound Message": {
+    "Build Elliot Request": {
       "main": [
         [
           {
-            "node": "Execute: Classify (reused)",
+            "node": "Ask Elliot",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Execute: Classify (reused)": {
+    "Ask Elliot": {
       "main": [
         [
           {
-            "node": "Execute: Draft WhatsApp Reply",
+            "node": "Read Elliot Answer",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Verify Meta Signature": {
+    "Read Elliot Answer": {
       "main": [
         [
           {
-            "node": "Signature Valid?",
+            "node": "Has Reply?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Elliot Failed?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Signature Valid?": {
+    "Has Reply?": {
       "main": [
         [
           {
-            "node": "Extract WhatsApp Fields",
+            "node": "Format for WhatsApp",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
+      ]
+    },
+    "Format for WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Reply": {
+      "main": [
+        [
+          {
+            "node": "Check Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Send Result": {
+      "main": [
+        [
+          {
+            "node": "Send Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Failed?": {
+      "main": [
+        [
+          {
+            "node": "Log Send Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elliot Failed?": {
+      "main": [
+        [
+          {
+            "node": "Log Elliot Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

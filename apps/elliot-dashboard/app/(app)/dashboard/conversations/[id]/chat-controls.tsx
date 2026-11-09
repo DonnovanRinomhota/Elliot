@@ -4,23 +4,35 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ErrorText, btn } from "../../../../_ui/ui";
+import { timeLeftLabel, whatsappWindow } from "@/lib/whatsapp";
 
-// Live website chat: take over from Elliot, reply as yourself, hand back.
-// Pinned to the bottom of the screen (see the conversation page), so it's
-// always in reach however far up the messages you are. Kept compact.
-// Replies are saved as human_agent messages; the visitor's chat window picks
-// them up within a few seconds (it polls /api/widget/messages).
+// Live chats (website and WhatsApp): take over from Elliot, reply as
+// yourself, hand back. Pinned to the bottom of the screen (see the
+// conversation page), so it's always in reach however far up the messages
+// you are. Kept compact.
+// Website: replies are saved as human_agent messages; the visitor's chat
+// window picks them up within a few seconds (it polls /api/widget/messages).
+// WhatsApp: replies go through /api/conversations/:id/whatsapp, which sends
+// them on WhatsApp (workflow 32) and then saves them.
 export default function ChatControls({
   conversationId,
   handledByMe,
   handlerName,
   canTakeOver,
+  channel = "chat_widget",
+  lastInboundAt = null,
 }: {
   conversationId: string;
   handledByMe: boolean;
   handlerName: string | null;
   canTakeOver: boolean;
+  channel?: "chat_widget" | "whatsapp";
+  /** WhatsApp only: when the client last wrote (starts the 24-hour reply window). */
+  lastInboundAt?: string | null;
 }) {
+  const onWhatsApp = channel === "whatsapp";
+  const window24 = onWhatsApp ? whatsappWindow(lastInboundAt) : null;
+  const who = onWhatsApp ? "client" : "visitor";
   const router = useRouter();
   const supabase = createClient();
   const [text, setText] = useState("");
@@ -40,11 +52,40 @@ export default function ChatControls({
     return true;
   }
 
+  async function sendWhatsApp() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setError(data?.error || `Couldn't send it (HTTP ${res.status}).`);
+        return false;
+      }
+      router.refresh();
+      return true;
+    } catch (e) {
+      setError(`Couldn't send it: ${(e as Error).message}`);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
-    if (await call("send_human_chat_message", { p_conversation_id: conversationId, p_content: text })) setText("");
+    const ok = onWhatsApp
+      ? await sendWhatsApp()
+      : await call("send_human_chat_message", { p_conversation_id: conversationId, p_content: text });
+    if (ok) setText("");
   }
+
+  const windowClosed = Boolean(window24 && !window24.open);
 
   if (!handledByMe) {
     return (
@@ -52,12 +93,14 @@ export default function ChatControls({
         <div className="flex flex-wrap items-center justify-between gap-3 md:flex-nowrap">
           <div className="min-w-0 md:flex-1">
             <h2 className="m-0 text-[14px] font-semibold text-ink">
-              {handlerName ? `${handlerName} is handling this chat` : "Elliot is answering this chat"}
+              {handlerName ? `${handlerName} is handling this chat` : `Elliot is answering this ${onWhatsApp ? "WhatsApp chat" : "chat"}`}
             </h2>
             <p className="m-0 mt-0.5 text-[13px] text-gray-500">
               {handlerName
                 ? "Elliot is paused. You can take it over yourself."
-                : "Take over to reply yourself. Elliot stays quiet until you hand it back; the visitor sees your replies in the same chat window."}
+                : onWhatsApp
+                  ? "Take over to reply yourself. Elliot stays quiet until you hand it back; the client gets your replies on WhatsApp."
+                  : "Take over to reply yourself. Elliot stays quiet until you hand it back; the visitor sees your replies in the same chat window."}
             </p>
           </div>
           {canTakeOver ? (
@@ -96,14 +139,20 @@ export default function ChatControls({
               (e.currentTarget.form as HTMLFormElement).requestSubmit();
             }
           }}
-          placeholder="Type your reply. Enter sends, Shift+Enter for a new line."
-          disabled={busy}
+          placeholder={windowClosed ? "Replies are closed until the client writes again." : "Type your reply. Enter sends, Shift+Enter for a new line."}
+          disabled={busy || windowClosed}
           className="w-full p-3 leading-relaxed"
         />
         {error && <ErrorText>{error}</ErrorText>}
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[12.5px] text-gray-500">The visitor sees this in the chat window on your website.</span>
-          <button type="submit" disabled={busy || !text.trim()} className={btn.primary}>
+          <span className={`text-[12.5px] ${windowClosed ? "text-alert" : "text-gray-500"}`}>
+            {!onWhatsApp
+              ? `The ${who} sees this in the chat window on your website.`
+              : windowClosed
+                ? "More than 24 hours since the client last wrote. WhatsApp only allows replies within 24 hours, so wait for them to write again, or call or email them."
+                : `Goes to the client on WhatsApp. You can reply for another ${timeLeftLabel(window24!.minutesLeft)}.`}
+          </span>
+          <button type="submit" disabled={busy || !text.trim() || windowClosed} className={`${btn.primary} shrink-0`}>
             {busy ? "Sending…" : "Send"}
           </button>
         </div>

@@ -76,9 +76,10 @@ test('01: no answer until the visitor has given a name and an email or phone', (
   assert.deepStrictEqual(params, ['t', 'conv', 'Anna', 'a@x.pl', '']);
 
   const cond = nodeOf(wf01, 'Visitor Identified?').parameters.conditions.conditions[0].leftValue;
-  assert.strictEqual(expr(cond, { json: { visitor: { ready: true } } }), true);
-  assert.strictEqual(expr(cond, { json: { visitor: { ready: false } } }), false);
-  assert.ok(!expr(cond, { json: {} }));
+  const web = { 'Merge Tenant Context': { channel: 'chat_widget' } };
+  assert.strictEqual(expr(cond, { json: { visitor: { ready: true } }, nodes: web }), true);
+  assert.strictEqual(expr(cond, { json: { visitor: { ready: false, phone: '+48601' } }, nodes: web }), false);
+  assert.ok(!expr(cond, { json: {}, nodes: web }));
 
   const body = expr(nodeOf(wf01, 'Respond: Ask For Details').parameters.responseBody, {
     nodes: { 'Get or Create Conversation': { conversation_id: 'conv' } },
@@ -136,14 +137,17 @@ test('16: the email sender\'s display name is saved and passed to the draft', ()
   assert.strictEqual(expr(draft, { nodes: { 'Upsert Contact': { id: 'c', name: null } } }), '');
 });
 
-test('25: WhatsApp contacts are matched by phone in any format; name passed to the draft', () => {
+test('25: WhatsApp contacts are matched by phone in any format; saved with a +', () => {
   const wf = load('25-whatsapp-inbound-trigger.json');
   const up = nodeOf(wf, 'Upsert Contact');
   // queryReplacement is [tenant_id, from_wa_id, contact_name]
   assert.match(up.parameters.query, /select \* from upsert_conversation_contact_row\(\$1, null, \$3, null, \$2, null, 'whatsapp'\)/);
   assert.ok(!/insert into contacts/i.test(up.parameters.query));
-  const draft = nodeOf(wf, 'Execute: Draft WhatsApp Reply').parameters.workflowInputs.value.contact_name;
-  assert.strictEqual(expr(draft, { nodes: { 'Upsert Contact': { id: 'c', name: 'Tomek' } } }), 'Tomek');
+  // 0032: the number is saved with a '+', and the contact's name goes on to Elliot.
+  const p = expr(up.parameters.options.queryReplacement, {
+    nodes: { 'Lookup Tenant by Phone Number Id': { tenant_id: 't' }, 'Extract WhatsApp Fields': { from_wa_id: '48601234567', contact_name: 'Tomek' } },
+  });
+  assert.deepStrictEqual(p, ['t', '+48601234567', 'Tomek']);
 });
 
 test('14 + 26: drafts greet by name, or ask for the name when it is unknown', () => {

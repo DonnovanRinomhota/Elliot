@@ -26,6 +26,8 @@ except onboarding is scoped to the logged-in user's own tenant via RLS.
        (workflow 28) and `N8N_INGEST_WEBHOOK_URL` (workflow 08). Each falls
        back to its old `NEXT_PUBLIC_*` name, so existing setups keep
        working. None of these is called from the browser any more.
+     - `N8N_SEND_WHATSAPP_MESSAGE_WEBHOOK_URL` (workflow 32): a team member's
+       reply in a WhatsApp chat they've taken over. See `docs/whatsapp-setup.md`.
 3. `npm run dev` and open http://localhost:3000
 
 Same env vars need to be set in Vercel (Settings → Environment Variables)

@@ -114,7 +114,7 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: R
   );
 }
 
-const ACRONYMS: Record<string, string> = { faq: "FAQ", crm: "CRM", pdf: "PDF", url: "URL" };
+const ACRONYMS: Record<string, string> = { whatsapp: "WhatsApp", faq: "FAQ", crm: "CRM", pdf: "PDF", url: "URL" };
 
 /** "no_show" -> "No show", "QUALIFYING" -> "Qualifying", "faq" -> "FAQ". */
 export function humanize(value: string): string {
