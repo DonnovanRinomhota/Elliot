@@ -46,3 +46,7 @@ Copy this workflow's ID from n8n and confirm it matches the workflow ID referenc
 - **Output** now also has `listing_link` and `confirmation_sent_to` (null when no email went out). Elliot uses them to tell the client the confirmation was emailed.
 
 Elliot (01) asks for the client's email before booking so the confirmation can be sent; if they don't want to give one, it books anyway.
+
+## The client's own email (0034)
+`book_appointment` takes an optional `email`: the address the client gave in the chat for the confirmation. 12 uses it instead of the one on file, and saves it on the contact (unless another contact in the agency already has it). Before this, a client who already had an email on file got the confirmation at the old address. If the email can't be sent, the result says why (`confirmation_error`) and Elliot tells the client the viewing is booked but the email didn't go through.
+

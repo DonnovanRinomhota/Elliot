@@ -70,7 +70,8 @@ test('01: Elliot asks for an email before booking, sends links, and only promise
     const p = prompt(ch);
     assert.match(p, /make sure you have their email address so the confirmation can be emailed/);
     assert.match(p, /If they'd rather not give one, book anyway/);
-    assert.match(p, /Always pass the listing_id of the property they chose/);
+    assert.match(p, /Never say a viewing is booked, confirmed or being arranged, and never mention a confirmation email, unless book_appointment returned success/);
+    assert.match(p, /passing the listing_id of the property they chose and their email as email/);
     assert.match(p, /each with its key facts and its Link, exactly as given/);
     assert.match(p, /never say you have no photos when a listing has a link/);
     assert.match(p, /13\. Never tell the visitor that someone from the team will contact them/);
@@ -121,7 +122,7 @@ test('01: Elliot hears whether the confirmation email went out, with the propert
   assert.match(sent, /Property link: https:\/\/elliot-real-estate-five\.vercel\.app\/p\/L1\./);
   assert.match(sent, /A confirmation email was sent to don@x\.pl\./);
   const none = resultText('book_appointment', { success: true, appointment_id: 'a1', starts_at: 's', ends_at: 'e', status: 'confirmed' });
-  assert.match(none, /No confirmation email was sent \(no email address on file\)\./);
+  assert.match(none, /No confirmation email was sent \(no email address on file\)\. Do not say one is coming\./);
 });
 
 test('01: the booking carries the conversation it was made in', () => {
@@ -135,7 +136,7 @@ test('12: the conversation and the listing\'s own page are looked up and stored'
   assert.match(lookup.query, /cv\.id::text = nullif\(\$4, ''\) and cv\.tenant_id = \$1/);
   assert.match(lookup.query, /li\.url as listing_url/);
   assert.match(lookup.query, /t\.name as tenant_name/);
-  assert.deepStrictEqual(expr(lookup.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c', listing_id: 'L1', conversation_id: ' conv ' } }), ['t', 'c', 'L1', 'conv']);
+  assert.deepStrictEqual(expr(lookup.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c', listing_id: 'L1', conversation_id: ' conv ', email: ' New@Mail.pl ' } }), ['t', 'c', 'L1', 'conv', 'New@Mail.pl']);
 
   const ins = nodeOf(wf12, 'Insert Appointment').parameters;
   assert.match(ins.query, /conversation_id\)\nvalues .*nullif\(\$9, ''\)::uuid\)/);
@@ -221,9 +222,10 @@ test('12: a confirmation email goes to the client when there is an email; the bo
   const result = nodeOf(wf12, 'Booking Result').parameters.jsCode;
   const booked = { success: true, appointment_id: 'a1' };
   const ok = run(result, { nodes: { 'Format Results': booked, 'Send Confirmation Email': { id: 'gm1' }, 'Build Confirmation Email': { to: 'don@example.pl' } } })[0].json;
-  assert.deepStrictEqual(ok, { ...booked, confirmation_sent_to: 'don@example.pl' });
+  assert.deepStrictEqual(ok, { ...booked, confirmation_sent_to: 'don@example.pl', confirmation_to: 'don@example.pl', confirmation_error: null });
   const failed = run(result, { nodes: { 'Format Results': booked, 'Send Confirmation Email': { error: { message: 'quota' } }, 'Build Confirmation Email': { to: 'x' } } })[0].json;
   assert.strictEqual(failed.confirmation_sent_to, null);
+  assert.strictEqual(failed.confirmation_error, 'quota');
   const skipped = run(result, { nodes: { 'Format Results': booked } })[0].json;
   assert.strictEqual(skipped.confirmation_sent_to, null);
   assert.strictEqual(skipped.success, true);
