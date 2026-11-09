@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ElliotMark } from "@/app/_ui/elliot-logo";
 import { isAdminEmail } from "@/lib/admin";
 import { getAdminView, getMembership } from "@/lib/tenant";
 import SignOutButton from "./dashboard/sign-out-button";
@@ -169,7 +170,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </span>
       <div className="min-w-0 leading-tight">
         <div className="truncate text-[14px] font-semibold tracking-[-0.01em] text-ink">{tenantName}</div>
-        <div className="text-[12px] text-gray-500">Elliot assistant</div>
+        <div className="flex items-center gap-1 text-[12px] text-gray-500">
+          <ElliotMark size={11} />
+          Elliot assistant
+        </div>
       </div>
     </div>
   );
