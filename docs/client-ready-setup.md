@@ -131,29 +131,10 @@ so nothing breaks if you skip this.
 
 ## 4. WhatsApp (only if the client gets it)
 
-1. Import `25-whatsapp-inbound-trigger.json` as a new workflow (as in 3d)
-   and delete the old 25. Both use the `whatsapp` webhook path, so only one
-   can be active.
-2. Open **Check Verify Token** and replace
-   `PASTE_WHATSAPP_VERIFY_TOKEN_HERE` with your verify token (the same one
-   you enter in Meta's webhook settings).
-3. Open **Verify Meta Signature** and replace
-   `PASTE_META_APP_SECRET_HERE` with your App Secret (Meta App Dashboard →
-   App settings → Basic → App Secret).
-4. Select credentials on the flagged nodes, Save, Activate.
-
-The real values live only in your n8n. **Never export this workflow back
-into the repo with them filled in**; the repo keeps the placeholders. If
-you ever move to a plan with Variables, or self-host, variables named
-`WHATSAPP_VERIFY_TOKEN` / `META_APP_SECRET` take priority over the pasted
-values.
-
-`require('crypto')` (used for the signature) works on n8n Cloud. Self-hosted
-n8n needs `NODE_FUNCTION_ALLOW_BUILTIN=crypto`.
-
-If messages stop arriving, look at workflow 25's executions: `Verify Meta
-Signature` outputs a `_signature` field saying why (`no_secret_configured`,
-`missing`, `invalid`, `no_raw_body`).
+WhatsApp now answers instantly through Elliot, like the website chat
+(November 2026, migration 0032 and workflows 01, 25, 32). Follow
+**`docs/whatsapp-setup.md`**: Meta app and token, the three workflows, the
+webhook, the dashboard setting, and an end-to-end test.
 
 ## 5. Per-client switches (in the dashboard)
 

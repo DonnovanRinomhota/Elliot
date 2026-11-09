@@ -1,5 +1,9 @@
 # Workflow Spec: 26 - Draft WhatsApp Reply
 
+> **No longer used (November 2026).** Workflow 25 now sends WhatsApp messages
+> to Elliot (workflow 01), which answers instantly; see `25-whatsapp-inbound-trigger.md`.
+> Kept so the repo still documents drafts already in Approvals.
+
 ## Trigger
 Sub-workflow, called via Execute Workflow node from `25` (WhatsApp Inbound Trigger), after `13` (Classify, reused) has already run.
 

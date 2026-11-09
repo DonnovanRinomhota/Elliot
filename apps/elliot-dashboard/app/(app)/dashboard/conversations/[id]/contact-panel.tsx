@@ -10,8 +10,8 @@ type Contact = { id: string; name: string | null; email: string | null; phone: s
 
 const MISSING_HINT: Record<string, string> = {
   chat_widget: "Website chats now ask for a name and an email or phone before Elliot answers. Older chats may not have them.",
-  whatsapp: "WhatsApp gives us the phone number. If there's no name, Elliot's drafted reply asks for it; add it here once you know it.",
-  email: "Email gives us the address. If there's no name, Elliot's drafted reply asks for it; add it here once you know it.",
+  whatsapp: "WhatsApp gives us the phone number. If there's no name, Elliot asks for it in the chat; you can also add it here.",
+  email: "Email gives us the address. If there's no name, Elliot asks for it in the chat; you can also add it here.",
 };
 
 // The person in this conversation. The team can fill in or correct their

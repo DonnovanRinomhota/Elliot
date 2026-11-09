@@ -52,8 +52,9 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   // has a real send pipeline (workflow 17 -> 15), so that's the only channel
   // this supports today. See KNOWN_ISSUES.md.
   const canReplyAsHuman = conversation.channel === "email" && !!contact?.email;
-  // Website chat: a person can take over live (0027 + the widget's polling).
-  const isLiveChat = conversation.channel === "chat_widget";
+  // Website chat and WhatsApp: a person can take over live (0027 + the
+  // widget's polling; WhatsApp replies go out through workflow 32).
+  const isLiveChat = conversation.channel === "chat_widget" || conversation.channel === "whatsapp";
   const handler = conversation.handler as unknown as { full_name: string | null; email: string } | null;
   const handledByMe = Boolean(me && conversation.assigned_human === me.id);
   const handlerName = conversation.assigned_human && !handledByMe ? handler?.full_name || handler?.email?.split("@")[0] || "A colleague" : null;
@@ -62,6 +63,8 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   // Older chats can hold the same visitor message several times (fixed in
   // workflow 01; migration 0031 removes the copies). Never show them twice.
   const shown = withoutRepeats((messages ?? []) as { id: string; role: string; content: string; created_at: string }[]);
+  // WhatsApp's 24-hour reply window starts at the client's last message.
+  const lastInboundAt = [...shown].reverse().find((m) => m.role === "user")?.created_at ?? null;
   const ROLE_LABEL: Record<string, string> = {
     user: contactName,
     assistant: "Elliot",
@@ -106,7 +109,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
                       {messageTime(m.created_at)}
                     </div>
                     <div
-                      className={`max-w-[78%] whitespace-pre-wrap rounded-lg px-4 py-2.5 text-[14px] leading-relaxed ${
+                      className={`max-w-[78%] whitespace-pre-wrap [overflow-wrap:anywhere] rounded-lg px-4 py-2.5 text-[14px] leading-relaxed ${
                         isHuman
                           ? "bg-ink text-white"
                           : isOutbound
@@ -133,7 +136,14 @@ export default async function ConversationDetailPage({ params }: { params: { id:
               {conversation.assigned_human && <AutoRefresh seconds={4} />}
               {/* Pinned to the bottom of the screen while the messages scroll. */}
               <div className="sticky bottom-0 z-10 -mx-2 mt-6 bg-gradient-to-t from-[#eef1f6] from-70% to-transparent px-2 pb-4 pt-3">
-                <ChatControls conversationId={conversation.id} handledByMe={handledByMe} handlerName={handlerName} canTakeOver={Boolean(me)} />
+                <ChatControls
+                  conversationId={conversation.id}
+                  handledByMe={handledByMe}
+                  handlerName={handlerName}
+                  canTakeOver={Boolean(me)}
+                  channel={conversation.channel === "whatsapp" ? "whatsapp" : "chat_widget"}
+                  lastInboundAt={lastInboundAt}
+                />
               </div>
             </>
           )}

@@ -1,67 +1,92 @@
 # Workflow Spec: 25 - WhatsApp Inbound Trigger
 
-## Trigger
-Two webhook nodes sharing the same path (`/webhook/whatsapp`), distinguished by HTTP method — this is how Meta's WhatsApp Cloud API integration works: it verifies the URL once with a `GET`, then delivers every subsequent event as a `POST` to the same URL.
+## What it does
+Every WhatsApp message a client sends to an agency's number arrives here.
+The workflow hands it to **Elliot** (workflow `01`, the same agent as the
+website chat) and sends Elliot's answer back on WhatsApp, usually within a
+few seconds. So WhatsApp gets everything the website chat gets: answers
+from the knowledge base, listing search, viewings booked with the property,
+lead capture and scoring, hand-over to a person, and a team member taking
+the chat over from the dashboard.
 
-## How a phone number maps to a tenant
-`Lookup Tenant by Phone Number Id` selects from `ai_config` where `whatsapp_phone_number_id` = the `phone_number_id` Meta's payload says the message arrived on. **This is a real improvement over the equivalent email mechanism, not just a copy of it:** `16-email-inbound-trigger.md` documents that only one Gmail OAuth2 credential is wired into that trigger node, so only one tenant's mailbox is ever actually reachable no matter how many rows have `connected_gmail_address` set. WhatsApp Cloud API doesn't have that constraint — many phone numbers can live under one Meta Business Account behind a single access token, and every webhook payload names which number received it. So this lookup is expected to genuinely route more than one tenant once more than one tenant has a real number configured, using the one shared credential on workflow 27's send node.
+Until November 2026 this workflow classified the message (`13`) and wrote a
+draft (`26`) that waited in Approvals. That made clients wait for someone
+to click Send, so it was replaced by instant replies (migration `0032`).
+Workflows `26`/`27`/`28` stay in the repo so drafts already in Approvals can
+still be sent, but `25` no longer creates new drafts.
+
+## Trigger
+Two webhook nodes sharing the path `/webhook/whatsapp`: Meta verifies the
+URL once with a `GET`, then delivers every event as a `POST`.
 
 ## Nodes (in order)
 | Node | What it does |
 |---|---|
-| WhatsApp Verify (GET) | Receives Meta's one-time (or repeated, if you re-verify) handshake request |
-| Check Verify Token | Compares `hub.verify_token` against the verify token pasted into this node (or a `WHATSAPP_VERIFY_TOKEN` variable, where available); `hub.mode` must be `subscribe` |
-| Verify OK? | Branches on the result |
-| Respond Challenge / Respond Verify Failed | Echoes `hub.challenge` back as plain text (200) if valid, else a 403 |
-| WhatsApp Webhook (POST) | Receives every inbound message and delivery/read status update Meta sends |
-| Respond Ack | Fires immediately, in parallel with the processing branch below — Meta expects a fast 200 regardless of content and will retry aggressively (eventually disabling the webhook) if it doesn't get one quickly |
-| Extract WhatsApp Fields | Parses Meta's payload; sets `skip: true` for status-update pings (no `messages` key at all) and for any message that isn't `type: "text"` |
-| Should Process? | Drops anything flagged `skip` |
-| Lookup Tenant by Phone Number Id | Resolves tenant via `whatsapp_phone_number_id` |
-| If Tenant Found | Branches to the real pipeline, or to logging |
-| Log Unmatched Number *(false branch)* | Inserts an `audit_log` row (`event_type: 'whatsapp_unmatched_phone_number_id'`) — see Error paths |
-| Upsert Contact | Creates or updates the `contacts` row by `(tenant_id, phone)`, keeping an existing name rather than overwriting it with WhatsApp's profile display name |
-| Get or Create Conversation (WhatsApp) | Resolves or creates the one `conversations` row for `(tenant, contact, channel='whatsapp')` — reused forever, same simplification `16` uses for email, no thread concept needed since the phone number itself is the thread |
-| Insert Inbound Message | Logs the message as `role: 'user'` |
-| Execute: Classify (reused) | Calls workflow `13` — see note below |
-| Execute: Draft WhatsApp Reply | Calls workflow `26` |
+| WhatsApp Verify (GET) → Check Verify Token → Verify OK? → Respond Challenge / Respond Verify Failed | Meta's subscription handshake. Unchanged. |
+| WhatsApp Webhook (POST) | Every message and delivery/read status. Raw Body on (for the signature). |
+| Respond Ack | 200 straight away, in parallel with the rest, so Meta doesn't retry. |
+| Verify Meta Signature → Signature Valid? | Drops anything not signed with the Meta App Secret. Unchanged. |
+| Extract WhatsApp Fields | Reads Meta's payload. Text and button replies pass through as they are. Photos, voice notes, documents, stickers, locations and contact cards become a short note, e.g. `[Sent a photo: is this the building?]`, so Elliot can answer (it can't open media yet). Statuses, reactions and empty messages are skipped. |
+| Should Process? | Stops skipped events. |
+| Lookup Tenant by Phone Number Id | `ai_config.whatsapp_phone_number_id` (Settings → WhatsApp phone number ID) → the agency, with its slug for Elliot. Always outputs, so an unknown number reaches the next node. |
+| If Tenant Found → Log Unmatched Number | Unknown number → `audit_log` (`whatsapp_unmatched_phone_number_id`). |
+| Claim Message | `claim_whatsapp_message()` (0032). Meta sometimes delivers a message twice; only the first copy carries on, so the client never gets two answers. |
+| Is New Message? | Stops repeats. |
+| Upsert Contact | The contact by phone (any format, saved as `+48…`). WhatsApp's profile name only fills a blank name. |
+| Get or Create Conversation (WhatsApp) | One conversation per client on WhatsApp, reused. |
+| Build Elliot Request | Elliot's chat webhook address (worked out from this n8n's own address, or pasted), plus `{ tenant_slug, message, conversation_id, channel: 'whatsapp', contact: { name, phone } }`. |
+| Ask Elliot | `POST` to workflow `01`. Elliot saves the client's message and its own answer in the conversation. Never errors the workflow; the next node reads the result. |
+| Read Elliot Answer | Elliot's `reply`; or nothing when a team member has taken the chat over (`human: true`: the person answers from the dashboard); or, if Elliot failed, a short holding message so the client isn't ignored. |
+| Has Reply? → Format for WhatsApp | Turns Elliot's Markdown into WhatsApp formatting (`**bold**` → `*bold*`, `[text](link)` → `text: link`, no headings, bullets as `•`), max 4096 characters. |
+| Send WhatsApp Reply | `POST https://graph.facebook.com/v20.0/{phone_number_id}/messages` with the "WhatsApp Cloud API token" credential. |
+| Check Send Result → Send Failed? → Log Send Failure | If Meta refuses the message, `log_whatsapp_send_failure()` (0032) writes `audit_log` (`whatsapp_send_failed`) and a note the team sees in the conversation. |
+| Elliot Failed? → Log Elliot Failure | `audit_log` (`whatsapp_elliot_failed`) when Elliot errored or answered nothing. |
 
-## Workflow 13 is reused as-is, not forked
-Classification is genuinely channel-agnostic — it only ever looks at subject+body text to pick one of six categories. Rather than duplicating it, this workflow calls the existing `13 - Classify Email` sub-workflow, passing the WhatsApp sender id as `from_email` and empty strings for `subject`/`gmail_thread_id`/`gmail_message_id` (13 never reads the latter two). This is cosmetic — the field names say "email" but nothing about the classification logic actually depends on the channel — not a functional risk. If this is ever confusing in practice, the fix is renaming 13's input parameters to be channel-neutral, not building a second classifier.
+## Workflow 01 and WhatsApp
+`01` accepts an optional `channel: 'whatsapp'`. For WhatsApp:
+- the website's "name and email or phone first" form doesn't apply (the
+  phone number is always known). If the name isn't known, Elliot asks for
+  it in the conversation and saves it with `capture_lead`;
+- Elliot is told to write like a text message: short, plain text, links
+  written out, `*single asterisks*` for bold, same language as the client;
+- a `[Sent a photo]`-style note means Elliot can't open the attachment and
+  asks the client to type what they need.
 
-## Credentials required
-None on this workflow's own nodes beyond the shared Postgres credential — no WhatsApp credential is needed to *receive* messages, only to send them (see workflow `27`).
+Elliot's conversation history is now the latest 20 messages (it was the
+first 20, which broke long WhatsApp chats; fixed in 0032).
 
-## Secrets required
-n8n Cloud Starter has no Variables and blocks `$env`, so both secrets are
-**pasted into their Code node after import**, replacing a placeholder. The
-repo only ever holds the placeholders; don't export the workflow back with
-real values. On plans with Variables, or self-hosted with `$env` allowed, a
-variable of the same name takes priority over the pasted value.
+## Credentials
+- **Elliot Postgres (service role)** on every Postgres node.
+- **WhatsApp Cloud API token** (HTTP Header Auth: `Authorization` =
+  `Bearer <token>`) on *Send WhatsApp Reply*. The same credential as `27`
+  and `32`; one token covers every agency's number.
 
-- **Verify token** (`Check Verify Token`, placeholder
-  `PASTE_WHATSAPP_VERIFY_TOKEN_HERE`; variable `WHATSAPP_VERIFY_TOKEN`) — a
-  secret string you choose and also enter in the Meta App dashboard's
-  webhook configuration. Meta echoes it back on the verify `GET`; the
-  workflow checks it matches before confirming the subscription. Left as
-  the placeholder, every handshake is refused.
-- **Meta App Secret** (`Verify Meta Signature`, placeholder
-  `PASTE_META_APP_SECRET_HERE`; variable `META_APP_SECRET`) — from Meta App
-  Dashboard → App settings → Basic. Used to verify each POST's
-  `X-Hub-Signature-256` over the raw body (**Raw Body** is on in the
-  `WhatsApp Webhook (POST)` node in this export). Left as the placeholder,
-  every message is dropped (`no_secret_configured`).
+## Secrets pasted after import
+n8n Cloud Starter has no Variables and blocks `$env`, so these are pasted
+into their Code node, replacing a placeholder. Never export the workflow
+back into the repo with real values.
+- **Verify token** (`Check Verify Token`, `PASTE_WHATSAPP_VERIFY_TOKEN_HERE`).
+- **Meta App Secret** (`Verify Meta Signature`, `PASTE_META_APP_SECRET_HERE`).
+- **Elliot's chat address** (`Build Elliot Request`,
+  `PASTE_ELLIOT_CHAT_WEBHOOK_URL_HERE`): optional. Left as the placeholder,
+  it's worked out from this n8n's own address
+  (`https://<you>.app.n8n.cloud/webhook/chat`).
 
-`require('crypto')` works on n8n Cloud; self-hosted needs
-`NODE_FUNCTION_ALLOW_BUILTIN=crypto`. A `WHATSAPP_SIGNATURE_CHECK` variable
-set to `off` skips the signature check for local testing with hand-written
-payloads; never in production.
+A variable of the same name (`WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET`,
+`ELLIOT_CHAT_WEBHOOK_URL`) wins on plans that have Variables.
 
 ## Error paths
-- **Unmatched `phone_number_id` → logged to `audit_log`, not silently dropped.** This is a deliberate improvement over `16`'s documented gap (a misconfigured `connected_gmail_address` drops mail with zero trace). Still requires someone to actually look at `audit_log`; no alerting is built.
-- **Non-text messages (image, audio, location, document, etc.) are skipped, not handled.** `Extract WhatsApp Fields` flags these and the pipeline stops there — no draft, no reply, no record beyond nothing happening. Building real media support (downloading from Meta's authenticated media URL, storing it, giving Claude something to look at) is future work.
-- **Unsigned or forged POSTs are dropped.** `Verify Meta Signature` recomputes Meta's `X-Hub-Signature-256` (HMAC-SHA256 of the raw body with the Meta App Secret) and `Signature Valid?` stops anything that isn't `valid`. The POST still gets its 200 ack first, so Meta doesn't retry. The node's `_signature` output says why a message was dropped: `no_secret_configured`, `missing`, `invalid` or `no_raw_body`.
-- **The `WhatsApp Webhook (POST)` node has two outputs firing per event** (`Respond Ack` and `Extract WhatsApp Fields`) — this is intentional (see Trigger notes above), not a duplicate-processing bug; only one branch touches the database.
+- Unsigned or forged POST → dropped after the 200 ack; `_signature` says why.
+- Unknown phone number id → `audit_log`.
+- Repeated delivery → ignored.
+- Elliot errors or times out (2 minutes) → holding message to the client +
+  `audit_log`.
+- Meta refuses the reply → `audit_log` + a note in the conversation. Common
+  codes: `190` token expired, `131030` the test number can only message
+  numbers added in Meta's API Setup, `131047` more than 24 hours since the
+  client's last message.
+- Several quick messages in a row are answered one by one (each runs
+  through Elliot separately), as on the website.
 
 ## Expected output
-No return value consumed by anything — like `16`, this is a top-level trigger workflow.
+None; a top-level trigger.

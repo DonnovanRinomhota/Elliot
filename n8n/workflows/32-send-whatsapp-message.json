@@ -1,0 +1,286 @@
+{
+  "name": "32 - Send WhatsApp Message",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-whatsapp-message",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "90c84e5e-615e-521a-b6b4-4ea2f5758f93",
+      "name": "Send WhatsApp Message Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Elliot Internal Webhook Secret"
+        }
+      },
+      "webhookId": "4b5f8dfc-e465-565a-8ddb-60ccb7b7649e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// From the dashboard (POST /api/conversations/:id/whatsapp), after it has\n// checked the signed-in team member belongs to this agency and has taken the\n// conversation over: { tenant_id, conversation_id, content }.\nconst body = $input.first().json.body || {};\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nfor (const f of ['tenant_id', 'conversation_id']) {\n  if (!body[f] || !uuid.test(String(body[f]))) throw new Error(`${f} is required and must be a uuid`);\n}\nconst content = String(body.content || '').trim();\nif (!content) throw new Error('content is required');\nif (content.length > 4096) throw new Error('content is longer than WhatsApp allows (4096 characters)');\nreturn [{ json: { tenant_id: String(body.tenant_id), conversation_id: String(body.conversation_id), content } }];"
+      },
+      "id": "3badaa03-6953-5658-b080-7f7780bf3478",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- The client's number, the agency's WhatsApp number id and when the client\n-- last wrote. No row unless it's this agency's WhatsApp conversation.\nselect\n  c.id as conversation_id,\n  ct.phone,\n  ac.whatsapp_phone_number_id as phone_number_id,\n  (select max(m.created_at) from messages m where m.conversation_id = c.id and m.role = 'user') as last_inbound_at\nfrom conversations c\nleft join contacts ct on ct.id = c.contact_id\nleft join ai_config ac on ac.tenant_id = c.tenant_id\nwhere c.id = $1::uuid and c.tenant_id = $2::uuid and c.channel = 'whatsapp';",
+        "options": {
+          "queryReplacement": "={{ [ $json.conversation_id, $json.tenant_id ] }}"
+        }
+      },
+      "id": "2fc5ca0e-329c-570a-88e9-ff67b4b54546",
+      "name": "Load Conversation",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -460,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// One row when the conversation is this agency's WhatsApp chat, nothing\n// otherwise ('Load Conversation' always outputs, so this sees {}).\n// WhatsApp only accepts a free-form message within 24 hours of the client's\n// last message; after that it needs an approved template (not built), so\n// it's refused here with a clear reason instead of failing at Meta.\nconst r = $input.first().json || {};\nconst input = $('Validate Input').first().json;\nconst fail = (code, error) => [{ json: { ok: false, code, error } }];\n\nif (!r.conversation_id) return fail(404, 'This WhatsApp conversation was not found.');\nif (!r.phone_number_id) {\n  return fail(422, 'This agency has no WhatsApp number set up yet. Add the WhatsApp phone number id in Settings.');\n}\nconst to = String(r.phone || '').replace(/\\D/g, '');\nif (to.length < 6) return fail(422, 'This contact has no WhatsApp number on file.');\nconst last = r.last_inbound_at ? new Date(r.last_inbound_at).getTime() : NaN;\nif (!Number.isFinite(last) || Date.now() - last >= 24 * 3600e3) {\n  return fail(409, \"WhatsApp only allows replies within 24 hours of the client's last message. Wait for them to write again, or call or email them.\");\n}\nreturn [{ json: { ok: true, to, phone_number_id: r.phone_number_id, text: input.content } }];"
+      },
+      "id": "f0648e43-961e-5eed-89c8-46fb29494ead",
+      "name": "Check Conversation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-can-send",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a98d580f-e6ea-5ae2-9db0-78e5eaae087d",
+      "name": "Can Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -20,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v20.0/' + $json.phone_number_id + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: $json.to, type: 'text', text: { preview_url: true, body: $json.text } }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "78bf0bf6-62a9-5968-8d26-876b81805b50",
+      "name": "Send via WhatsApp API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        -100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_CRED_ID",
+          "name": "WhatsApp Cloud API token"
+        }
+      },
+      "notes": "The same \"WhatsApp Cloud API token\" credential as workflows 25 and 27."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta answers { messages: [{ id }] } when it accepted the message, or\n// { error: { message, code } } when it didn't.\nconst r = $input.first().json;\nconst status = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nconst apiError = body && typeof body === 'object' ? body.error : null;\nif (status >= 200 && status < 300 && !apiError) {\n  const id = (body && body.messages && body.messages[0] && body.messages[0].id) || null;\n  return [{ json: { code: 200, response: { success: true, wa_message_id: id } } }];\n}\nconst reason = apiError\n  ? `${apiError.message || 'unknown error'}${apiError.code ? ` (code ${apiError.code})` : ''}`\n  : `HTTP ${status || 'no response'}`;\nreturn [{ json: { code: 502, response: { success: false, error: `WhatsApp refused the message: ${reason}` } } }];"
+      },
+      "id": "c7989ea0-0a1b-5e8b-bbb3-4a9f48ea888f",
+      "name": "Send Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      },
+      "id": "2e64abce-e1c8-51ba-a982-5334cd249dc3",
+      "name": "Respond Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      },
+      "id": "750d62db-1736-5099-984f-4cc09f5de28e",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        100
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Send WhatsApp Message Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Load Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Conversation": {
+      "main": [
+        [
+          {
+            "node": "Check Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conversation": {
+      "main": [
+        [
+          {
+            "node": "Can Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Send?": {
+      "main": [
+        [
+          {
+            "node": "Send via WhatsApp API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via WhatsApp API": {
+      "main": [
+        [
+          {
+            "node": "Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Result": {
+      "main": [
+        [
+          {
+            "node": "Respond Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
