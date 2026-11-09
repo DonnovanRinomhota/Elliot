@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import PasswordInput from "../_ui/password-input";
+import { ElliotLogo } from "@/app/_ui/elliot-logo";
 
 type Mode = "sign-in" | "create-business";
 
@@ -199,10 +200,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-[380px]">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-ink text-[14px] font-semibold text-white">
-            E
-          </span>
-          <span className="text-[16px] font-semibold text-ink">Elliot</span>
+          <ElliotLogo size={34} className="text-ink" />
         </div>
         <div className="card p-7">{children}</div>
         <p className="mt-6 text-center text-[12.5px] text-gray-400">Your AI front office for leads, viewings and client messages.</p>

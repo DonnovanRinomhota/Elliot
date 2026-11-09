@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ElliotMark } from "@/app/_ui/elliot-logo";
 import { isAdminEmail } from "@/lib/admin";
 import PlatformTabs from "./platform-tabs";
 
@@ -20,9 +21,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
       <header className="border-b border-ink-800 bg-ink text-white">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 md:px-8">
           <div className="flex items-center gap-2.5">
-            <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-[14px] font-semibold text-ink">
-              E
-            </span>
+            <ElliotMark size={32} />
             <div className="leading-tight">
               <div className="text-[14px] font-semibold">Elliot</div>
               <div className="text-[12px] text-ink-200">Control panel</div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { ElliotLogo } from "@/app/_ui/elliot-logo";
 
 export default function ForgotPasswordPage() {
   const supabase = createClient();
@@ -34,10 +35,7 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-[380px]">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-md bg-ink text-[14px] font-semibold text-white">
-            E
-          </span>
-          <span className="text-[16px] font-semibold text-ink">Elliot</span>
+          <ElliotLogo size={34} className="text-ink" />
         </div>
       <div className="card p-7">
         <h1 className="m-0 mb-2 text-[20px] font-semibold text-ink">Reset your password</h1>
