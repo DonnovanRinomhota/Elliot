@@ -1,7 +1,7 @@
 // Run with: npm test. CSV and number parsing for the Listings import.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCsv, parseNumber, formatPrice } from "./listings";
+import { parseCsv, parseNumber, formatPrice, propertyLink } from "./listings";
 
 test("parseCsv handles quotes, escaped quotes, CRLF and semicolons", () => {
   assert.deepEqual(parseCsv('a,b\r\n"x, y","say ""hi"""\r\n'), [
@@ -34,4 +34,14 @@ test("formatPrice", () => {
   assert.equal(formatPrice(820000, "PLN", "sale"), "820 000 PLN");
   assert.equal(formatPrice("3200", "PLN", "rent"), "3 200 PLN / month");
   assert.equal(formatPrice(null, "PLN", "sale"), "Price on request");
+});
+
+test("propertyLink: the agency's page, else Elliot's property page", () => {
+  assert.equal(propertyLink("L1", "https://agency.pl/oferta/1"), "https://agency.pl/oferta/1");
+  assert.equal(propertyLink("L1", null), "/p/L1");
+  assert.equal(propertyLink("L1", "  "), "/p/L1");
+  assert.equal(propertyLink("L1", "https://drive.google.com/drive/folders/abc"), "/p/L1");
+  assert.equal(propertyLink("L1", "https://www.dropbox.com/sh/x"), "/p/L1");
+  assert.equal(propertyLink("L1", "agency.pl/no-scheme"), "/p/L1");
+  assert.equal(propertyLink("L1", null, "https://elliot.example/"), "https://elliot.example/p/L1");
 });

@@ -143,7 +143,7 @@ test('01: listing results are turned into text Claude can quote, and usage accum
   assert.match(text, /2-room flat with balcony \(ref A-1\)/);
   assert.match(text, /For sale: 820000 PLN/);
   assert.match(text, /Mokotów, Warszawa, 48 m2, 2 rooms, floor 3/);
-  assert.match(text, /Link: https:\/\/x\.test\/a1/);
+  assert.match(text, /Link \(send this to the visitor\): https:\/\/x\.test\/a1/);
   assert.match(text, /Available now/);
   assert.strictEqual(found.usage_input_tokens, 1500);
   assert.strictEqual(found.usage_output_tokens, 150);
@@ -214,8 +214,10 @@ test('24: accepts hot_lead, emails every recipient with a link to the conversati
   })[0].json;
   const raw = decodeRaw(out.raw_message);
   assert.match(raw, /^To: office@acme\.test, ola@acme\.test\r\n/);
-  assert.match(raw, /Subject: \[Elliot\] Hot lead ready to talk \(high\)/);
-  assert.match(raw, /\/dashboard\/conversations\/conv-1/);
+  // 0033: the subject is UTF-8 encoded (client names can have Polish letters) and names the client.
+  assert.match(raw, /Subject: =\?UTF-8\?B\?/);
+  assert.strictEqual(out.subject, '[Elliot] Hot lead ready to talk: A client (high)');
+  assert.match(out.body, /\/dashboard\/conversations\/conv-1/);
 });
 
 // ───────────── 31: daily summary ─────────────

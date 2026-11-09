@@ -18,6 +18,8 @@ import {
   timeRange,
   weekLabel,
   weekStart,
+  bookedAtLabel,
+  channelLabel,
 } from "./appointments";
 
 test("day keys are in the agency's time zone", () => {
@@ -80,4 +82,13 @@ test("names, addresses and map links", () => {
   assert.equal(personName(null), "Unassigned");
   assert.equal(listingAddress({ address: "ul. Puławska 145", district: "Mokotów", city: " " }), "ul. Puławska 145, Mokotów");
   assert.equal(mapsUrl("ul. Puławska 145, Warszawa"), "https://www.google.com/maps/search/?api=1&query=ul.%20Pu%C5%82awska%20145%2C%20Warszawa");
+});
+
+test("when and where a viewing was booked", () => {
+  assert.equal(bookedAtLabel("2026-11-09T15:12:00Z", "Europe/Warsaw"), "9 Nov 2026, 16:12");
+  assert.equal(bookedAtLabel("2026-11-09T15:12:00Z", "Europe/Warsaw", false), "9 Nov, 16:12");
+  assert.equal(channelLabel("whatsapp"), "WhatsApp");
+  assert.equal(channelLabel("chat_widget"), "website chat");
+  assert.equal(channelLabel("phone_call"), "phone call");
+  assert.equal(channelLabel(null), null);
 });

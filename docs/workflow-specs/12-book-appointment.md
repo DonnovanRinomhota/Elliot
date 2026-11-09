@@ -38,3 +38,11 @@ Called as a sub-workflow via n8n's "Execute Workflow" node — invoked by the Ma
 
 ## Connecting this to the Main Agent
 Copy this workflow's ID from n8n and confirm it matches the workflow ID referenced in the Main Agent's "Execute: Book Appointment Sub-Workflow" node.
+
+## Confirmation email and the conversation (0033)
+- **Input `conversation_id`** (from 01): stored on `appointments.conversation_id`, so the appointment shows when and on which channel it was booked and links to the chat. The calendar event's description links to it too, with the client's phone.
+- **Confirmation email to the client.** After the booking is saved: *Has Client Email?* → *Build Confirmation Email* (English, then Polish: day and time in the agency's time zone, property, price and size, address, agent, and the property link) → *Send Confirmation Email* through the agency's Gmail (**Gmail account** credential, the same as 15 and 24). It runs with *On Error: Continue*: a failed email never fails the booking.
+- **Property link:** the listing's own website page when it has one, otherwise the dashboard's public property page `/p/<listing id>` with the photos (a Google Drive or Dropbox folder isn't a property page, so it gets ours). `DASHBOARD_URL` in *Format Results* and *Build Confirmation Email* must match the dashboard's address.
+- **Output** now also has `listing_link` and `confirmation_sent_to` (null when no email went out). Elliot uses them to tell the client the confirmation was emailed.
+
+Elliot (01) asks for the client's email before booking so the confirmation can be sent; if they don't want to give one, it books anyway.

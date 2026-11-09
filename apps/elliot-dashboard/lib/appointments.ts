@@ -9,10 +9,11 @@ export const DEFAULT_TZ = "Europe/Warsaw";
 
 /** Columns for an appointment with its client, listing and agent. */
 export const APPOINTMENT_SELECT =
-  "id, starts_at, ends_at, timezone, status, notes, created_at, listing_id, agent_id, " +
+  "id, starts_at, ends_at, timezone, status, notes, created_at, listing_id, agent_id, conversation_id, " +
   "contact:contacts(id, name, email, phone), " +
   "listing:listings(id, title, reference, address, district, city, photos, image_url, url, price, currency, transaction_type, rooms, area_m2, floor), " +
-  "agent:tenant_users(id, full_name, email)";
+  "agent:tenant_users(id, full_name, email), " +
+  "conversation:conversations(id, channel)";
 
 export type ApptListing = {
   id: string;
@@ -45,7 +46,29 @@ export type Appointment = {
   contact: { id?: string; name: string | null; email: string | null; phone: string | null } | null;
   listing: ApptListing | null;
   agent: { id: string; full_name: string | null; email: string } | null;
+  /** The conversation the viewing was booked in (0033); null for older or manual bookings. */
+  conversation_id?: string | null;
+  conversation?: { id: string; channel: string } | null;
 };
+
+const CHANNEL_LABEL: Record<string, string> = { whatsapp: "WhatsApp", chat_widget: "website chat", email: "email", sms: "SMS" };
+
+/** "on WhatsApp", "on website chat"... for where a viewing was booked. */
+export function channelLabel(channel: string | null | undefined): string | null {
+  return channel ? CHANNEL_LABEL[channel] ?? channel.replace(/_/g, " ") : null;
+}
+
+/** When a viewing was booked, in the agency's time zone: "9 Nov 2026, 16:12". */
+export function bookedAtLabel(createdAt: string, tz: string, withYear = true): string {
+  return new Date(createdAt).toLocaleString("en-GB", {
+    timeZone: tz,
+    day: "numeric",
+    month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export type TeamMember = { id: string; full_name: string | null; email: string; role: string };
 

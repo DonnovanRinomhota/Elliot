@@ -3,10 +3,12 @@ import { ExternalLink, MapPin, Phone, Mail, MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { contactLabel } from "@/lib/contacts";
 import { listingPhotos } from "@/lib/listing-photos";
-import { formatPrice } from "@/lib/listings";
+import { formatPrice, propertyLink } from "@/lib/listings";
 import {
   APPOINTMENT_SELECT,
   DEFAULT_TZ,
+  bookedAtLabel,
+  channelLabel,
   dayKey,
   dayLabel,
   listingAddress,
@@ -20,7 +22,7 @@ import AppointmentActions from "../appointment-actions";
 import AgentPicker from "./agent-picker";
 import ChangeListing from "./change-listing";
 import ListingPicker from "./listing-picker";
-import PhotoGallery from "./photo-gallery";
+import PhotoGallery from "@/app/_ui/photo-gallery";
 import BackButton from "@/app/_ui/back-button";
 
 // Everything an agent needs before a viewing: the property (photos, address,
@@ -33,7 +35,9 @@ export default async function AppointmentPage({ params }: { params: { id: string
 
   const [{ data: team }, { data: conversation }] = await Promise.all([
     supabase.from("tenant_users").select("id, full_name, email, role").is("removed_at", null).in("role", ["admin", "agent"]).order("full_name"),
-    a.contact?.id
+    a.conversation_id
+      ? Promise.resolve({ data: { id: a.conversation_id } })
+      : a.contact?.id
       ? supabase.from("conversations").select("id").eq("contact_id", a.contact.id).order("updated_at", { ascending: false }).limit(1).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
@@ -68,6 +72,18 @@ export default async function AppointmentPage({ params }: { params: { id: string
               {tz !== DEFAULT_TZ ? ` (${tz})` : ""}
             </span>
             <StatusBadge kind="appointment" value={a.status} />
+            <span className="basis-full text-[13px] text-gray-500 sm:basis-auto">
+              Booked {bookedAtLabel(a.created_at, tz)}
+              {a.conversation ? ` on ${channelLabel(a.conversation.channel)}` : ""}
+              {conversation && (
+                <>
+                  {" · "}
+                  <a href={`/dashboard/conversations/${(conversation as { id: string }).id}`} className="text-ink-600 underline">
+                    Read the conversation
+                  </a>
+                </>
+              )}
+            </span>
           </span>
         }
         actions={<AppointmentActions id={a.id} status={a.status} startsAt={a.starts_at} />}
@@ -117,9 +133,12 @@ export default async function AppointmentPage({ params }: { params: { id: string
                   <a href={`/dashboard/listings/${l.id}`} className={`${btn.secondary} ${btn.small}`}>
                     Open listing
                   </a>
-                  {l.url && (
+                  <a href={propertyLink(l.id, l.url)} target="_blank" rel="noreferrer" className={`${btn.ghost} ${btn.small}`}>
+                    Client&apos;s property page <ExternalLink size={13} aria-hidden="true" />
+                  </a>
+                  {l.url && !propertyLink(l.id, l.url).startsWith("http") && (
                     <a href={l.url} target="_blank" rel="noreferrer" className={`${btn.ghost} ${btn.small}`}>
-                      Listing page <ExternalLink size={13} aria-hidden="true" />
+                      Photo folder <ExternalLink size={13} aria-hidden="true" />
                     </a>
                   )}
                 </div>

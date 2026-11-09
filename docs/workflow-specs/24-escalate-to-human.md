@@ -44,3 +44,12 @@ After importing this workflow, open 01's **`Execute: Escalate To Human Sub-Workf
 
 ## Visibility
 A dedicated **Escalations** screen exists in the dashboard (`apps/elliot-dashboard/app/dashboard/escalations/`) — open/resolved split, acknowledge/resolve actions, and a direct link to the existing conversation viewer for full context. Without this screen, an escalation created by this workflow would have no UI at all.
+
+## What the alert email contains (0033)
+*Insert Escalation* also reads `escalation_context()`: the client's name, phone, email, the channel, and the latest 40 messages. The email has:
+- **What they need:** Elliot's summary (`context_summary`);
+- **Client:** name, phone, email, channel;
+- the link to the conversation (take over from there);
+- **Conversation so far:** the transcript, oldest first.
+
+The subject names the client, e.g. `[Elliot] Follow-up needed: Don`. Elliot (01) now has to call this tool whenever it tells a client someone from the team will contact them, send them something or follow up, so a promise in the chat always reaches a person.

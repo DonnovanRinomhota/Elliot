@@ -1,6 +1,6 @@
 import { StatusBadge } from "../../../_ui/ui";
 import { contactLabel } from "@/lib/contacts";
-import { DEFAULT_TZ, dayKey, dayLabel, personName, timeRange, type Appointment } from "@/lib/appointments";
+import { DEFAULT_TZ, bookedAtLabel, channelLabel, dayKey, dayLabel, personName, timeRange, type Appointment } from "@/lib/appointments";
 import { APPOINTMENT_GRID } from "./grid";
 import AppointmentActions from "./appointment-actions";
 import { ListingLine } from "./viewing-bits";
@@ -26,6 +26,9 @@ export default function AppointmentCard({ appointment, number }: { appointment: 
           <div className="tabular text-[12.5px] text-gray-500">
             {timeRange(a, tz)}
             {tz !== DEFAULT_TZ ? ` (${tz})` : ""}
+          </div>
+          <div className="tabular mt-0.5 whitespace-nowrap text-[11.5px] text-gray-400" title={`Booked ${bookedAtLabel(a.created_at, tz)}${a.conversation ? ` on ${channelLabel(a.conversation.channel)}` : ""}`}>
+            Booked {bookedAtLabel(a.created_at, tz, false)}
           </div>
         </div>
 
