@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { draftTimeline, inboundFor, stamp, type InboundMessage } from "@/lib/approvals";
+import { DEFAULT_TZ } from "@/lib/appointments";
 import ApprovalCard from "./approval-card";
 import FolderTabs, { FolderTab } from "../folder-tabs";
 import { EmptyState, FilterDescription, PageHeader, Pagination, paginate } from "../../../_ui/ui";
@@ -10,8 +12,9 @@ import { EmptyState, FilterDescription, PageHeader, Pagination, paginate } from 
 // from whatsapp_drafts -- see docs/workflow-specs/27-send-approved-whatsapp.md.
 const STATUS_TABS: FolderTab[] = [
   { key: "pending", label: "Waiting", count: 0, tone: "warning" },
+  { key: "sent", label: "Sent", count: 0, tone: "success" },
   { key: "auto_sent", label: "Sent automatically", count: 0, tone: "neutral" },
-  { key: "approved", label: "Approved", count: 0, tone: "success" },
+  { key: "approved", label: "Approved, sending", count: 0, tone: "success" },
   { key: "rejected", label: "Rejected", count: 0, tone: "danger" },
   { key: "blocked_needs_template", label: "Blocked on WhatsApp", count: 0, tone: "danger" },
 ];
@@ -30,16 +33,18 @@ export default async function ApprovalsPage({
   // email_drafts rather than merging them -- see migration 0025's header
   // comment. Merged into one list here, in application code, tagged by
   // channel so the card knows which table/RPC/send-webhook to use.
-  const [emailResult, whatsappResult] = await Promise.all([
+  const [emailResult, whatsappResult, { data: tenant }] = await Promise.all([
     supabase
       .from("email_drafts")
-      .select("id, to_email, subject, body, category, confidence, status, created_at")
+      .select("id, conversation_id, to_email, subject, body, category, confidence, status, created_at, reviewed_at, sent_at")
       .order("created_at", { ascending: false }),
     supabase
       .from("whatsapp_drafts")
-      .select("id, to_wa_id, body, category, confidence, status, created_at")
+      .select("id, conversation_id, to_wa_id, body, category, confidence, status, created_at, reviewed_at, sent_at, last_inbound_at")
       .order("created_at", { ascending: false }),
+    supabase.from("tenants").select("timezone").maybeSingle(),
   ]);
+  const tz = (tenant as { timezone?: string } | null)?.timezone || DEFAULT_TZ;
 
   if (emailResult.error) {
     return <p className="text-[13px] text-alert">Couldn&apos;t load email drafts: {emailResult.error.message}</p>;
@@ -68,13 +73,34 @@ export default async function ApprovalsPage({
   const visible = activeStatus === "all" ? scoped : scoped.filter((d: any) => d.status === activeStatus);
   const pg = paginate(visible, searchParams.page);
 
+  // The client's message each draft on this page answers, and the dates.
+  const conversationIds = [...new Set(pg.items.map((d: any) => d.conversation_id).filter(Boolean))] as string[];
+  const { data: inbound } = conversationIds.length
+    ? await supabase
+        .from("messages")
+        .select("conversation_id, content, created_at")
+        .in("conversation_id", conversationIds)
+        .eq("role", "user")
+        .order("created_at", { ascending: false })
+        .limit(500)
+    : { data: [] as InboundMessage[] };
+  const cards = pg.items.map((d: any) => {
+    const msg = inboundFor(d, (inbound ?? []) as InboundMessage[]);
+    const receivedAt = msg?.created_at ?? d.last_inbound_at ?? null;
+    return {
+      ...d,
+      timeline: draftTimeline(d, tz, receivedAt),
+      inbound: msg ? { content: msg.content, at: stamp(msg.created_at, tz) } : null,
+    };
+  });
+
   return (
     <div>
       <PageHeader
         title="Approvals"
         description={
           <FilterDescription days={days} count={scoped.length} noun={["draft", "drafts"]} clearHref="/dashboard/approvals">
-            Replies Elliot has drafted. Nothing is sent until you approve it. You can edit a draft before sending.
+            Drafts waiting for your OK, with the client&apos;s message and when it came in. Nothing is sent until you approve it, and you can edit a draft first.
           </FilterDescription>
         }
         tabs={
@@ -82,6 +108,7 @@ export default async function ApprovalsPage({
             tabs={tabs}
             activeKey={activeStatus}
             basePath="/dashboard/approvals"
+            defaultKey="pending"
             extraParams={days ? { days: String(days) } : {}}
           />
         }
@@ -93,7 +120,7 @@ export default async function ApprovalsPage({
         </EmptyState>
       ) : (
         <div className="grid gap-4">
-          {pg.items.map((draft: any) => (
+          {cards.map((draft: any) => (
             <ApprovalCard key={draft.id} draft={draft} />
           ))}
         </div>

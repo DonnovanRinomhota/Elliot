@@ -16,11 +16,14 @@ export default function FolderTabs({
   activeKey,
   basePath,
   extraParams = {},
+  defaultKey = "all",
 }: {
   tabs: FolderTab[];
   activeKey: string;
   basePath: string;
   extraParams?: Record<string, string>;
+  /** The tab the page shows when there's no status in the address (Approvals: "pending"). */
+  defaultKey?: string;
 }) {
   return (
     <nav aria-label="Filter by status" className="overflow-x-auto border-b border-gray-200">
@@ -28,7 +31,9 @@ export default function FolderTabs({
         {tabs.map((tab) => {
           const active = tab.key === activeKey;
           const params = new URLSearchParams(extraParams);
-          if (tab.key !== "all") params.set("status", tab.key);
+          // The default tab needs no status; every other tab must say which it is
+          // (Approvals defaults to "pending", so its "All" link needs status=all).
+          if (tab.key !== defaultKey) params.set("status", tab.key);
           const qs = params.toString();
           const href = `${basePath}${qs ? `?${qs}` : ""}`;
 

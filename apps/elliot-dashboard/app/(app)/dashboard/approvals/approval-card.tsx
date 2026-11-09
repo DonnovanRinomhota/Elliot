@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { StatusBadge, btn, humanize, timeAgo } from "../../../_ui/ui";
+import { StatusBadge, btn, humanize } from "../../../_ui/ui";
 
 // channel decides which table/RPC/send workflow this card talks to --
 // email_drafts + approve_email_draft() + workflow 17, or whatsapp_drafts +
@@ -21,6 +21,11 @@ type Draft = {
   confidence: string | number;
   status: string;
   created_at: string;
+  conversation_id?: string | null;
+  /** [label, date] steps, e.g. [["Received", "9 Nov 2026, 17:01"], ["Drafted", ...], ["Sent", ...]]. */
+  timeline?: [string, string][];
+  /** The client's message this draft answers. */
+  inbound?: { content: string; at: string } | null;
 };
 
 export default function ApprovalCard({ draft }: { draft: Draft }) {
@@ -128,13 +133,37 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
           </div>
           {!isWhatsapp && <h2 className="m-0 mt-0.5 text-[15px] font-semibold text-ink">{draft.subject}</h2>}
           <div className="mt-1 text-[12.5px] text-gray-500">
-            {[humanize(draft.category), confidenceText, timeAgo(draft.created_at)].filter(Boolean).join(", ")}
+            {[humanize(draft.category), confidenceText].filter(Boolean).join(", ")}
           </div>
+          {draft.timeline && draft.timeline.length > 0 && (
+            <dl className="m-0 mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px]">
+              {draft.timeline.map(([label, at]) => (
+                <div key={label} className="flex gap-1.5">
+                  <dt className="text-gray-500">{label}</dt>
+                  <dd className="tabular m-0 text-ink">{at}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
         <StatusBadge kind="draft" value={draft.status} />
       </header>
 
       <div className="px-5 py-4">
+        {draft.inbound && (
+          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-[12px] text-gray-500">
+              <span className="font-medium text-gray-600">Client&apos;s message · {draft.inbound.at}</span>
+              {draft.conversation_id && (
+                <a href={`/dashboard/conversations/${draft.conversation_id}`} className="text-ink-600 underline">
+                  Open conversation
+                </a>
+              )}
+            </div>
+            <p className="m-0 line-clamp-4 whitespace-pre-wrap text-[13.5px] leading-relaxed text-gray-700">{draft.inbound.content}</p>
+          </div>
+        )}
+        <div className="mb-1.5 text-[12px] font-medium text-gray-500">{isPending ? "Elliot's draft reply" : "Reply"}</div>
         {isEditing ? (
           <>
             <label htmlFor={`body-${draft.id}`} className="mb-1.5 block text-[12.5px] font-medium text-gray-600">

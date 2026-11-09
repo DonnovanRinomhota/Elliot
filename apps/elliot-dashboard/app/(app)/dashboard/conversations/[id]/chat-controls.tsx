@@ -26,11 +26,13 @@ export default function ChatControls({
   handledByMe: boolean;
   handlerName: string | null;
   canTakeOver: boolean;
-  channel?: "chat_widget" | "whatsapp";
+  channel?: "chat_widget" | "whatsapp" | "email";
   /** WhatsApp only: when the client last wrote (starts the 24-hour reply window). */
   lastInboundAt?: string | null;
 }) {
   const onWhatsApp = channel === "whatsapp";
+  // Email: taking over only pauses Elliot; you reply with the email form below.
+  const onEmail = channel === "email";
   const window24 = onWhatsApp ? whatsappWindow(lastInboundAt) : null;
   const who = onWhatsApp ? "client" : "visitor";
   const router = useRouter();
@@ -93,23 +95,44 @@ export default function ChatControls({
         <div className="flex flex-wrap items-center justify-between gap-3 md:flex-nowrap">
           <div className="min-w-0 md:flex-1">
             <h2 className="m-0 text-[14px] font-semibold text-ink">
-              {handlerName ? `${handlerName} is handling this chat` : `Elliot is answering this ${onWhatsApp ? "WhatsApp chat" : "chat"}`}
+              {handlerName
+                ? `${handlerName} is handling this ${onEmail ? "conversation" : "chat"}`
+                : `Elliot is answering this ${onWhatsApp ? "WhatsApp chat" : onEmail ? "email conversation" : "chat"}`}
             </h2>
             <p className="m-0 mt-0.5 text-[13px] text-gray-500">
               {handlerName
                 ? "Elliot is paused. You can take it over yourself."
-                : onWhatsApp
+                : onEmail
+                  ? "Take over to stop Elliot replying to this client's emails until you hand it back. You reply with the email form below."
+                  : onWhatsApp
                   ? "Take over to reply yourself. Elliot stays quiet until you hand it back; the client gets your replies on WhatsApp."
                   : "Take over to reply yourself. Elliot stays quiet until you hand it back; the visitor sees your replies in the same chat window."}
             </p>
           </div>
           {canTakeOver ? (
             <button type="button" disabled={busy} onClick={() => call("take_over_conversation", { p_conversation_id: conversationId })} className={`${btn.primary} shrink-0`}>
-              {busy ? "Taking over…" : "Take over this chat"}
+              {busy ? "Taking over…" : onEmail ? "Take over" : "Take over this chat"}
             </button>
           ) : (
             <p className="m-0 text-[13px] text-gray-500">Only members of this agency can take over chats.</p>
           )}
+        </div>
+        {error && <div className="mt-3"><ErrorText>{error}</ErrorText></div>}
+      </section>
+    );
+  }
+
+  if (onEmail) {
+    return (
+      <section className="rounded-[18px] border border-accent/25 bg-white px-5 py-3.5 shadow-[0_-4px_16px_rgba(16,24,40,0.10)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="m-0 text-[14px] font-semibold text-ink">You&apos;re handling this conversation. Elliot is paused.</h2>
+            <p className="m-0 mt-0.5 text-[13px] text-gray-500">Reply with the email form. Elliot won&apos;t answer this client&apos;s emails until you hand it back.</p>
+          </div>
+          <button type="button" disabled={busy} onClick={() => call("hand_back_conversation", { p_conversation_id: conversationId })} className={`${btn.secondary} ${btn.small}`}>
+            Hand back to Elliot
+          </button>
         </div>
         {error && <div className="mt-3"><ErrorText>{error}</ErrorText></div>}
       </section>

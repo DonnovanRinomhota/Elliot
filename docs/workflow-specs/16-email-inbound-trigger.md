@@ -1,31 +1,48 @@
 # Workflow Spec: 16 - Email Inbound Trigger
 
-## Trigger
-Gmail Trigger node, polling `INBOX` every minute. This is the entry point for the entire email agent — every inbound email that reaches any tenant's connected Gmail account starts here.
+## What it does (since 0035)
+Every email that reaches the agency's connected Gmail inbox is handed to
+**Elliot** (workflow `01`, the same agent as WhatsApp and the website chat),
+and Elliot's answer is sent back **in the same Gmail thread**, usually within
+a minute or two (the trigger checks the inbox every minute). So email gets
+everything the other channels get: answers from the knowledge base, listings
+with links, viewings booked with a confirmation email, hand-over to the team.
 
-## How a mailbox maps to a tenant
-`Lookup Tenant by Mailbox` selects from `ai_config` where `connected_gmail_address = <the email's "to" address>`. This is the mechanism that makes the single shared Gmail Trigger multi-tenant-aware in principle — in practice, since only one Gmail OAuth2 credential is wired into the trigger node itself (same limitation as 15/18/20/24), only whichever mailbox that credential polls will ever produce events here, regardless of how many tenants have a `connected_gmail_address` on file.
+Until November 2026 this workflow classified the email (`13`) and drafted a
+reply (`14`) that waited in Approvals. Workflows 13/14/15/17 stay for drafts
+already in Approvals and for "Reply yourself" on the conversation page.
 
 ## Nodes (in order)
 | Node | What it does |
 |---|---|
-| Gmail Trigger | Polls INBOX every minute |
-| Extract Email Fields | Pulls `from`/`to`/`subject`/`text`/`html`/`id`/`threadId` from n8n's Gmail Trigger output. **Worth knowing:** a code comment notes this shape was confirmed via a live test to differ from what was originally assumed — n8n's Gmail Trigger returns a pre-parsed (MIME-parsed) object with `from.value[0].address`-style nesting, not the raw Gmail API `headers`/`parts` structure. If this ever needs revisiting, don't assume the raw API shape without checking a real trigger payload first |
-| Lookup Tenant by Mailbox | Resolves tenant via `connected_gmail_address` |
-| If Tenant Found | Drops the email silently if no tenant matches (see Error paths) |
-| If Not Self-Sent | Filters out emails the tenant's own connected address sent to itself — prevents the agent from replying to its own sent mail in a loop |
-| Upsert Contact | Creates or updates the `contacts` row for the sender |
-| Get or Create Conversation (Email) | Resolves or creates a `conversations` row for this thread |
-| Insert Inbound Message | Logs the email as a `role: 'user'` message |
-| Execute: Classify Email | Calls 13 |
-| Execute: Draft Email Reply | Calls 14 with 13's classification result merged in |
+| Gmail Trigger | Checks INBOX every minute (Gmail account credential). |
+| Extract Email Fields | Sender, every recipient (To, Cc, Bcc), subject, Gmail ids and the email's own Message-ID. Only the new part of a reply goes on (cut at "On … wrote:" / "W dniu … pisze:" / "Original Message", quoted lines dropped). Skips no-reply senders, mailer-daemon, auto-replies (Auto-Submitted), newsletters (List-Unsubscribe, Precedence: bulk) and empty emails. |
+| Should Process? | Stops skipped emails. |
+| Lookup Tenant by Mailbox | The agency whose **Settings → Gmail address** is any of the recipients, ignoring case. Always outputs. |
+| If Tenant Found → Log Unmatched Mailbox | Unknown mailbox → `audit_log` (`email_unmatched_mailbox`), not silently dropped. |
+| If Not Self-Sent | Never answers the agency's own emails. |
+| Claim Message → Is New Message? | Each email is answered once (`claim_whatsapp_message`, id `gmail:<id>`). |
+| Upsert Contact / Get or Create Conversation (Email) | As before. |
+| Build Elliot Request → Ask Elliot → Read Elliot Answer | `POST` to 01's chat webhook with `channel: 'email'`. If a team member has taken the conversation over, nothing is sent. If Elliot fails, the client gets a short holding reply and the failure is logged. |
+| Build Reply Email → Send Reply via Gmail → Check Send Result | "Re:" subject, In-Reply-To/References, Gmail `threadId`, plain UTF-8 text. |
+| Send Failed? → Log Send Failure | `log_reply_send_failure()` (0035): `audit_log` + a note in the conversation. |
 
-## Credentials required
-Gmail OAuth2 credential on the trigger node itself (polling), and the shared Postgres credential.
+## Workflow 01 and email
+`channel: 'email'`: no website details form (the email address is known),
+Elliot passes it to `book_appointment` so the confirmation goes there, asks
+for the name if unknown, and writes an email: greeting, short paragraphs,
+links in full, plain text, signed with the agency name.
 
-## Error paths
-- **If Tenant Found is false → the email is silently dropped, no error, no log.** This is worth being aware of: if `connected_gmail_address` is ever misconfigured or unset for a tenant whose mailbox this trigger is polling, inbound mail goes nowhere with no visible failure. This exact gap is already flagged in the workflow file itself — a node note reads: "No-match branch should log/alert rather than silently drop -- TODO: wire the false branch to a simple logging step (or Slack alert) so misrouted mail doesn't vanish silently." Still not built.
-- **If Not Self-Sent is false → also silently dropped**, but this one is intentional (loop prevention), not a gap.
+## The team
+On the conversation page an email conversation has **Take over**: Elliot
+stops answering that client's emails until **Hand back to Elliot**. The team
+replies with the "Reply yourself" form (workflows 17 → 15).
 
-## Expected output
-No return value consumed by anything — this is a top-level trigger workflow, not a sub-workflow.
+## Credentials
+Gmail account (trigger and *Send Reply via Gmail*), Elliot Postgres (service
+role) on every Postgres node. *Build Elliot Request* works out Elliot's
+address from n8n's own; a pasted `ELLIOT_CHAT_WEBHOOK_URL` wins.
+
+## Limits
+- One Gmail credential, so one agency mailbox per n8n workflow (unchanged).
+- Attachments aren't read; Elliot sees the text only.
