@@ -50,26 +50,14 @@ both ways is answered once.
      another Header Auth credential on import).
    - *Send via Gmail (team fallback)*: **Gmail account**.
    - Save, then **Publish**.
-3. **Re-import 12, 15, 16, 18, 20, 24, 31, 35, 37, 38** (replace each). In each,
-   open the node below, set *Workflow* to **39 - Send Email**, save, publish:
-
-   | Workflow | Node |
-   | --- | --- |
-   | 12 | Send Confirmation Email |
-   | 15 | Send Email |
-   | 18 | Send Notification |
-   | 20 | Send Email |
-   | 24 | Send Notification |
-   | 31 | Send Email |
-   | 35 | Send Owner Email (also re-check Book Via 12 / Free Times Via 11) |
-   | 37 | Send Email |
-   | 38 | Send Email Reminder |
-
-   Also re-check the Postgres / Google Calendar / WhatsApp credentials on
-   re-imported workflows, as usual.
+3. **Re-import 12, 15, 16, 18, 20, 24, 31, 35, 37, 38** (replace each). Their send
+   nodes already point at 39 (id `gwZAVRJ6G4iph76o` on makodevops.app.n8n.cloud)
+   with their inputs filled in. If 39 is ever re-created with a new id, pick it
+   again in each send node *and* re-enter its inputs: n8n clears them when the
+   workflow changes (values in the workflow JSON). Re-check credentials as usual,
+   then publish.
 4. **Import `40-email-inbound-forwarded.json`**: credentials on *Fetch Email*
-   (**Resend API key**), the Postgres nodes, and *Send Reply* → workflow
-   **39 - Send Email**. Publish, then copy the *Resend Webhook* node's
+   (**Resend API key**) and the Postgres nodes. Publish, then copy the *Resend Webhook* node's
    **Production URL**.
 5. **Resend → Webhooks → Add endpoint**: paste that URL, event
    **email.received**, save.
