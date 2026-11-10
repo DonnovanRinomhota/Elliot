@@ -40,7 +40,7 @@ export default async function ApprovalsPage({
       .order("created_at", { ascending: false }),
     supabase
       .from("whatsapp_drafts")
-      .select("id, conversation_id, to_wa_id, body, category, confidence, status, created_at, reviewed_at, sent_at, last_inbound_at")
+      .select("id, conversation_id, to_wa_id, body, category, confidence, status, created_at, reviewed_at, sent_at, last_inbound_at, send_error")
       .order("created_at", { ascending: false }),
     supabase.from("tenants").select("timezone").maybeSingle(),
   ]);

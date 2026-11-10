@@ -1,5 +1,7 @@
 # Workflow Spec: 27 - Send Approved WhatsApp
 
+> **0045:** follow-up drafts (`category = follow_up`) outside the 24-hour window are now sent with the approved `elliot_follow_up` template instead of being blocked. See `docs/whatsapp-follow-ups.md`.
+
 ## Trigger
 Sub-workflow, called from three places: workflow `26` (autonomous FAQ path, `auto: true`), workflow `28` (human clicked send, `auto: false`), and the dashboard's Approvals screen (also `auto: false`) — same calling shape as `15 - Send Approved Email`.
 

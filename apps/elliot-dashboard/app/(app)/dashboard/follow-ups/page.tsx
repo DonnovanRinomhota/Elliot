@@ -53,7 +53,7 @@ export default async function FollowUpsPage() {
     <div>
       <PageHeader
         title="Follow-ups"
-        description="Email sequences Elliot sends after a conversation goes quiet. A sequence stops as soon as the lead replies."
+        description="Emails and WhatsApp messages Elliot sends after a conversation goes quiet. A sequence stops as soon as the lead replies."
       />
 
       <div className="mb-6 grid max-w-3xl gap-1 text-[13px] text-gray-600">
@@ -70,7 +70,7 @@ export default async function FollowUpsPage() {
           <a href="/dashboard/leads" className="text-ink underline">
             Leads
           </a>
-          . Leads without an email address are skipped.
+          . Leads with no email address and no WhatsApp chat are skipped.
         </p>
       </div>
 

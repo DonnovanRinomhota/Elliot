@@ -47,7 +47,7 @@ type AiConfig = {
 const AUTONOMY_ACTIONS: { key: string; label: string; description: string }[] = [
   { key: "send_email", label: "Send email replies", description: "Even when automatic, only confident answers to common questions are sent without review." },
   { key: "book_appointment", label: "Book appointments", description: "Confirming a viewing time the client has already agreed to." },
-  { key: "send_follow_up", label: "Send follow-up sequences", description: "Each scheduled email in an active follow-up sequence." },
+  { key: "send_follow_up", label: "Send follow-up sequences", description: "Each scheduled email or WhatsApp message in an active follow-up sequence." },
 ];
 
 const PLAN_LABELS: Record<string, string> = {

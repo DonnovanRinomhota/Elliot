@@ -9,9 +9,15 @@
  *  - Progress is tracked by step INDEX (follow_up_runs.current_step_index), so
  *    steps must be stored in ascending day_offset order -- an out-of-order
  *    array would schedule a later step's next_run_at in the past.
- *  - Only `subject` and `body` are read. `channel` is not read by the sweep
- *    (it always sends email), but is kept as "email" to match the documented
- *    step shape.
+ *  - `channel` is "email" or "whatsapp" (0045). The sweep sends a WhatsApp
+ *    step only to a contact who has written to the agency on WhatsApp (that
+ *    is their opt-in); otherwise it sends it as an email, and an email step
+ *    to a contact without an email address goes by WhatsApp. WhatsApp steps
+ *    have no subject.
+ *  - A WhatsApp step sent more than 24 hours after the client's last
+ *    WhatsApp message must go inside the approved "elliot_follow_up"
+ *    template, and WhatsApp caps a template message at 1,024 characters,
+ *    so WhatsApp messages are kept to WHATSAPP_BODY_MAX.
  *  - The only placeholder substituted is {{contact_name}}, falling back to
  *    "there" when the contact has no name. Anything else would be sent to the
  *    contact literally, which is why unknown placeholders are rejected here
@@ -21,9 +27,11 @@
  * plain `node:test` (see follow-up-steps.test.ts).
  */
 
+export type StepChannel = "email" | "whatsapp";
+
 export type SequenceStep = {
   day_offset: number;
-  channel: "email";
+  channel: StepChannel;
   subject: string;
   body: string;
 };
@@ -32,6 +40,7 @@ export type SequenceStep = {
 export type DraftStep = {
   key: string;
   day: string;
+  channel: StepChannel;
   subject: string;
   body: string;
 };
@@ -41,6 +50,8 @@ export const MAX_DAY_OFFSET = 365;
 export const NAME_MAX = 80;
 export const SUBJECT_MAX = 200;
 export const BODY_MAX = 5000;
+/** WhatsApp's own limit for a template message (1,024), less the template's fixed words and the agency name. */
+export const WHATSAPP_BODY_MAX = 900;
 
 export const SUPPORTED_PLACEHOLDER = "{{contact_name}}";
 
@@ -111,10 +122,14 @@ export function validateSequence(input: { name: string; steps: DraftStep[] }): V
       error = `Another step is already set for day ${day}. Give each step its own day.`;
     }
 
+    const whatsapp = draft.channel === "whatsapp";
+    if (!error && whatsapp && draft.body.trim().length > WHATSAPP_BODY_MAX) {
+      error = `WhatsApp allows ${WHATSAPP_BODY_MAX} characters in a follow-up message (this one has ${draft.body.trim().length}). Shorten it, or send this step as an email.`;
+    }
     error =
       error ??
-      checkText("Subject", draft.subject, SUBJECT_MAX) ??
-      checkText("Message", draft.body, BODY_MAX);
+      (whatsapp ? null : checkText("Subject", draft.subject, SUBJECT_MAX)) ??
+      checkText("Message", draft.body, whatsapp ? WHATSAPP_BODY_MAX : BODY_MAX);
 
     if (error) {
       errors.stepErrors[draft.key] = error;
@@ -124,7 +139,7 @@ export function validateSequence(input: { name: string; steps: DraftStep[] }): V
     seenDays.set(day, draft.key);
     parsed.push({
       key: draft.key,
-      step: { day_offset: day, channel: "email", subject: draft.subject.trim(), body: draft.body.trim() },
+      step: { day_offset: day, channel: whatsapp ? "whatsapp" : "email", subject: whatsapp ? "" : draft.subject.trim(), body: draft.body.trim() },
     });
   }
 
@@ -149,6 +164,7 @@ export function stepsFromJson(json: unknown, makeKey: () => string): DraftStep[]
     return {
       key: makeKey(),
       day,
+      channel: s.channel === "whatsapp" ? "whatsapp" : "email",
       subject: typeof s.subject === "string" ? s.subject : "",
       body: typeof s.body === "string" ? s.body : "",
     };
@@ -160,13 +176,19 @@ export function stepsFromJson(json: unknown, makeKey: () => string): DraftStep[]
  * runs them (it indexes by position), not re-sorted, so a hand-authored
  * out-of-order array is shown as it will really behave. Tolerates malformed rows.
  */
-export function displaySteps(json: unknown): { day: number; subject: string }[] {
+export function displaySteps(json: unknown): { day: number; channel: StepChannel; subject: string }[] {
   if (!Array.isArray(json)) return [];
   return json.map((raw) => {
     const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const channel: StepChannel = s.channel === "whatsapp" ? "whatsapp" : "email";
+    const firstLine = typeof s.body === "string" ? s.body.trim().split("\n")[0].slice(0, 60) : "";
     return {
       day: typeof s.day_offset === "number" ? s.day_offset : 0,
-      subject: typeof s.subject === "string" && s.subject.trim() ? s.subject : "(no subject)",
+      channel,
+      subject:
+        channel === "whatsapp"
+          ? firstLine || "(empty message)"
+          : typeof s.subject === "string" && s.subject.trim() ? s.subject : "(no subject)",
     };
   });
 }
