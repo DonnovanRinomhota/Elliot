@@ -38,6 +38,7 @@ type AiConfig = {
   email_forwarding_code?: string | null;
   email_forwarding_url?: string | null;
   email_forwarding_code_at?: string | null;
+  calendar_status?: string | null;
 } | null;
 
 // Matches the actions this codebase actually checks a mode for (main agent's
@@ -441,12 +442,17 @@ export default function SettingsForm({
       <Card title="Connected services" description="Your calendar, CRM and WhatsApp number.">
         {configError && <p className="mb-3 text-[12.5px] text-alert">Couldn&apos;t load your current settings: {configError}</p>}
         <div className="mb-3">
-          <label className={labelClass}>Google Calendar ID</label>
+          <label className={labelClass}>Agency Google Calendar ID</label>
           <input
             className={inputClass}
             value={integrations.google_calendar_id}
             onChange={(e) => setIntegrations({ ...integrations, google_calendar_id: e.target.value })}
           />
+          <p className="mt-1 text-[12.5px] text-gray-400">
+            Used when no agent has their own calendar. Agents add theirs on the{" "}
+            <a href="/dashboard/team" className="text-gray-500 underline">Team page</a>, so two of them can have viewings at the same time.
+            {aiConfig?.calendar_status === "not_shared" && <span className="block text-alert">Elliot can&apos;t see this calendar: share it with Elliot&apos;s Google account.</span>}
+          </p>
         </div>
         <div className="mb-4">
           <label className={labelClass}>CRM webhook URL</label>

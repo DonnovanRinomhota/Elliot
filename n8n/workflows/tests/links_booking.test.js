@@ -136,10 +136,10 @@ test('12: the conversation and the listing\'s own page are looked up and stored'
   assert.match(lookup.query, /cv\.id::text = nullif\(\$4, ''\) and cv\.tenant_id = \$1/);
   assert.match(lookup.query, /li\.url as listing_url/);
   assert.match(lookup.query, /t\.name as tenant_name/);
-  assert.deepStrictEqual(expr(lookup.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c', listing_id: 'L1', conversation_id: ' conv ', email: ' New@Mail.pl ' } }), ['t', 'c', 'L1', 'conv', 'New@Mail.pl']);
+  assert.deepStrictEqual(expr(lookup.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c', listing_id: 'L1', conversation_id: ' conv ', email: ' New@Mail.pl ', starts_at: 's', ends_at: 'e' } }), ['t', 'c', 'L1', 'conv', 'New@Mail.pl', 's', 'e']);
 
   const ins = nodeOf(wf12, 'Insert Appointment').parameters;
-  assert.match(ins.query, /conversation_id\)\nvalues .*nullif\(\$9, ''\)::uuid\)/);
+  assert.match(ins.query, /conversation_id, agent_id, booked_calendar_id\)\nvalues .*nullif\(\$9, ''\)::uuid, nullif\(\$11, ''\)::uuid, \$12\)/);
   const p = expr(ins.options.queryReplacement, {
     json: { id: 'g1' },
     nodes: {
