@@ -1,0 +1,401 @@
+{
+  "name": "42 - ASARI Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "037f201e-9545-52d9-acc4-ec9c51fb2d9e",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ],
+      "notes": "One agency per run: the one synced longest ago."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "asari-sync",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "f1ebe4f1-7f0c-59ab-9db9-b65aa9377430",
+      "name": "Sync Now Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        420
+      ],
+      "webhookId": "80b30ed2-2d88-5470-bb5c-d4e5cccfd547",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Elliot Internal Webhook Secret"
+        }
+      },
+      "notes": "Settings → ASARI → Sync now. Answers at once; the result shows in Settings."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0044: the agency asked for, else the one synced longest ago; with what Elliot already has.\nselect * from asari_next_sync(nullif($1, '')::uuid);",
+        "options": {
+          "queryReplacement": "={{ [ String(($json.body && $json.body.tenant_id) || '') ] }}"
+        }
+      },
+      "id": "bdc2e624-1402-5ebe-a541-56f50f8c6f4a",
+      "name": "Pick Agency",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.asari.pro/site/exportedListingIdList",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "SiteAuth",
+              "value": "={{ $('Pick Agency').first().json.api_user_id + ':' + $('Pick Agency').first().json.api_token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a78ef75f-06ce-589f-a0f0-d682f778e3e6",
+      "name": "List Exported Listings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// What ASARI exports now vs what Elliot has: fetch only new and changed\n// listings (at most MAX per run; the rest next time, oldest first is fine).\n// ASARI allows 25 calls a minute, so Get Listing waits 2.6 s between calls.\nconst MAX = 150;\nconst agency = $('Pick Agency').first().json;\nlet known = agency.known || {};\nif (typeof known === 'string') { try { known = JSON.parse(known); } catch (e) { known = {}; } }\nconst r = $input.first().json;\nconst status = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = null; } }\nconst base = { tenant_id: agency.tenant_id };\nif (!(status >= 200 && status < 300) || !body || body.success === false || !Array.isArray(body.data)) {\n  const why = (body && (body.error || (body.parameterErrors && JSON.stringify(body.parameterErrors))))\n    || (status === 401 || status === 403 ? 'ASARI refused the user ID or token' : `ASARI answered HTTP ${status || 'nothing'}`);\n  return [{ json: { ...base, ok: false, error: String(why).slice(0, 300), exported_ids: null, to_fetch: [], total: 0 } }];\n}\nconst entries = body.data.map((x) => (typeof x === 'object' && x !== null\n  ? { id: String(x.id ?? x.listingId ?? ''), version: String(x.lastUpdated ?? x.updated ?? x.modificationDate ?? '') }\n  : { id: String(x), version: '' })).filter((x) => x.id);\nconst toFetch = entries.filter((e) => !(e.id in known) || (e.version && known[e.id] !== e.version)).map((e) => e.id);\nreturn [{ json: { ...base, ok: true, error: null, exported_ids: entries.map((e) => e.id), to_fetch: toFetch.slice(0, MAX),\n  left_for_next_run: Math.max(0, toFetch.length - MAX), total: entries.length } }];"
+      },
+      "id": "c0b58861-b31a-5193-a74c-93d36fb98c41",
+      "name": "Plan Sync",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9def83fc-06f8-550f-895f-4a4b25ad2945",
+              "leftValue": "={{ $json.ok === true && $json.to_fetch.length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2ebb0de4-1b75-503d-a0c2-128fd301ac6a",
+      "name": "Anything To Fetch?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.to_fetch.map((id) => ({ json: { id } }));"
+      },
+      "id": "525ca0eb-e2ed-5f67-9cd9-4acff22d65cb",
+      "name": "Split Fetches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.asari.pro/site/listing",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "SiteAuth",
+              "value": "={{ $('Pick Agency').first().json.api_user_id + ':' + $('Pick Agency').first().json.api_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2600
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "4f017cf2-b1e5-5a37-b80e-e89819cb9a00",
+      "name": "Get Listing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        200
+      ],
+      "notes": "ASARI allows 25 calls a minute: one call every 2.6 seconds."
+    },
+    {
+      "parameters": {
+        "jsCode": "// ASARI listing (apiSite /site/listing) → an Elliot listing (0044). ASARI's\n// field names vary between accounts and versions, so each value is looked for\n// under the names it is known to use; the whole original is kept in `raw`, so\n// the mapping can be improved later without asking ASARI again.\nconst IMG = 'https://img.asariweb.pl/normal/';\nconst pick = (o, ...paths) => {\n  for (const p of paths) {\n    const v = p.split('.').reduce((x, k) => (x == null ? undefined : x[k]), o);\n    if (v !== undefined && v !== null && v !== '') return v;\n  }\n  return null;\n};\nconst num = (v) => {\n  if (v == null || v === '') return null;\n  if (typeof v === 'object') v = v.amount ?? v.value;\n  const n = Number(String(v).replace(/\\s/g, '').replace(',', '.'));\n  return Number.isFinite(n) ? n : null;\n};\nconst int = (v) => {\n  if (v == null || v === '') return null;\n  if (/^(parter|ground|0)$/i.test(String(v).trim())) return 0;\n  const n = parseInt(String(v), 10);\n  return Number.isFinite(n) ? n : null;\n};\nconst text = (v) => (v == null ? null : typeof v === 'object' ? (v.name ?? v.value ?? null) : String(v).trim() || null);\nconst strip = (h) => (h == null ? null : String(h).replace(/<br\\s*\\/?>/gi, '\\n').replace(/<\\/p>/gi, '\\n\\n').replace(/<[^>]+>/g, '')\n  .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/\\n{3,}/g, '\\n\\n').trim() || null);\n\nfunction mapAsari(l) {\n  const section = String(pick(l, 'section', 'sectionName', 'type') || '');\n  const transaction_type = /rent|lease|wynaj|najem/i.test(section) ? 'rent' : 'sale';\n  // Commercial first: \"WarehouseSale\" contains \"house\".\n  const property_type = /commercial|office|warehouse|premises|object|lokal|biur|magazyn|hala/i.test(section) ? 'commercial'\n    : /apartment|flat|mieszk/i.test(section) ? 'apartment'\n    : /house|dom/i.test(section) ? 'house'\n    : /lot|plot|dzia|grunt/i.test(section) ? 'plot'\n    : /room|pok[oó]j/i.test(section) ? 'room'\n    : 'other';\n  const statusRaw = String(pick(l, 'status', 'listingStatus') || '');\n  const status = /sold|sprzedan/i.test(statusRaw) ? 'sold'\n    : /rented|wynaj[eę]t/i.test(statusRaw) ? 'let'\n    : /reserv|rezerw/i.test(statusRaw) ? 'under_offer'\n    : /withdraw|archiv|inactive|closed|wycofan/i.test(statusRaw) ? 'withdrawn'\n    : 'available';\n  const price = num(pick(l, 'price', 'totalPrice', 'priceAmount'));\n  const currency = String(pick(l, 'price.currency', 'currency') || 'PLN').toUpperCase().replace('ZŁ', 'PLN');\n  const area = num(pick(l, 'totalArea', 'usableArea', 'area', 'lotArea'));\n  const rooms = int(pick(l, 'noOfRooms', 'roomsNo', 'rooms', 'numberOfRooms'));\n  const city = text(pick(l, 'location.locality', 'location.city', 'city', 'locality'));\n  const district = text(pick(l, 'location.quarter', 'location.district', 'quarter', 'district', 'location.subLocality'));\n  const street = text(pick(l, 'street', 'location.street', 'streetName'));\n  const streetNo = text(pick(l, 'streetNumber', 'location.streetNumber', 'houseNumber'));\n  const address = street ? [street, streetNo].filter(Boolean).join(' ') : null;\n  const reference = text(pick(l, 'listingId', 'signature', 'number', 'offerNumber'));\n  const typeWord = { apartment: 'Mieszkanie', house: 'Dom', plot: 'Działka', room: 'Pokój', commercial: 'Lokal', other: 'Nieruchomość' }[property_type];\n  const fallbackTitle = [typeWord + (transaction_type === 'rent' ? ' na wynajem' : ''), rooms ? `${rooms} pok.` : null, area ? `${area} m²` : null, district || city]\n    .filter(Boolean).join(', ');\n  const title = text(pick(l, 'name', 'title', 'headerAdvertisement', 'advertisementTitle')) || fallbackTitle;\n  const images = pick(l, 'images', 'photos', 'imageList') || [];\n  const photos = (Array.isArray(images) ? images : [])\n    .map((i) => (typeof i === 'object' ? (i.url || (i.id != null ? IMG + i.id : null)) : (/^https?:/.test(String(i)) ? String(i) : IMG + i)))\n    .filter(Boolean).slice(0, 30);\n  const features = [\n    pick(l, 'balcony') ? 'balcony' : null, pick(l, 'terrace') ? 'terrace' : null, pick(l, 'garden') ? 'garden' : null,\n    pick(l, 'elevator', 'lift') ? 'lift' : null, pick(l, 'parkingSpace', 'garage', 'parking') ? 'parking' : null,\n    pick(l, 'basement', 'cellar') ? 'cellar' : null,\n  ].filter(Boolean);\n  const avail = text(pick(l, 'availableFrom', 'availability'));\n  return {\n    external_id: String(pick(l, 'id') ?? ''),\n    external_version: String(pick(l, 'lastUpdated', 'updated', 'modificationDate') ?? ''),\n    reference,\n    title: String(title).slice(0, 300),\n    status,\n    transaction_type,\n    property_type,\n    price,\n    currency: /^[A-Z]{3}$/.test(currency) ? currency : 'PLN',\n    city, district, address,\n    area_m2: area,\n    rooms,\n    bedrooms: int(pick(l, 'noOfBedrooms', 'bedrooms')),\n    bathrooms: int(pick(l, 'noOfBathrooms', 'bathrooms')),\n    floor: int(pick(l, 'floorNo', 'floor')),\n    description: strip(pick(l, 'description', 'descriptionPl')),\n    features,\n    photos,\n    image_url: photos[0] || null,\n    available_from: avail && /^\\d{4}-\\d{2}-\\d{2}/.test(avail) ? avail.slice(0, 10) : null,\n    raw: l,\n  };\n}\n\n\n// One item per Get Listing answer; ASARI's { success, data } wrapper.\nconst rows = [];\nlet failed = 0;\nfor (const it of $input.all()) {\n  const r = it.json;\n  let body = r.body;\n  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = null; } }\n  const st = Number(r.statusCode || 0);\n  const l = body && body.success !== false ? (body.data || null) : null;\n  if (!(st >= 200 && st < 300) || !l || typeof l !== 'object') { failed += 1; continue; }\n  const m = mapAsari(l);\n  if (m.external_id) rows.push(m); else failed += 1;\n}\nreturn [{ json: { tenant_id: $('Plan Sync').first().json.tenant_id, rows, failed } }];"
+      },
+      "id": "b318adde-a709-53b5-87c1-dd25c2c35c05",
+      "name": "Map Listings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select upsert_external_listings($1::uuid, 'asari', $2::jsonb) as result;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, JSON.stringify($json.rows) ] }}"
+        }
+      },
+      "id": "f4a5226b-0afe-5bcb-8c65-be08e7f8902e",
+      "name": "Save Listings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1760,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Withdraws listings ASARI no longer exports and saves the result for Settings.\nselect asari_finish_sync($1::uuid, $2::jsonb, $3, $4::jsonb) as result;",
+        "options": {
+          "queryReplacement": "={{ (() => {\n  const plan = $('Plan Sync').first().json;\n  const safe = (n) => { try { return $(n).first().json; } catch (e) { return null; } };\n  const mapped = safe('Map Listings') || {};\n  let saved = (safe('Save Listings') || {}).result || {};\n  if (typeof saved === 'string') { try { saved = JSON.parse(saved); } catch (e) { saved = {}; } }\n  const counts = { exported: plan.total || 0, fetched: (plan.to_fetch || []).length, new: saved.new || 0, updated: saved.updated || 0,\n    failed: (mapped.failed || 0) + (saved.skipped || 0), left_for_next_run: plan.left_for_next_run || 0 };\n  return [ plan.tenant_id, plan.exported_ids ? JSON.stringify(plan.exported_ids) : null, plan.error || '', JSON.stringify(counts) ];\n})() }}"
+        }
+      },
+      "id": "1ee68592-8baa-5c2e-b607-07caa817a155",
+      "name": "Finish Sync",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1980,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Pick Agency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync Now Webhook": {
+      "main": [
+        [
+          {
+            "node": "Pick Agency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Agency": {
+      "main": [
+        [
+          {
+            "node": "List Exported Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Exported Listings": {
+      "main": [
+        [
+          {
+            "node": "Plan Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Sync": {
+      "main": [
+        [
+          {
+            "node": "Anything To Fetch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything To Fetch?": {
+      "main": [
+        [
+          {
+            "node": "Split Fetches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Finish Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Fetches": {
+      "main": [
+        [
+          {
+            "node": "Get Listing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Listing": {
+      "main": [
+        [
+          {
+            "node": "Map Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Listings": {
+      "main": [
+        [
+          {
+            "node": "Save Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Listings": {
+      "main": [
+        [
+          {
+            "node": "Finish Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "description": "0044: copies an agency's ASARI listings into Elliot, hourly (one agency per run) or on Sync now."
+  }
+}
