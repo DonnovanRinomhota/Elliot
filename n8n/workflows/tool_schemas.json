@@ -117,6 +117,18 @@
           "email": {
             "type": "string",
             "description": "The email address the visitor wants the confirmation sent to, if they gave one in this conversation. Leave out if they did not."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "viewing",
+              "valuation"
+            ],
+            "description": "viewing (default): seeing one of the agency's listings. valuation: an agent visits the client's own property to value it (after record_valuation_request)."
+          },
+          "property_address": {
+            "type": "string",
+            "description": "For kind valuation: the full address of the client's property (street, number, city), where the agent goes."
           }
         },
         "required": [
@@ -160,6 +172,89 @@
         "required": [
           "appointment_id",
           "action"
+        ]
+      }
+    },
+    {
+      "name": "record_valuation_request",
+      "description": "Record a client who wants to sell or let their own property, or asks what it is worth. Saves the property details on their lead and marks them as a seller or landlord. Call it as soon as you know the address and the type of property, and again when you learn more; details merge. Never give a price or estimate yourself.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "string",
+            "description": "The client's contact_id, if you have it"
+          },
+          "intent": {
+            "type": "string",
+            "enum": [
+              "sell",
+              "let"
+            ],
+            "description": "sell, or let (rent it out)"
+          },
+          "address": {
+            "type": "string",
+            "description": "Street and number of the property"
+          },
+          "city": {
+            "type": "string"
+          },
+          "district": {
+            "type": "string"
+          },
+          "property_type": {
+            "type": "string",
+            "enum": [
+              "apartment",
+              "house",
+              "plot",
+              "commercial",
+              "other"
+            ]
+          },
+          "area_m2": {
+            "type": "number",
+            "description": "Floor area in square metres"
+          },
+          "rooms": {
+            "type": "integer"
+          },
+          "floor": {
+            "type": "string",
+            "description": "Floor and floors in the building, e.g. 3/5"
+          },
+          "year_built": {
+            "type": "string",
+            "description": "Year or period the building was built"
+          },
+          "condition": {
+            "type": "string",
+            "description": "Condition in their words, e.g. after renovation, to renovate"
+          },
+          "extras": {
+            "type": "string",
+            "description": "Balcony, parking, garden, storage, lift..."
+          },
+          "timeline": {
+            "type": "string",
+            "description": "When they want to sell or let, in their words"
+          },
+          "within_3_months": {
+            "type": "boolean",
+            "description": "True if they want to sell or let within about 3 months"
+          },
+          "expected_price": {
+            "type": "string",
+            "description": "A price they hope for, only if they said one"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Anything else useful for the agent"
+          }
+        },
+        "required": [
+          "intent"
         ]
       }
     }

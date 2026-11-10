@@ -9,7 +9,7 @@ export const DEFAULT_TZ = "Europe/Warsaw";
 
 /** Columns for an appointment with its client, listing and agent. */
 export const APPOINTMENT_SELECT =
-  "id, starts_at, ends_at, timezone, status, notes, created_at, listing_id, agent_id, conversation_id, " +
+  "id, starts_at, ends_at, timezone, status, notes, created_at, listing_id, agent_id, conversation_id, kind, location, " +
   "reminder_sent_at, reminder_channel, client_confirmed_at, cancelled_by, previous_starts_at, " +
   "contact:contacts(id, name, email, phone), " +
   "listing:listings(id, title, reference, address, district, city, photos, image_url, url, price, currency, transaction_type, rooms, area_m2, floor), " +
@@ -56,6 +56,9 @@ export type Appointment = {
   client_confirmed_at?: string | null;
   cancelled_by?: string | null;
   previous_starts_at?: string | null;
+  /** 0043: viewing | valuation | call, and where a valuation visit happens. */
+  kind?: string | null;
+  location?: string | null;
 };
 
 type ClientNoteInput = Pick<

@@ -143,7 +143,7 @@ test('12: the event goes in the picked calendar, the agent and calendar are save
   const ins = nodeOf(wf12, 'Insert Appointment').parameters;
   const p = expr(ins.options.queryReplacement, { json: { id: 'ev1' }, nodes: { 'When Executed by Another Workflow': req,
     'Load Tenant + Contact Info': { timezone: 'Europe/Warsaw' }, 'Pick Calendar': { agent_id: 'u-k', google_calendar_id: 'kasia-cal@group.calendar.google.com' } } });
-  assert.deepStrictEqual(p.slice(10), ['u-k', 'kasia-cal@group.calendar.google.com']);
+  assert.deepStrictEqual(p.slice(10, 12), ['u-k', 'kasia-cal@group.calendar.google.com']);
   assert.match(nodeOf(wf12, 'Delete Orphaned Calendar Event').parameters.url, /encodeURIComponent\(\$\('Pick Calendar'\)\.first\(\)\.json\.google_calendar_id\)/);
   const fr = run(nodeOf(wf12, 'Format Results').parameters.jsCode, { json: { id: 'a1' }, nodes: {
     'When Executed by Another Workflow': req, 'HTTP Request': {}, 'Load Tenant + Contact Info': {}, 'Pick Calendar': { agent_name: 'Kasia' } } })[0].json;

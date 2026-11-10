@@ -34,6 +34,10 @@ directly: he sets Elliot up, watches how it performs and adjusts it with them.
 - **Reminds clients the day before** (WhatsApp or email). Clients can reply
   to confirm, move or cancel; Elliot does it, updates the calendar and tells
   the agent.
+- **Wins sellers and landlords**: when someone wants to sell or let their
+  property, or asks what it is worth, Elliot never guesses a price. It asks
+  about the property, marks them as a seller (hot if they want to sell within
+  3 months), alerts an agent and books a free valuation visit at their address.
 - **Alerts the team immediately** when a client asks for a person, wants
   something only a person can do, or is a hot lead, with a summary and the
   full conversation.

@@ -126,7 +126,7 @@ test('12: insert stores the listing; result reports it', () => {
     'Load Tenant + Contact Info': { timezone: 'Europe/Warsaw', listing_id: 'L1', listing_title: 'Flat', listing_address: 'ul. X 1' },
   };
   const params = expr(ins.parameters.options.queryReplacement, { nodes, json: { id: 'gcal1' } });
-  assert.strictEqual(params.length, 12); // 0033: + conversation_id; 0034: + email; 0042: + agent, calendar
+  assert.strictEqual(params.length, 14); // 0033: + conversation_id; 0034: + email; 0042: + agent, calendar; 0043: + kind, location
   assert.strictEqual(params[5], 'gcal1');
   assert.strictEqual(params[7], 'L1');
   nodes['Load Tenant + Contact Info'] = { timezone: 'UTC' };

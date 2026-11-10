@@ -25,7 +25,7 @@ export default async function LeadsPage({
   const [{ data: leads, error }, { data: sequences }, { data: runningRuns }] = await Promise.all([
     supabase
       .from("leads")
-      .select("id, tenant_id, status, score, qualification_answers, created_at, assigned_to, owner:tenant_users(full_name, email), contact:contacts(name, email, phone)")
+      .select("id, tenant_id, status, score, qualification_answers, intent, created_at, assigned_to, owner:tenant_users(full_name, email), contact:contacts(name, email, phone)")
       .order("created_at", { ascending: false }),
     // For "Start follow-up": only active sequences can take new leads.
     supabase.from("follow_up_sequences").select("id, name, steps").eq("is_active", true).order("created_at"),

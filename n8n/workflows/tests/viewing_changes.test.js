@@ -68,7 +68,7 @@ test('01: change_viewing is offered, allowed and routed to workflow 37', () => {
   assert.ok(!('contact_id' in t.input_schema.properties), 'the model must not choose whose booking to change');
   const ref = JSON.parse(fs.readFileSync(path.join(WF_DIR, 'tool_schemas.json'), 'utf8')).tools.find((x) => x.name === 'change_viewing');
   assert.deepStrictEqual(ref.input_schema, t.input_schema, 'tool_schemas.json out of sync');
-  assert.match(nodeOf(wf01, 'Extract Tool Call').parameters.jsCode, /'change_viewing'\]/);
+  assert.match(nodeOf(wf01, 'Extract Tool Call').parameters.jsCode, /'change_viewing'[,\]]/);
   const rules = nodeOf(wf01, 'Route by Tool').parameters.rules.values;
   const idx = rules.findIndex((r) => r.conditions.conditions[0].rightValue === 'change_viewing');
   assert.strictEqual(wf01.connections['Route by Tool'].main[idx][0].node, 'Execute: Change Viewing Sub-Workflow');
