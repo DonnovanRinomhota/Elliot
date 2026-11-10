@@ -139,7 +139,7 @@ test('12: the conversation and the listing\'s own page are looked up and stored'
   assert.deepStrictEqual(expr(lookup.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c', listing_id: 'L1', conversation_id: ' conv ', email: ' New@Mail.pl ', starts_at: 's', ends_at: 'e' } }), ['t', 'c', 'L1', 'conv', 'New@Mail.pl', 's', 'e']);
 
   const ins = nodeOf(wf12, 'Insert Appointment').parameters;
-  assert.match(ins.query, /conversation_id, agent_id, booked_calendar_id\)\nvalues .*nullif\(\$9, ''\)::uuid, nullif\(\$11, ''\)::uuid, \$12\)/);
+  assert.match(ins.query, /conversation_id, agent_id, booked_calendar_id, kind, location\)\nvalues .*nullif\(\$9, ''\)::uuid, nullif\(\$11, ''\)::uuid, \$12, \$13, nullif\(\$14, ''\)\)/);
   const p = expr(ins.options.queryReplacement, {
     json: { id: 'g1' },
     nodes: {

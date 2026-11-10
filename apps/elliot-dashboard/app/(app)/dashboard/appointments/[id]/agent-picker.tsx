@@ -30,7 +30,7 @@ export default function AgentPicker({ appointmentId, agentId, team }: { appointm
   return (
     <div className="grid gap-1.5">
       <label htmlFor="agent" className="text-[12.5px] font-medium text-gray-600">
-        Agent doing the viewing
+        Assigned agent
       </label>
       <select id="agent" value={value} onChange={(e) => save(e.target.value)} disabled={state === "saving"} className="h-9 w-full px-3">
         <option value="">Nobody yet</option>

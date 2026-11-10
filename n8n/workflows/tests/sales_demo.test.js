@@ -116,7 +116,7 @@ test('01: sales gets 6 tools (no listings) with call types; agencies keep all 7'
   assert.deepStrictEqual(book.input_schema.required, ['contact_id', 'call_type', 'starts_at', 'ends_at', 'email']);
   assert.ok(!('listing_id' in book.input_schema.properties));
   const a = tools('agency');
-  assert.strictEqual(a.length, 7);
+  assert.strictEqual(a.length, 8); // 0043: + record_valuation_request (not in sales mode)
   assert.ok(a.find((t) => t.name === 'book_appointment').input_schema.properties.listing_id);
   assert.deepStrictEqual(tools('demo').map((t) => t.name), a.map((t) => t.name));
 });

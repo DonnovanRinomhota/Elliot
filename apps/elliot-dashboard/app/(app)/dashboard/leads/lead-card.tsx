@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { btn, humanize, formatDate } from "../../../_ui/ui";
 import { LEAD_GRID } from "./grid";
 import { contactLabel } from "@/lib/contacts";
+import { sellerLabel, valuationOf, valuationRows } from "@/lib/valuation";
 
 type Lead = {
   id: string;
@@ -13,6 +14,8 @@ type Lead = {
   status: string;
   score: number | string | null;
   qualification_answers: Record<string, unknown> | null;
+  /** 0043: buy | rent | sell | let */
+  intent?: string | null;
   created_at: string;
   contact: { name: string | null; email: string | null; phone: string | null } | null;
 };
@@ -100,6 +103,8 @@ export default function LeadCard({
   const hasAnswers = !!lead.qualification_answers && Object.keys(lead.qualification_answers).length > 0;
   const name = contactLabel(lead.contact);
   const detailsId = `lead-details-${lead.id}`;
+  const seller = sellerLabel(lead.intent, lead.qualification_answers);
+  const valuation = valuationOf(lead.qualification_answers);
 
   // Same row shape workflow 21 inserts: the sweep (20) picks it up from
   // next_run_at, and the "contact replied" stop check counts from now.
@@ -162,7 +167,14 @@ export default function LeadCard({
       <div className={`grid gap-2 px-5 py-3.5 ${LEAD_GRID}`}>
         <span className="tabular hidden text-[12.5px] text-gray-400 md:block">{number}</span>
         <div className="min-w-0">
-          <div className={`truncate text-[14px] font-medium ${isClosed ? "text-gray-500" : "text-ink"}`}>{name}</div>
+          <div className={`flex min-w-0 items-center gap-1.5 text-[14px] font-medium ${isClosed ? "text-gray-500" : "text-ink"}`}>
+            <span className="truncate">{name}</span>
+            {seller && (
+              <span className="flex-shrink-0 rounded-full border border-brass/30 bg-brass-soft px-1.5 py-px text-[11px] font-medium text-brass-dark" title="Asked for a valuation of their property">
+                {seller}
+              </span>
+            )}
+          </div>
           <div className="truncate text-[12.5px] text-gray-500">
             {[lead.contact?.name ? lead.contact?.email : null, lead.contact?.phone].filter(Boolean).join(", ") || " "}
           </div>
@@ -220,6 +232,19 @@ export default function LeadCard({
 
       {open && (
         <div id={detailsId} className="grid gap-6 border-t border-gray-100 bg-gray-50 px-5 py-5 md:grid-cols-2">
+          {valuation && (
+            <div className="md:col-span-2">
+              <h3 className="m-0 mb-2 text-[13px] font-semibold text-ink">Property to value</h3>
+              <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px]">
+                {valuationRows(valuation).map(([k, v]) => (
+                  <div key={k} className="contents">
+                    <dt className="text-gray-500">{k}</dt>
+                    <dd className="m-0 text-ink">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
           <div>
             <h3 className="m-0 mb-2 text-[13px] font-semibold text-ink">
               Why this score{lead.score != null ? ` (${lead.score} of 100)` : ""}

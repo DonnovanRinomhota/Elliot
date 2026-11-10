@@ -65,7 +65,7 @@ export default async function AppointmentPage({ params }: { params: { id: string
     <div>
       <BackButton fallback="/dashboard/appointments" />
       <PageHeader
-        title={`Viewing with ${client}`}
+        title={`${a.kind === "valuation" ? "Valuation visit" : a.kind === "call" ? "Call" : "Viewing"} with ${client}`}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
             <span className="text-ink">
@@ -97,7 +97,30 @@ export default async function AppointmentPage({ params }: { params: { id: string
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
         <div className="grid content-start gap-6">
-          {l ? (
+          {a.kind === "valuation" ? (
+            // 0043: an agent values the client's own property, at their address.
+            <Panel title="The property to value">
+              <div className="grid gap-3">
+                {a.location ? (
+                  <div className={row}>
+                    <MapPin {...icon} />
+                    <div>
+                      <div className="text-ink">{a.location}</div>
+                      <a href={mapsUrl(a.location)} target="_blank" rel="noreferrer" className="text-[13px] text-ink-600 underline">
+                        Open in Google Maps
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="m-0 text-[13px] text-brass-dark">The client didn&apos;t give the address. Ask them before the visit.</p>
+                )}
+                <p className="m-0 text-[13px] text-gray-500">
+                  What Elliot learned about the property (size, rooms, condition, when they want to sell) is on the client&apos;s lead, under Details.{" "}
+                  <a href="/dashboard/leads" className="text-ink-600 underline">Open Leads</a>
+                </p>
+              </div>
+            </Panel>
+          ) : l ? (
             <Panel title="The property" action={<ChangeListing appointmentId={a.id} currentId={l.id} />}>
               {photos.length > 0 ? (
                 <PhotoGallery photos={photos} title={l.title} />

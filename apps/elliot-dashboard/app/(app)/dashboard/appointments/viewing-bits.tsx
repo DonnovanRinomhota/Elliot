@@ -1,6 +1,6 @@
 // Small pieces shared by the Appointments list, its calendar view and the
 // Calendar page. No hooks, so server and client components can both use them.
-import { Image as ImageIcon } from "lucide-react";
+import { Home, Image as ImageIcon } from "lucide-react";
 import { listingPhotos } from "@/lib/listing-photos";
 import { resizedPhotoUrl } from "@/lib/google-drive";
 import { listingAddress, shortName, timeOf, type ApptListing, type Appointment } from "@/lib/appointments";
@@ -22,8 +22,22 @@ export function ListingThumb({ listing, className = "h-11 w-14" }: { listing: Ap
 }
 
 /** Thumbnail + title + address, or a prompt to pick the property. */
-export function ListingLine({ appointment }: { appointment: Pick<Appointment, "listing" | "notes"> }) {
+export function ListingLine({ appointment }: { appointment: Pick<Appointment, "listing" | "notes" | "kind" | "location"> }) {
   const l = appointment.listing;
+  // 0043: a valuation visit is at the client's own property, not a listing.
+  if (appointment.kind === "valuation") {
+    return (
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-11 w-14 flex-shrink-0 items-center justify-center rounded bg-brass-soft text-brass-dark" aria-hidden="true">
+          <Home size={15} strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0">
+          <div className="truncate text-[13.5px] text-ink">Valuation visit</div>
+          <div className="truncate text-[12.5px] text-gray-500">{appointment.location || "Address not given"}</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex min-w-0 items-center gap-3">
       <ListingThumb listing={l} />
@@ -77,7 +91,9 @@ export function ViewingChip({
     >
       <span className="tabular font-medium">{timeOf(a.starts_at, tz)}</span> <span>{client}</span>
       {showListing && (
-        <span className="mt-0.5 block truncate text-[11.5px] opacity-80">{a.listing ? a.listing.district || a.listing.title : "Property not set"}</span>
+        <span className="mt-0.5 block truncate text-[11.5px] opacity-80">
+          {a.kind === "valuation" ? "Valuation" : a.listing ? a.listing.district || a.listing.title : "Property not set"}
+        </span>
       )}
       {showAgent && !a.agent && <span className="mt-0.5 block text-[11.5px] font-medium text-brass-dark">Unassigned</span>}
     </a>
