@@ -715,33 +715,70 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gmailOAuth2",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "39 - Send Email"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "",
+            "audience": "team",
+            "raw_message": "={{ $json.raw_message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "audience",
+              "displayName": "audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "raw_message",
+              "displayName": "raw_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
         "options": {
-          "timeout": 20000
+          "waitForSubWorkflow": true
         }
       },
-      "id": "e1f2f3ea-06eb-5f09-9100-5f41e6998643",
+      "id": "3dcce8b1-bdf3-5106-9966-a55f6de37673",
       "name": "Send Owner Email",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
       "position": [
         1220,
         40
       ],
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "UEVuaDdqEf2Zd7CE",
-          "name": "Gmail account"
-        }
-      },
-      "notes": "Goes to the email in Control panel → Health & alerts.",
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "notes": "Pick '39 - Send Email' in Workflow after importing."
     }
   ],
   "pinData": {},

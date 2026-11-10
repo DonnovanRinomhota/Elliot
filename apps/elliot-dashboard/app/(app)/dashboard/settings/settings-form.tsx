@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { checkAlertChannels, formatWhatsapp } from "@/lib/alerts";
+import { forwardingCode, forwardingStatus, inboundAddress, isEmail, senderPreview } from "@/lib/agency-email";
 
 type Tenant = {
   id: string;
   name: string;
+  slug: string;
   industry: string | null;
   plan: string;
   status: string;
@@ -30,6 +32,12 @@ type AiConfig = {
   reminders_enabled?: boolean | null;
   booking_notice_minutes?: number | null;
   booking_buffer_minutes?: number | null;
+  email_from_name?: string | null;
+  email_inbound_last_at?: string | null;
+  email_inbound_last_from?: string | null;
+  email_forwarding_code?: string | null;
+  email_forwarding_url?: string | null;
+  email_forwarding_code_at?: string | null;
 } | null;
 
 // Matches the actions this codebase actually checks a mode for (main agent's
@@ -76,10 +84,12 @@ export default function SettingsForm({
   tenant,
   aiConfig,
   configError,
+  ownFromAddress = null,
 }: {
   tenant: Tenant;
   aiConfig: AiConfig;
   configError: string | null;
+  ownFromAddress?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -93,8 +103,12 @@ export default function SettingsForm({
   const [autonomy, setAutonomy] = useState<Record<string, string>>(
     Object.fromEntries(AUTONOMY_ACTIONS.map((a) => [a.key, aiConfig?.autonomy_rules?.[a.key]?.mode ?? "approval_required"]))
   );
+  const [email, setEmail] = useState({
+    agency_email: aiConfig?.connected_gmail_address ?? "",
+    from_name: aiConfig?.email_from_name ?? "",
+  });
+  const [copied, setCopied] = useState(false);
   const [integrations, setIntegrations] = useState({
-    connected_gmail_address: aiConfig?.connected_gmail_address ?? "",
     google_calendar_id: aiConfig?.google_calendar_id ?? "primary",
     crm_webhook_url: aiConfig?.crm_webhook_url ?? "",
     whatsapp_phone_number_id: aiConfig?.whatsapp_phone_number_id ?? "",
@@ -156,7 +170,6 @@ export default function SettingsForm({
     const { error } = await supabase
       .from("ai_config")
       .update({
-        connected_gmail_address: integrations.connected_gmail_address || null,
         google_calendar_id: integrations.google_calendar_id || "primary",
         crm_webhook_url: integrations.crm_webhook_url || null,
         whatsapp_phone_number_id: integrations.whatsapp_phone_number_id || null,
@@ -165,6 +178,33 @@ export default function SettingsForm({
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, integrations: error.message }));
     setSaved("integrations");
+  }
+
+  async function saveEmail() {
+    setErrors((e) => ({ ...e, email: "" }));
+    const agencyEmail = email.agency_email.trim().toLowerCase();
+    if (agencyEmail && !isEmail(agencyEmail)) {
+      return setErrors((e) => ({ ...e, email: "That doesn't look like an email address." }));
+    }
+    setSaving("email");
+    const { error } = await supabase
+      .from("ai_config")
+      .update({ connected_gmail_address: agencyEmail || null, email_from_name: email.from_name.trim() || null })
+      .eq("tenant_id", tenant.id);
+    setSaving(null);
+    if (error) return setErrors((e) => ({ ...e, email: error.message }));
+    setEmail({ agency_email: agencyEmail, from_name: email.from_name.trim() });
+    setSaved("email");
+  }
+
+  async function copyInbound() {
+    try {
+      await navigator.clipboard.writeText(inboundAddress(tenant.slug));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* the address is on screen to copy by hand */
+    }
   }
 
   async function saveNotifications() {
@@ -284,21 +324,122 @@ export default function SettingsForm({
         <SaveButton saving={saving === "autonomy"} saved={saved === "autonomy"} onClick={saveAutonomy} />
       </Card>
 
-      <Card title="Connected services" description="Your inbox, calendar, CRM and WhatsApp number.">
-        {configError && <p className="mb-3 text-[12.5px] text-alert">Couldn&apos;t load your current settings: {configError}</p>}
-        <div className="mb-3">
-          <label className={labelClass}>Connected Gmail address</label>
-          <input
-            className={inputClass}
-            value={integrations.connected_gmail_address}
-            onChange={(e) => setIntegrations({ ...integrations, connected_gmail_address: e.target.value })}
-            placeholder="inbox@yourbusiness.com"
-          />
-          <p className="mt-1 text-[12.5px] text-gray-400">
-            The inbox Elliot reads and replies from. Changing this here doesn&apos;t reconnect the inbox; contact your
-            Elliot administrator to switch accounts.
-          </p>
+      <Card title="Email" description="Elliot answers the emails clients send you, and sends confirmations and reminders in your name.">
+        <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className={labelClass} htmlFor="s-agency-email">Your agency&apos;s email address</label>
+            <input
+              id="s-agency-email"
+              className={inputClass}
+              type="email"
+              value={email.agency_email}
+              onChange={(e) => { setSaved(null); setEmail({ ...email, agency_email: e.target.value }); }}
+              placeholder="biuro@youragency.pl"
+            />
+            <p className="mt-1 text-[12.5px] text-gray-400">Where clients write to you. Their replies to Elliot&apos;s emails come back here.</p>
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="s-from-name">Sender name</label>
+            <input
+              id="s-from-name"
+              className={inputClass}
+              value={email.from_name}
+              onChange={(e) => { setSaved(null); setEmail({ ...email, from_name: e.target.value }); }}
+              placeholder={tenant.name}
+            />
+            <p className="mt-1 text-[12.5px] text-gray-400">The name clients see. Empty uses your business name.</p>
+          </div>
         </div>
+        {(() => {
+          const p = senderPreview({ slug: tenant.slug, agencyName: tenant.name, fromName: email.from_name, ownFromAddress, agencyEmail: email.agency_email });
+          return (
+            <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-2.5 text-[12.5px]">
+              <dt className="text-gray-500">Clients get emails from</dt>
+              <dd className="m-0 break-all font-medium text-gray-700">{p.from}</dd>
+              <dt className="text-gray-500">Their replies go to</dt>
+              <dd className="m-0 break-all font-medium text-gray-700">{p.replyTo}</dd>
+            </dl>
+          );
+        })()}
+        {errors.email && <p className="mb-2 text-[12.5px] text-alert">{errors.email}</p>}
+        <SaveButton saving={saving === "email"} saved={saved === "email"} onClick={saveEmail} />
+
+        <div className="mt-5 border-t border-gray-100 pt-4">
+          <h3 className="m-0 text-sm font-semibold text-ink">Forward your inbox to Elliot</h3>
+          <p className="m-0 mt-0.5 mb-3 text-[13px] text-gray-500">
+            Set your inbox to forward a copy of incoming email to this address. You keep every email; Elliot answers the enquiries and skips newsletters and automatic emails.
+          </p>
+          <div className="mb-3 flex items-center gap-2">
+            <code className="min-w-0 flex-1 break-all rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-ink">{inboundAddress(tenant.slug)}</code>
+            <button
+              type="button"
+              onClick={copyInbound}
+              className="h-9 shrink-0 cursor-pointer rounded-full border border-gray-200 bg-white px-3.5 text-[13px] font-medium text-ink hover:bg-gray-50"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          {(() => {
+            const st = forwardingStatus(aiConfig?.email_inbound_last_at, aiConfig?.email_inbound_last_from);
+            const dot = st.tone === "ok" ? "bg-accent" : st.tone === "quiet" ? "bg-alert" : "bg-gray-300";
+            return (
+              <p className="mb-3 flex items-start gap-2 text-[12.5px] text-gray-600">
+                <span className={`mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />
+                {st.label}
+              </p>
+            );
+          })()}
+          {forwardingCode(aiConfig?.email_forwarding_code, aiConfig?.email_forwarding_code_at) && (
+            <div className="mb-3 rounded-lg bg-accent-soft px-3 py-2.5 text-[13px] text-ink">
+              Gmail&apos;s confirmation code: <strong className="font-mono tracking-wide">{aiConfig?.email_forwarding_code}</strong>
+              <span className="block text-[12.5px] text-gray-600">
+                Enter it in Gmail where you added the forwarding address
+                {aiConfig?.email_forwarding_url ? (
+                  <>
+                    , or{" "}
+                    <a className="text-accent-dark underline" href={aiConfig.email_forwarding_url} target="_blank" rel="noreferrer">
+                      confirm with Google&apos;s link
+                    </a>
+                  </>
+                ) : null}
+                .
+              </span>
+            </div>
+          )}
+          <details className="text-[13px] text-gray-600">
+            <summary className="cursor-pointer font-medium text-ink">How to set up forwarding</summary>
+            <div className="mt-2 flex flex-col gap-3">
+              <div>
+                <strong className="text-gray-700">Gmail or Google Workspace</strong>
+                <ol className="m-0 mt-1 pl-5">
+                  <li>Settings (gear) → See all settings → Forwarding and POP/IMAP → Add a forwarding address.</li>
+                  <li>Paste the address above → Next → Proceed.</li>
+                  <li>Google sends a confirmation code to Elliot. Refresh this page after a minute: the code appears above. Enter it in Gmail and click Verify.</li>
+                  <li>Choose &ldquo;Forward a copy of incoming mail to&rdquo; the address above, and &ldquo;keep Gmail&apos;s copy in the Inbox&rdquo;. Save Changes.</li>
+                </ol>
+              </div>
+              <div>
+                <strong className="text-gray-700">Outlook or Microsoft 365</strong>
+                <ol className="m-0 mt-1 pl-5">
+                  <li>Settings → Mail → Forwarding → Enable forwarding.</li>
+                  <li>Paste the address above, tick &ldquo;Keep a copy of forwarded messages&rdquo;, Save.</li>
+                  <li>On a company Microsoft 365 account, your IT administrator may need to allow forwarding to outside addresses.</li>
+                </ol>
+              </div>
+              <div>
+                <strong className="text-gray-700">Other email (home.pl, OVH, nazwa.pl, cPanel…)</strong>
+                <p className="m-0 mt-1">In your email hosting panel, add a forward (przekierowanie) from your address to the address above, keeping a copy in your mailbox.</p>
+              </div>
+              <p className="m-0 text-[12.5px] text-gray-500">
+                Then send a test email from another address to yours: Elliot answers within a minute, and the status above turns to Working.
+              </p>
+            </div>
+          </details>
+        </div>
+      </Card>
+
+      <Card title="Connected services" description="Your calendar, CRM and WhatsApp number.">
+        {configError && <p className="mb-3 text-[12.5px] text-alert">Couldn&apos;t load your current settings: {configError}</p>}
         <div className="mb-3">
           <label className={labelClass}>Google Calendar ID</label>
           <input

@@ -172,7 +172,9 @@ test('12: a confirmation email goes to the client when there is an email; the bo
   assert.deepStrictEqual(next(wf12, 'Send Confirmation Email'), ['Booking Result']);
   const send = nodeOf(wf12, 'Send Confirmation Email');
   assert.strictEqual(send.onError, 'continueRegularOutput');
-  assert.strictEqual(send.parameters.nodeCredentialType, 'gmailOAuth2');
+  // 0039: sent by workflow 39 (Resend, from the agency's name), not Gmail.
+  assert.strictEqual(send.type, 'n8n-nodes-base.executeWorkflow');
+  assert.strictEqual(send.parameters.workflowInputs.value.audience, 'client');
 
   const cond = nodeOf(wf12, 'Has Client Email?').parameters.conditions.conditions[0].leftValue;
   const has = (email) => expr(cond, { nodes: { 'Load Tenant + Contact Info': { contact_email: email } } });

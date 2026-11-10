@@ -49,8 +49,11 @@ directly: he sets Elliot up, watches how it performs and adjusts it with them.
   of code.
 - **WhatsApp Business**: the same conversations on the agency's WhatsApp
   number, with instant replies.
-- **Email**: Elliot replies to enquiries sent to the agency's Gmail inbox, in
-  the same email thread.
+- **Email**: the agency forwards its inbox (Gmail, Outlook or any other) to
+  its Elliot address; Elliot replies to enquiries in the same email thread,
+  in the agency's name, and clients' replies go back to the agency's inbox.
+  Portal enquiries (Otodom, OLX) are answered too. Confirmations and reminders
+  are sent in the agency's name as well, optionally from its own domain.
 - **Phone calls**: not offered yet.
 
 ## Languages
@@ -74,8 +77,10 @@ from; changes apply straight away.
 
 ## Works with
 
-Google Calendar, Gmail, WhatsApp Business, the agency's website, and CRMs
-through a webhook, Zapier or Make. Not yet: Outlook / Microsoft 365. For a
+Google Calendar, any email inbox (Gmail, Outlook / Microsoft 365, or the
+agency's own mail server, by forwarding), WhatsApp Business, the agency's
+website, and CRMs through a webhook, Zapier or Make. Not yet: Outlook
+calendars. For a
 specific CRM such as ASARI, Galactica Virgo or IMO, book a call to discuss
 the connection.
 

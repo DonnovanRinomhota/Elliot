@@ -223,7 +223,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Where a client can see a property: the agency's own page for it when it\n// has one, otherwise Elliot's property page with the photos (/p/<id> on the\n// dashboard; photos added in Listings or imported from Google Drive). A\n// Google Drive / Dropbox folder isn't a property page, so it gets ours.\nconst DASHBOARD_URL = 'https://app.getelliot.eu'; // change if the dashboard moves to its own domain\nfunction propertyLink(id, url) {\n  const own = String(url || '').trim();\n  if (/^https?:\\/\\//i.test(own) && !/drive\\.google\\.com|dropbox\\.com/i.test(own)) return own;\n  return id ? `${DASHBOARD_URL}/p/${id}` : null;\n}\n\n// The client's confirmation email (English, then Polish), sent from the\n// agency's connected Gmail -- the same account and raw RFC 2822 pattern as\n// workflows 15 and 24. Times are in the agency's time zone.\nconst info = $('Load Tenant + Contact Info').first().json;\nconst booked = $input.first().json;\nconst req = $('When Executed by Another Workflow').first().json;\nconst tz = info.timezone || 'Europe/Warsaw';\nconst start = new Date(req.starts_at);\nconst end = new Date(req.ends_at);\nconst when = (locale) =>\n  `${start.toLocaleDateString(locale, { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ` +\n  `${start.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit' })}–` +\n  `${end.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit' })}`;\nconst agency = info.tenant_name || 'our office';\nconst first = String(info.contact_name || '').trim().split(/\\s+/)[0] || '';\nconst link = booked.listing_link;\nconst facts = [\n  info.listing_price != null ? `${Number(info.listing_price).toLocaleString('pl-PL')} ${info.listing_currency || 'PLN'}${info.listing_transaction_type === 'rent' ? ' / month' : ''}` : null,\n  info.listing_area_m2 ? `${Number(info.listing_area_m2)} m²` : null,\n  info.listing_rooms ? `${info.listing_rooms} room${info.listing_rooms === 1 ? '' : 's'}` : null,\n].filter(Boolean).join(' · ');\n\nconst en = [\n  `Hi${first ? ' ' + first : ''},`,\n  '',\n  `Your viewing with ${agency} is confirmed.`,\n  '',\n  `When:     ${when('en-GB')}`,\n  info.listing_title ? `Property: ${info.listing_title}${info.listing_reference ? ` (ref ${info.listing_reference})` : ''}` : null,\n  facts ? `          ${facts}` : null,\n  info.listing_address ? `Address:  ${info.listing_address}` : null,\n  info.agent_name ? `Agent:    ${info.agent_name}` : null,\n  link ? `Photos and details: ${link}` : null,\n  '',\n  'Need to change or cancel? Just reply to this email or send us a message.',\n  '',\n  `See you there,`,\n  agency,\n].filter((l) => l !== null);\n\nconst pl = [\n  `Dzień dobry${first ? ' ' + first : ''},`,\n  '',\n  `potwierdzamy prezentację nieruchomości z ${agency}.`,\n  '',\n  `Termin:   ${when('pl-PL')}`,\n  info.listing_title ? `Oferta:   ${info.listing_title}${info.listing_reference ? ` (nr ${info.listing_reference})` : ''}` : null,\n  info.listing_address ? `Adres:    ${info.listing_address}` : null,\n  info.agent_name ? `Agent:    ${info.agent_name}` : null,\n  link ? `Zdjęcia i szczegóły: ${link}` : null,\n  '',\n  'Jeśli chcą Państwo zmienić lub odwołać termin, wystarczy odpowiedzieć na tę wiadomość.',\n  '',\n  'Do zobaczenia,',\n  agency,\n].filter((l) => l !== null);\n\n// 0037: getelliot.eu's own calls, and the public demo agency.\nconst isCall = booked.kind === 'consultation';\nconst isDemo = info.assistant_mode === 'demo';\nif (isCall) {\n  en.length = 0; pl.length = 0;\n  const callEn = booked.call_label || '15-minute intro call';\n  const callPl = callEn.startsWith('30') ? '30-minutowa prezentacja na żywo' : '15-minutowa rozmowa wstępna';\n  en.push(`Hi${first ? ' ' + first : ''},`, '', `Your ${callEn} with Elliot is booked.`, '',\n    `When:         ${when('en-GB')} (Warsaw time)`,\n    booked.meet_link ? `Google Meet:  ${booked.meet_link}` : 'The Google Meet link is in the calendar invitation.', '',\n    'Need another time? Just reply to this email.', '', 'Talk soon,', 'Donnovan, Elliot', 'https://getelliot.eu');\n  pl.push(`Dzień dobry${first ? ' ' + first : ''},`, '', `potwierdzamy: ${callPl} z Elliot.`, '',\n    `Termin:       ${when('pl-PL')} (czas warszawski)`,\n    booked.meet_link ? `Google Meet:  ${booked.meet_link}` : 'Link do Google Meet jest w zaproszeniu w kalendarzu.', '',\n    'Jeśli potrzebny jest inny termin, wystarczy odpowiedzieć na tę wiadomość.', '', 'Do usłyszenia,', 'Donnovan, Elliot');\n}\nif (isDemo) {\n  en.splice(1, 0, '', 'This is a DEMO booking made on getelliot.eu. No real viewing is scheduled; this is the email your clients would get.');\n  pl.splice(1, 0, '', 'To jest rezerwacja DEMO z getelliot.eu. Żadna prezentacja się nie odbędzie; tak wygląda wiadomość, którą dostają Twoi klienci.');\n}\nconst subject = (isDemo ? '[DEMO] ' : '') + (isCall ? `Booked: Elliot ${booked.call_label || 'call'}, ` +\n  `${start.toLocaleDateString('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' })} ` +\n  `${start.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' })}` : '') + (isCall ? '' : `Viewing confirmed: ${start.toLocaleDateString('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' })}, ` +\n  `${start.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' })}` +\n  `${info.listing_title ? ' – ' + info.listing_title : ''}`);\nconst encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`;\nconst body = en.join('\\n') + '\\n\\n----------------------------------------\\n\\n' + pl.join('\\n') + '\\n';\nconst raw =\n  `To: ${info.contact_email}\\r\\n` +\n  `Subject: ${encodedSubject}\\r\\n` +\n  `MIME-Version: 1.0\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n` +\n  `Content-Transfer-Encoding: base64\\r\\n\\r\\n` +\n  Buffer.from(body, 'utf8').toString('base64');\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nreturn [{ json: { to: info.contact_email, subject, body, raw_message: encoded } }];"
+        "jsCode": "// Where a client can see a property: the agency's own page for it when it\n// has one, otherwise Elliot's property page with the photos (/p/<id> on the\n// dashboard; photos added in Listings or imported from Google Drive). A\n// Google Drive / Dropbox folder isn't a property page, so it gets ours.\nconst DASHBOARD_URL = 'https://app.getelliot.eu'; // change if the dashboard moves to its own domain\nfunction propertyLink(id, url) {\n  const own = String(url || '').trim();\n  if (/^https?:\\/\\//i.test(own) && !/drive\\.google\\.com|dropbox\\.com/i.test(own)) return own;\n  return id ? `${DASHBOARD_URL}/p/${id}` : null;\n}\n\n// The client's confirmation email (English, then Polish), sent by workflow\n// 39 from the agency's name and Elliot address (0039), replies to the agency. Times are in the agency's time zone.\nconst info = $('Load Tenant + Contact Info').first().json;\nconst booked = $input.first().json;\nconst req = $('When Executed by Another Workflow').first().json;\nconst tz = info.timezone || 'Europe/Warsaw';\nconst start = new Date(req.starts_at);\nconst end = new Date(req.ends_at);\nconst when = (locale) =>\n  `${start.toLocaleDateString(locale, { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ` +\n  `${start.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit' })}–` +\n  `${end.toLocaleTimeString(locale, { timeZone: tz, hour: '2-digit', minute: '2-digit' })}`;\nconst agency = info.tenant_name || 'our office';\nconst first = String(info.contact_name || '').trim().split(/\\s+/)[0] || '';\nconst link = booked.listing_link;\nconst facts = [\n  info.listing_price != null ? `${Number(info.listing_price).toLocaleString('pl-PL')} ${info.listing_currency || 'PLN'}${info.listing_transaction_type === 'rent' ? ' / month' : ''}` : null,\n  info.listing_area_m2 ? `${Number(info.listing_area_m2)} m²` : null,\n  info.listing_rooms ? `${info.listing_rooms} room${info.listing_rooms === 1 ? '' : 's'}` : null,\n].filter(Boolean).join(' · ');\n\nconst en = [\n  `Hi${first ? ' ' + first : ''},`,\n  '',\n  `Your viewing with ${agency} is confirmed.`,\n  '',\n  `When:     ${when('en-GB')}`,\n  info.listing_title ? `Property: ${info.listing_title}${info.listing_reference ? ` (ref ${info.listing_reference})` : ''}` : null,\n  facts ? `          ${facts}` : null,\n  info.listing_address ? `Address:  ${info.listing_address}` : null,\n  info.agent_name ? `Agent:    ${info.agent_name}` : null,\n  link ? `Photos and details: ${link}` : null,\n  '',\n  'Need to change or cancel? Just reply to this email or send us a message.',\n  '',\n  `See you there,`,\n  agency,\n].filter((l) => l !== null);\n\nconst pl = [\n  `Dzień dobry${first ? ' ' + first : ''},`,\n  '',\n  `potwierdzamy prezentację nieruchomości z ${agency}.`,\n  '',\n  `Termin:   ${when('pl-PL')}`,\n  info.listing_title ? `Oferta:   ${info.listing_title}${info.listing_reference ? ` (nr ${info.listing_reference})` : ''}` : null,\n  info.listing_address ? `Adres:    ${info.listing_address}` : null,\n  info.agent_name ? `Agent:    ${info.agent_name}` : null,\n  link ? `Zdjęcia i szczegóły: ${link}` : null,\n  '',\n  'Jeśli chcą Państwo zmienić lub odwołać termin, wystarczy odpowiedzieć na tę wiadomość.',\n  '',\n  'Do zobaczenia,',\n  agency,\n].filter((l) => l !== null);\n\n// 0037: getelliot.eu's own calls, and the public demo agency.\nconst isCall = booked.kind === 'consultation';\nconst isDemo = info.assistant_mode === 'demo';\nif (isCall) {\n  en.length = 0; pl.length = 0;\n  const callEn = booked.call_label || '15-minute intro call';\n  const callPl = callEn.startsWith('30') ? '30-minutowa prezentacja na żywo' : '15-minutowa rozmowa wstępna';\n  en.push(`Hi${first ? ' ' + first : ''},`, '', `Your ${callEn} with Elliot is booked.`, '',\n    `When:         ${when('en-GB')} (Warsaw time)`,\n    booked.meet_link ? `Google Meet:  ${booked.meet_link}` : 'The Google Meet link is in the calendar invitation.', '',\n    'Need another time? Just reply to this email.', '', 'Talk soon,', 'Donnovan, Elliot', 'https://getelliot.eu');\n  pl.push(`Dzień dobry${first ? ' ' + first : ''},`, '', `potwierdzamy: ${callPl} z Elliot.`, '',\n    `Termin:       ${when('pl-PL')} (czas warszawski)`,\n    booked.meet_link ? `Google Meet:  ${booked.meet_link}` : 'Link do Google Meet jest w zaproszeniu w kalendarzu.', '',\n    'Jeśli potrzebny jest inny termin, wystarczy odpowiedzieć na tę wiadomość.', '', 'Do usłyszenia,', 'Donnovan, Elliot');\n}\nif (isDemo) {\n  en.splice(1, 0, '', 'This is a DEMO booking made on getelliot.eu. No real viewing is scheduled; this is the email your clients would get.');\n  pl.splice(1, 0, '', 'To jest rezerwacja DEMO z getelliot.eu. Żadna prezentacja się nie odbędzie; tak wygląda wiadomość, którą dostają Twoi klienci.');\n}\nconst subject = (isDemo ? '[DEMO] ' : '') + (isCall ? `Booked: Elliot ${booked.call_label || 'call'}, ` +\n  `${start.toLocaleDateString('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' })} ` +\n  `${start.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' })}` : '') + (isCall ? '' : `Viewing confirmed: ${start.toLocaleDateString('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' })}, ` +\n  `${start.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' })}` +\n  `${info.listing_title ? ' – ' + info.listing_title : ''}`);\nconst encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`;\nconst body = en.join('\\n') + '\\n\\n----------------------------------------\\n\\n' + pl.join('\\n') + '\\n';\nconst raw =\n  `To: ${info.contact_email}\\r\\n` +\n  `Subject: ${encodedSubject}\\r\\n` +\n  `MIME-Version: 1.0\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n` +\n  `Content-Transfer-Encoding: base64\\r\\n\\r\\n` +\n  Buffer.from(body, 'utf8').toString('base64');\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nreturn [{ json: { to: info.contact_email, subject, body, raw_message: encoded } }];"
       },
       "id": "9022b884-2a25-56cd-943e-174b78ffe4b1",
       "name": "Build Confirmation Email",
@@ -236,37 +236,74 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gmailOAuth2",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "39 - Send Email"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('When Executed by Another Workflow').first().json.tenant_id }}",
+            "audience": "client",
+            "raw_message": "={{ $json.raw_message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "audience",
+              "displayName": "audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "raw_message",
+              "displayName": "raw_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
         "options": {
-          "timeout": 20000
+          "waitForSubWorkflow": true
         }
       },
-      "id": "6e944fa7-7b50-540c-982c-75b4b0109dc2",
+      "id": "276d8b7d-11ce-5b46-ab84-ce7c5b7a3fbe",
       "name": "Send Confirmation Email",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
       "position": [
         2176,
         428
       ],
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "UEVuaDdqEf2Zd7CE",
-          "name": "Gmail account"
-        }
-      },
       "onError": "continueRegularOutput",
-      "notes": "The same Gmail credential as workflows 15 and 24 (the agency's connected mailbox). A failed email never fails the booking."
+      "notes": "Pick '39 - Send Email' in Workflow after importing."
     },
     {
       "parameters": {
-        "jsCode": "// What goes back to Elliot (workflow 01): the booking, plus whether the\n// client's confirmation email went out -- and if it failed, why, so Elliot\n// tells the client instead of promising an email that isn't coming.\n// A failed email never fails the booking.\nconst result = { ...$('Format Results').first().json };\nlet sentTo = null;\nlet error = null;\nlet to = null;\ntry {\n  to = $('Build Confirmation Email').first().json.to;\n  const sent = $('Send Confirmation Email').first().json;\n  if (sent && sent.id && !sent.error) sentTo = to;\n  else error = (sent && sent.error && (sent.error.message || sent.error.description || String(sent.error))) || 'Gmail did not accept the message';\n} catch (e) { /* no email on file: the email branch didn't run */ }\nresult.confirmation_sent_to = sentTo;\nresult.confirmation_to = to;\nresult.confirmation_error = sentTo ? null : error;\nreturn [{ json: result }];"
+        "jsCode": "// What goes back to Elliot (workflow 01): the booking, plus whether the\n// client's confirmation email went out -- and if it failed, why, so Elliot\n// tells the client instead of promising an email that isn't coming.\n// A failed email never fails the booking.\nconst result = { ...$('Format Results').first().json };\nlet sentTo = null;\nlet error = null;\nlet to = null;\ntry {\n  to = $('Build Confirmation Email').first().json.to;\n  const sent = $('Send Confirmation Email').first().json;\n  if (sent && sent.id && !sent.error) sentTo = to;\n  else error = (sent && sent.error && (sent.error.message || sent.error.description || String(sent.error))) || 'the email was not accepted';\n} catch (e) { /* no email on file: the email branch didn't run */ }\nresult.confirmation_sent_to = sentTo;\nresult.confirmation_to = to;\nresult.confirmation_error = sentTo ? null : error;\nreturn [{ json: result }];"
       },
       "id": "0ae9cf37-7fa7-5b0e-9a9c-27f727ff5b9d",
       "name": "Booking Result",
