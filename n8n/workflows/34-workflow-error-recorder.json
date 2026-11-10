@@ -1,0 +1,60 @@
+{
+  "name": "34 - Workflow Error Recorder",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "8137b07f-25e0-51b7-8d0d-41eeaa37a59a",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Set this workflow as the 'Error workflow' in the settings of Elliot's other workflows."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select log_workflow_error($1, $2, $3, $4);",
+        "options": {
+          "queryReplacement": "={{ [ $json.workflow?.name || 'unknown workflow', $json.execution?.lastNodeExecuted || '', $json.execution?.error?.message || $json.trigger?.error?.message || 'unknown error', $json.execution?.url || '' ] }}"
+        }
+      },
+      "id": "a94f33fb-82d5-55d7-948a-cf6019a52b4c",
+      "name": "Log Workflow Error",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Workflow 33 includes it in the next alert (within 15 minutes)."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Log Workflow Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

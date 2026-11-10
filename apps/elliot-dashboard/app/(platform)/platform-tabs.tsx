@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/platform", label: "Agencies", match: (p: string) => p === "/platform" || p.startsWith("/platform/tenants") },
   { href: "/platform/activity", label: "Activity log", match: (p: string) => p.startsWith("/platform/activity") },
+  { href: "/platform/alerts", label: "Health & alerts", match: (p: string) => p.startsWith("/platform/alerts") },
   { href: "/dashboard/onboarding", label: "Add agency", match: () => false },
 ];
 

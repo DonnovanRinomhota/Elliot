@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { checkAlertChannels, formatWhatsapp } from "@/lib/alerts";
 
 type Tenant = {
   id: string;
@@ -22,6 +23,10 @@ type AiConfig = {
   crm_webhook_url: string | null;
   escalation_notify_email: string | null;
   whatsapp_phone_number_id: string | null;
+  alert_email_enabled?: boolean | null;
+  alert_email?: string | null;
+  alert_whatsapp_enabled?: boolean | null;
+  alert_whatsapp_number?: string | null;
 } | null;
 
 // Matches the actions this codebase actually checks a mode for (main agent's
@@ -92,6 +97,12 @@ export default function SettingsForm({
     whatsapp_phone_number_id: aiConfig?.whatsapp_phone_number_id ?? "",
   });
   const [notifyEmail, setNotifyEmail] = useState(aiConfig?.escalation_notify_email ?? "");
+  const [alerts, setAlerts] = useState({
+    email_enabled: !!aiConfig?.alert_email_enabled,
+    email: aiConfig?.alert_email ?? "",
+    whatsapp_enabled: !!aiConfig?.alert_whatsapp_enabled,
+    whatsapp: formatWhatsapp(aiConfig?.alert_whatsapp_number),
+  });
 
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -155,6 +166,27 @@ export default function SettingsForm({
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, notifications: error.message }));
     setSaved("notifications");
+  }
+
+  async function saveAlerts() {
+    setErrors((e) => ({ ...e, alerts: "" }));
+    const checked = checkAlertChannels(alerts);
+    if (!checked.ok) return setErrors((e) => ({ ...e, alerts: checked.error }));
+    setSaving("alerts");
+    const v = checked.value;
+    const { error } = await supabase
+      .from("ai_config")
+      .update({
+        alert_email_enabled: v.email_enabled,
+        alert_email: v.email,
+        alert_whatsapp_enabled: v.whatsapp_enabled,
+        alert_whatsapp_number: v.whatsapp,
+      })
+      .eq("tenant_id", tenant.id);
+    setSaving(null);
+    if (error) return setErrors((e) => ({ ...e, alerts: error.message }));
+    setAlerts((a) => ({ ...a, whatsapp: formatWhatsapp(v.whatsapp) }));
+    setSaved("alerts");
   }
 
   const inputClass = "h-9 w-full px-3";
@@ -285,6 +317,54 @@ export default function SettingsForm({
         </div>
         {errors.notifications && <p className="mb-2 text-[12.5px] text-alert">{errors.notifications}</p>}
         <SaveButton saving={saving === "notifications"} saved={saved === "notifications"} onClick={saveNotifications} />
+      </Card>
+      <Card
+        title="Problem alerts"
+        description="Get told when something goes wrong with your clients' messages, so nobody is left waiting."
+      >
+        <p className="m-0 mb-4 text-[13px] text-gray-600">
+          For example: a reply to a client couldn&apos;t be sent, Elliot couldn&apos;t answer a message, or a viewing
+          couldn&apos;t be booked. Checked every 15 minutes. Your Elliot administrator is always told as well.
+        </p>
+        <div className="mb-4 rounded-lg border border-gray-100 p-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={alerts.email_enabled}
+              onChange={(e) => { setSaved(null); setAlerts({ ...alerts, email_enabled: e.target.checked }); }}
+            />
+            Email alerts
+          </label>
+          <input
+            className={`${inputClass} mt-2`}
+            type="email"
+            value={alerts.email}
+            onChange={(e) => { setSaved(null); setAlerts({ ...alerts, email: e.target.value }); }}
+            placeholder="owner@yourbusiness.com"
+            aria-label="Alert email address"
+          />
+        </div>
+        <div className="mb-4 rounded-lg border border-gray-100 p-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={alerts.whatsapp_enabled}
+              onChange={(e) => { setSaved(null); setAlerts({ ...alerts, whatsapp_enabled: e.target.checked }); }}
+            />
+            WhatsApp alerts
+          </label>
+          <input
+            className={`${inputClass} mt-2`}
+            type="tel"
+            value={alerts.whatsapp}
+            onChange={(e) => { setSaved(null); setAlerts({ ...alerts, whatsapp: e.target.value }); }}
+            placeholder="+48 600 100 200"
+            aria-label="Alert WhatsApp number"
+          />
+          <p className="mt-1 text-[12.5px] text-gray-400">With the country code. A short one-line message; the details are in your dashboard.</p>
+        </div>
+        {errors.alerts && <p className="mb-2 text-[12.5px] text-alert">{errors.alerts}</p>}
+        <SaveButton saving={saving === "alerts"} saved={saved === "alerts"} onClick={saveAlerts} />
       </Card>
     </div>
   );
