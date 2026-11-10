@@ -8,6 +8,7 @@ import NavLink from "./dashboard/nav-link";
 import ExitViewAs from "./dashboard/exit-view-as";
 import AskElliot, { AskElliotButton } from "./dashboard/ask-elliot";
 import { DEFAULT_TZ, dayKey, timeOf } from "@/lib/appointments";
+import { untilLabel } from "@/lib/support-access";
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -41,11 +42,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // RLS returns only the agency this session is looking at: the user's own,
   // or the one a platform admin chose with "Open their dashboard".
-  const [{ data: tenantUser }, { data: tenant }, adminView, me] = await Promise.all([
+  const [{ data: tenantUser }, { data: tenant }, adminView, me, { data: supportGrant }] = await Promise.all([
     supabase.from("tenant_users").select("tenant_id, email, role, full_name").eq("auth_user_id", user.id).maybeSingle(),
-    supabase.from("tenants").select("id, name, timezone").maybeSingle(),
+    supabase.from("tenants").select("id, name, timezone, assistant_mode").maybeSingle(),
     getAdminView(supabase),
     getMembership(supabase, user.id),
+    // 0040: how long the agency's permission lasts, for the "viewing" banner.
+    supabase.from("support_access_grants").select("expires_at").maybeSingle(),
   ]);
 
   // Badge counts -- RLS scopes both to the logged-in user's tenant automatically,
@@ -232,8 +235,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {adminView && (
           <div className="mx-3 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brass/25 bg-brass-soft px-4 py-2.5 text-[13px] text-brass-dark md:ml-6 md:mr-6">
             <span>
-              You&apos;re viewing <strong className="font-semibold">{tenantName}</strong>&apos;s dashboard as a platform admin. What you change here
-              changes for them.
+              You&apos;re viewing <strong className="font-semibold">{tenantName}</strong>&apos;s dashboard
+              {supportGrant?.expires_at && (tenant as { assistant_mode?: string } | null)?.assistant_mode === "agency"
+                ? ` with their permission (until ${untilLabel(supportGrant.expires_at, tz)})`
+                : ""}
+              . What you change here changes for them, and they see each part you open in Settings.
             </span>
             <ExitViewAs />
           </div>

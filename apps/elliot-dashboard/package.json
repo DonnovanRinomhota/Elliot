@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npx --yes tsx --test lib/follow-up-steps.test.ts lib/listings.test.ts lib/listings-import.test.ts lib/listings-ai.test.ts lib/platform.test.ts lib/pagination-photos.test.ts lib/google-drive.test.ts lib/appointments.test.ts lib/contacts.test.ts lib/assistant/parse.test.ts lib/whatsapp.test.ts lib/approvals.test.ts lib/alerts.test.ts lib/agency-email.test.ts"
+    "test": "npx --yes tsx --test lib/follow-up-steps.test.ts lib/listings.test.ts lib/listings-import.test.ts lib/listings-ai.test.ts lib/platform.test.ts lib/pagination-photos.test.ts lib/google-drive.test.ts lib/appointments.test.ts lib/contacts.test.ts lib/assistant/parse.test.ts lib/whatsapp.test.ts lib/approvals.test.ts lib/alerts.test.ts lib/agency-email.test.ts lib/support-access.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

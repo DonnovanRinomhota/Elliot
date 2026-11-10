@@ -13,7 +13,7 @@
 // working until it's renamed -- the URL itself isn't a secret any more.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isAdminEmail } from "@/lib/admin";
+import { getPlatformAdmin } from "@/lib/platform-auth";
 import { callInternalWebhook } from "@/lib/n8n-webhook";
 
 export async function POST(request: Request) {
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ success: false, error: "Not signed in." }, { status: 401 });
   }
-  if (!isAdminEmail(user.email)) {
-    return NextResponse.json({ success: false, error: "Tenant onboarding is restricted to platform admins." }, { status: 403 });
+  if (!(await getPlatformAdmin())) {
+    return NextResponse.json({ success: false, error: "Tenant onboarding is restricted to platform admins signed in with two-step verification." }, { status: 403 });
   }
 
   let body: { name?: string; slug?: string; industry?: string; plan?: string; timezone?: string };

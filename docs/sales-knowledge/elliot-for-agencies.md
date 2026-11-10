@@ -100,7 +100,9 @@ review and adjustments.
 
 Elliot works for the agency: the agency decides what it says and owns its
 data. Each agency's data is kept separate from every other agency's. Personal
-data is handled under the GDPR. For contract terms and data processing
+data is handled under the GDPR. The Elliot team can open an agency's dashboard
+only while the agency allows it (Settings → Elliot support access, for 24 hours,
+7 days or during set-up), and the agency sees every part they opened. For contract terms and data processing
 details, book a call with Donnovan.
 
 ## Getting started

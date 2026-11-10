@@ -1,20 +1,25 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ElliotMark } from "@/app/_ui/elliot-logo";
-import { isAdminEmail } from "@/lib/admin";
+import { getPlatformAdminStatus } from "@/lib/platform-auth";
 import PlatformTabs from "./platform-tabs";
 
 // The control panel: every agency on Elliot, for platform admins only
 // (ADMIN_EMAILS). Separate from the agency dashboard on purpose -- different
 // audience, different data (it reads across all tenants with the service
-// role, after this check).
+// role, after this check). 0040: business figures only; an agency's own data
+// is reached through "Open their dashboard", with the agency's permission.
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const {
-    data: { user },
+    data: { user: signedIn },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  if (!isAdminEmail(user.email)) notFound();
+  if (!signedIn) redirect("/login");
+  // 0040: platform admins only, and only after the two-step code.
+  const admin = await getPlatformAdminStatus();
+  if (!admin) notFound();
+  if (admin.status !== "ok") redirect("/two-step");
+  const user = admin.user;
 
   return (
     <div className="min-h-screen">

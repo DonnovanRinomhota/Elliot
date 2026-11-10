@@ -12,6 +12,7 @@ import TenantForm from "./tenant-form";
 import ViewAsButton from "./view-as-button";
 import { describeEvent } from "@/lib/platform-events";
 import BackButton from "@/app/_ui/back-button";
+import { supportAccessState, untilLabel } from "@/lib/support-access";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ const n = (v: number | string | null | undefined) => Number(v || 0);
 export default async function TenantDetailPage({ params }: { params: { id: string } }) {
   const admin = createAdminClient();
 
-  const [{ data: overview }, { data: tenant }, { data: users }, { data: errors }, { data: crmFailures }, { data: events }] =
+  const [{ data: overview }, { data: tenant }, { data: users }, { data: errors }, { data: crmFailures }, { data: events }, { data: grant }, { data: visits }] =
     await Promise.all([
       admin.rpc("platform_tenant_overview", { p_days: 30 }),
       admin
@@ -53,12 +54,21 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
         .eq("tenant_id", params.id)
         .order("created_at", { ascending: false })
         .limit(10),
+      // 0040: whether the agency lets support into its dashboard, and what was opened.
+      admin.from("support_access_grants").select("expires_at, granted_by_email, granted_at").eq("tenant_id", params.id).maybeSingle(),
+      admin
+        .from("support_access_log")
+        .select("id, admin_email, section, viewed_at")
+        .eq("tenant_id", params.id)
+        .order("viewed_at", { ascending: false })
+        .limit(8),
     ]);
 
   if (!tenant) notFound();
   const row = ((overview ?? []) as TenantOverviewRow[]).find((r) => r.tenant_id === params.id);
   const state = row ? accountState(row) : accountState(tenant as any);
   const issues = row ? healthIssues(row, state) : [];
+  const access = supportAccessState(grant, (tenant as any).assistant_mode);
 
   const usage = row
     ? [
@@ -83,7 +93,7 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
             {ACCOUNT_STATE_LABEL[state]}
           </Badge>
         </div>
-        <ViewAsButton tenantId={tenant.id} tenantName={tenant.name} />
+        <ViewAsButton tenantId={tenant.id} tenantName={tenant.name} allowed={access.open} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -148,6 +158,32 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
                 </div>
               ))}
             </dl>
+          </Panel>
+
+          <Panel title="Support access">
+            <p className="m-0 text-[13px] text-ink">
+              {access.open
+                ? access.reason === "own_account"
+                  ? "Elliot's own account: open with two-step sign-in."
+                  : `Allowed until ${untilLabel(access.until, tenant.timezone || undefined)}${access.by ? ` by ${access.by}` : ""}.`
+                : access.reason === "expired"
+                  ? `Off. Their last permission ended ${timeAgo(access.expiredAt!)}.`
+                  : "Off. Their dashboard and clients' data stay closed to you."}
+            </p>
+            {!access.open && (
+              <p className="m-0 mt-1 text-[12.5px] text-gray-500">
+                They can allow it for 24 hours, 7 days or 30 days in Settings → Elliot support access, and see each part you open.
+              </p>
+            )}
+            {!!visits?.length && (
+              <ul className="m-0 mt-3 list-none border-t border-gray-100 p-0 pt-2 text-[12.5px] text-gray-600">
+                {visits.map((v: any) => (
+                  <li key={v.id} className="py-0.5">
+                    {v.section} <span className="text-gray-400">· {timeAgo(v.viewed_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
 
           <Panel title={`Team (${users?.length ?? 0})`} flush>

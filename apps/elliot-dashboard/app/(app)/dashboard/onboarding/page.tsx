@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { isAdminEmail } from "@/lib/admin";
+import { getPlatformAdminStatus } from "@/lib/platform-auth";
 import OnboardingForm from "./onboarding-form";
 import { Notice, PageHeader } from "../../../_ui/ui";
 
@@ -12,7 +12,9 @@ export default async function OnboardingPage() {
 
   if (!user) redirect("/login");
 
-  if (!isAdminEmail(user.email)) {
+  const admin = await getPlatformAdminStatus();
+  if (admin && admin.status !== "ok") redirect("/two-step");
+  if (!admin) {
     return (
       <div>
         <PageHeader title="New tenant" />
