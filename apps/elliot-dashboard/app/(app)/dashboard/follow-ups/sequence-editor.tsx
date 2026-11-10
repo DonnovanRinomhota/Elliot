@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   MAX_STEPS,
   SUPPORTED_PLACEHOLDER,
+  WHATSAPP_BODY_MAX,
   stepsFromJson,
   validateSequence,
   type DraftStep,
@@ -20,16 +21,19 @@ type ExistingSequence = { id: string; name: string; steps: unknown };
 const STARTER_STEPS: Omit<DraftStep, "key">[] = [
   {
     day: "0",
+    channel: "email",
     subject: "Thanks for reaching out",
     body: "Hi {{contact_name}},\n\nThanks for getting in touch. I wanted to make sure you have everything you need and to answer any questions.\n\nJust reply to this email and I'll get back to you.",
   },
   {
     day: "3",
+    channel: "email",
     subject: "Following up",
     body: "Hi {{contact_name}},\n\nJust following up on my earlier note. Is there anything I can help with, or a good time for a quick call?",
   },
   {
     day: "7",
+    channel: "email",
     subject: "One last check-in",
     body: "Hi {{contact_name}},\n\nI don't want to crowd your inbox, so this is my last note for now. If the timing changes, just reply and we'll pick things up from there.",
   },
@@ -62,7 +66,7 @@ export default function SequenceEditor({
   const [steps, setSteps] = useState<DraftStep[]>(() => {
     if (sequence) {
       const existing = stepsFromJson(sequence.steps, nextKey);
-      return existing.length > 0 ? existing : [{ key: nextKey(), day: "0", subject: "", body: "" }];
+      return existing.length > 0 ? existing : [{ key: nextKey(), day: "0", channel: "email", subject: "", body: "" }];
     }
     return STARTER_STEPS.map((s) => ({ ...s, key: nextKey() }));
   });
@@ -79,7 +83,7 @@ export default function SequenceEditor({
   function addStep() {
     const days = steps.map((s) => Number(s.day.trim())).filter((n) => Number.isInteger(n) && n >= 0);
     const nextDay = days.length > 0 ? Math.max(...days) + 3 : 0;
-    setSteps((prev) => [...prev, { key: nextKey(), day: String(nextDay), subject: "", body: "" }]);
+    setSteps((prev) => [...prev, { key: nextKey(), day: String(nextDay), channel: "email", subject: "", body: "" }]);
   }
 
   function removeStep(key: string) {
@@ -150,7 +154,10 @@ export default function SequenceEditor({
     <div className="mb-6 rounded-lg border border-gray-300 bg-white p-5">
       <div className="mb-4">
         <div className="text-sm font-medium">{isNew ? "New sequence" : "Edit sequence"}</div>
-        <div className="text-[12.5px] text-gray-500">Each step is sent to the lead as an email.</div>
+        <div className="text-[12.5px] text-gray-500">
+          Each step is an email or a WhatsApp message. WhatsApp goes only to clients who have written to you on WhatsApp;
+          the others get that step by email.
+        </div>
       </div>
 
       {!isNew && runningCount > 0 && (
@@ -199,7 +206,23 @@ export default function SequenceEditor({
                 </button>
               </div>
 
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="inline-flex rounded-full border border-gray-200 p-0.5" role="radiogroup" aria-label="Send as">
+                  {(["email", "whatsapp"] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      role="radio"
+                      aria-checked={step.channel === c}
+                      onClick={() => updateStep(step.key, { channel: c })}
+                      className={`h-7 cursor-pointer rounded-full border-0 px-3 text-[12.5px] font-medium ${
+                        step.channel === c ? "bg-ink text-white" : "bg-transparent text-gray-600 hover:text-ink"
+                      }`}
+                    >
+                      {c === "email" ? "Email" : "WhatsApp"}
+                    </button>
+                  ))}
+                </div>
                 <label htmlFor={`${step.key}-day`} className="text-[12.5px] font-medium text-gray-600">
                   Send on day
                 </label>
@@ -213,17 +236,19 @@ export default function SequenceEditor({
                 />
               </div>
 
-              <div className="mb-3">
-                <label htmlFor={`${step.key}-subject`} className={labelClass}>
-                  Subject
-                </label>
-                <input
-                  id={`${step.key}-subject`}
-                  className={inputClass}
-                  value={step.subject}
-                  onChange={(e) => updateStep(step.key, { subject: e.target.value })}
-                />
-              </div>
+              {step.channel === "email" && (
+                <div className="mb-3">
+                  <label htmlFor={`${step.key}-subject`} className={labelClass}>
+                    Subject
+                  </label>
+                  <input
+                    id={`${step.key}-subject`}
+                    className={inputClass}
+                    value={step.subject}
+                    onChange={(e) => updateStep(step.key, { subject: e.target.value })}
+                  />
+                </div>
+              )}
 
               <div>
                 <div className="mb-1 flex items-center justify-between">
@@ -248,6 +273,13 @@ export default function SequenceEditor({
                   value={step.body}
                   onChange={(e) => updateStep(step.key, { body: e.target.value })}
                 />
+                {step.channel === "whatsapp" && (
+                  <p className={`m-0 mt-1 text-[12px] ${step.body.trim().length > WHATSAPP_BODY_MAX ? "text-alert" : "text-gray-500"}`}>
+                    {step.body.trim().length} / {WHATSAPP_BODY_MAX}. More than 24 hours after the client&apos;s last WhatsApp
+                    message, WhatsApp only allows approved templates, so Elliot sends it inside one: &ldquo;Message from [your
+                    agency]:&rdquo;, your text, then &ldquo;Reply to this message to continue.&rdquo;
+                  </p>
+                )}
               </div>
 
               {stepError && (

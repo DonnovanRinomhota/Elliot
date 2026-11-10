@@ -20,6 +20,8 @@ type Draft = {
   category: string;
   confidence: string | number;
   status: string;
+  /** whatsapp only (0045): why WhatsApp refused it. */
+  send_error?: string | null;
   created_at: string;
   conversation_id?: string | null;
   /** [label, date] steps, e.g. [["Received", "9 Nov 2026, 17:01"], ["Drafted", ...], ["Sent", ...]]. */
@@ -189,9 +191,14 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
 
         {draft.status === "blocked_needs_template" && (
           <p className="mb-0 mt-3 rounded-md bg-alert-soft px-3 py-2 text-[13px] text-alert-dark">
-            Not sent: more than 24 hours have passed since this contact last wrote on WhatsApp, and Meta only allows
-            a free-form reply within 24 hours. Sending it now needs an approved WhatsApp template, which isn&apos;t set
-            up yet.
+            {draft.send_error ? (
+              <>Not sent: WhatsApp refused it. {draft.send_error}</>
+            ) : (
+              <>
+                Not sent: more than 24 hours have passed since this contact last wrote on WhatsApp, and WhatsApp only
+                allows a free-form reply within 24 hours. Reply from the conversation once they write again, or by email.
+              </>
+            )}
           </p>
         )}
       </div>

@@ -15,6 +15,7 @@ import {
 const step = (key: string, day: string, subject = "Following up", body = "Hi {{contact_name}}, checking in."): DraftStep => ({
   key,
   day,
+  channel: "email",
   subject,
   body,
 });
@@ -133,7 +134,33 @@ test("displaySteps preserves array order (the order the sweep runs them)", () =>
     { day_offset: 0, subject: "" },
   ]);
   assert.deepEqual(out, [
-    { day: 7, subject: "Last" },
-    { day: 0, subject: "(no subject)" },
+    { day: 7, channel: "email", subject: "Last" },
+    { day: 0, channel: "email", subject: "(no subject)" },
   ]);
+  assert.deepEqual(displaySteps([{ day_offset: 2, channel: "whatsapp", body: "Hi {{contact_name}}!\nStill looking?" }]), [
+    { day: 2, channel: "whatsapp", subject: "Hi {{contact_name}}!" },
+  ]);
+});
+
+test("WhatsApp steps: no subject, WhatsApp's length limit, channel kept", () => {
+  const wa = (key: string, day: string, body: string): DraftStep => ({ key, day, channel: "whatsapp", subject: "", body });
+  const r = validateSequence({ name: "Mixed", steps: [step("a", "0"), wa("b", "2", "  Hi {{contact_name}}, still looking?  ")] });
+  assert.equal(r.ok, true);
+  if (!r.ok) return;
+  assert.deepEqual(r.steps[1], { day_offset: 2, channel: "whatsapp", subject: "", body: "Hi {{contact_name}}, still looking?" });
+
+  const long = validateSequence({ name: "Long", steps: [wa("a", "0", "x".repeat(901))] });
+  assert.equal(long.ok, false);
+  if (long.ok) return;
+  assert.match(long.errors.stepErrors.a, /900 characters.*901/);
+  assert.equal(validateSequence({ name: "Ok", steps: [wa("a", "0", "x".repeat(900))] }).ok, true);
+  // An email step of the same length is fine.
+  assert.equal(validateSequence({ name: "Email", steps: [step("a", "0", "S", "x".repeat(4000))] }).ok, true);
+  // Placeholders are still checked.
+  const bad = validateSequence({ name: "Bad", steps: [wa("a", "0", "Hi {{first_name}}")] });
+  assert.equal(bad.ok, false);
+
+  let n = 0;
+  const drafts = stepsFromJson([{ day_offset: 1, channel: "whatsapp", body: "B" }, { day_offset: 3, channel: "sms", body: "C" }], () => `k${n++}`);
+  assert.deepEqual(drafts.map((d) => d.channel), ["whatsapp", "email"]);
 });

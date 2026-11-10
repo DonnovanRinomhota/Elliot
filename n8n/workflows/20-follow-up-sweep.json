@@ -25,7 +25,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "select\n  r.id as run_id,\n  r.tenant_id,\n  r.lead_id,\n  r.sequence_id,\n  r.current_step_index,\n  r.created_at as run_created_at,\n  s.steps,\n  l.contact_id,\n  c.name as contact_name,\n  c.email as contact_email,\n  ac.autonomy_rules,\n  ac.connected_gmail_address,\n  exists (\n    select 1 from messages m\n    join conversations conv on conv.id = m.conversation_id\n    where conv.contact_id = l.contact_id\n      and m.role = 'user'\n      and m.created_at > r.created_at\n  ) as contact_replied\nfrom follow_up_runs r\njoin follow_up_sequences s on s.id = r.sequence_id\njoin leads l on l.id = r.lead_id\njoin contacts c on c.id = l.contact_id\njoin ai_config ac on ac.tenant_id = r.tenant_id\nwhere r.status = 'running' and r.next_run_at <= now()\norder by r.next_run_at asc\nlimit 25;",
+        "query": "select\n  r.id as run_id,\n  r.tenant_id,\n  r.lead_id,\n  r.sequence_id,\n  r.current_step_index,\n  r.created_at as run_created_at,\n  s.steps,\n  l.contact_id,\n  c.name as contact_name,\n  c.email as contact_email,\n  c.phone as contact_phone,\n  ac.autonomy_rules,\n  ac.connected_gmail_address,\n  -- 0045: WhatsApp, for clients who have written to the agency there.\n  ac.whatsapp_phone_number_id,\n  wa.conversation_id as wa_conversation_id,\n  wa.last_inbound_at as wa_last_inbound_at,\n  exists (\n    select 1 from messages m\n    join conversations conv on conv.id = m.conversation_id\n    where conv.contact_id = l.contact_id\n      and m.role = 'user'\n      and m.created_at > r.created_at\n  ) as contact_replied\nfrom follow_up_runs r\njoin follow_up_sequences s on s.id = r.sequence_id\njoin leads l on l.id = r.lead_id\njoin contacts c on c.id = l.contact_id\njoin ai_config ac on ac.tenant_id = r.tenant_id\nleft join lateral (\n  select conv.id as conversation_id,\n         (select max(m.created_at) from messages m where m.conversation_id = conv.id and m.role = 'user') as last_inbound_at\n  from conversations conv\n  where conv.tenant_id = r.tenant_id and conv.contact_id = l.contact_id and conv.channel = 'whatsapp'\n  order by conv.created_at desc\n  limit 1\n) wa on true\nwhere r.status = 'running' and r.next_run_at <= now()\norder by r.next_run_at asc\nlimit 25;",
         "options": {}
       },
       "id": "828fa7a9-af45-41a3-8c54-c527ba566bf7",
@@ -47,7 +47,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// One item per due run (from Query Due Runs). Decide what happens to it:\n// stop_replied | complete | send.\nconst r = $json;\nconst steps = r.steps || [];\n\nif (r.contact_replied) {\n  return [{ json: { action: 'stop_replied', run_id: r.run_id } }];\n}\n\nconst step = steps[r.current_step_index];\nif (!step) {\n  return [{ json: { action: 'complete', run_id: r.run_id } }];\n}\n\nconst isFinal = r.current_step_index === steps.length - 1;\nconst nextStep = isFinal ? null : steps[r.current_step_index + 1];\n\nconst contactName = r.contact_name || 'there';\nconst subject = (step.subject || '').replace(/\\{\\{\\s*contact_name\\s*\\}\\}/g, contactName);\nconst body = (step.body || '').replace(/\\{\\{\\s*contact_name\\s*\\}\\}/g, contactName);\n\nconst mode = r.autonomy_rules?.send_follow_up?.mode === 'autonomous' ? 'autonomous' : 'approval_required';\n\nreturn [{\n  json: {\n    action: 'send',\n    run_id: r.run_id,\n    tenant_id: r.tenant_id,\n    contact_id: r.contact_id,\n    contact_email: r.contact_email,\n    from_email: r.connected_gmail_address || null,\n    subject,\n    body,\n    mode,\n    draft_status: mode === 'autonomous' ? 'auto_sent' : 'pending',\n    is_final: isFinal,\n    next_step_day_offset: nextStep ? (nextStep.day_offset ?? 0) : null,\n  }\n}];"
+        "jsCode": "// One output item per due run (from Query Due Runs), paired with its input.\n// action: stop_replied | complete | send. For send, channel says how:\n//   whatsapp -- a WhatsApp step to a client who has written to the agency on\n//               WhatsApp (their opt-in), or an email step for a client with\n//               no email address but a WhatsApp chat;\n//   email    -- an email step, or a WhatsApp step for a client who has never\n//               written on WhatsApp (WhatsApp would refuse it);\n//   none     -- no way to reach the client: the step is skipped.\n// WhatsApp after 24 hours goes inside the approved template; workflow 27\n// decides that when it sends (an approval can take longer than 24 hours).\nconst out = [];\n$input.all().forEach((item, i) => {\n  const r = item.json;\n  const steps = Array.isArray(r.steps) ? r.steps : [];\n  if (r.contact_replied) {\n    out.push({ json: { action: 'stop_replied', run_id: r.run_id }, pairedItem: i });\n    return;\n  }\n  const step = steps[r.current_step_index];\n  if (!step) {\n    out.push({ json: { action: 'complete', run_id: r.run_id }, pairedItem: i });\n    return;\n  }\n  const isFinal = r.current_step_index === steps.length - 1;\n  const nextStep = isFinal ? null : steps[r.current_step_index + 1];\n\n  const contactName = r.contact_name || 'there';\n  const fill = (t) => String(t || '').replace(/\\{\\{\\s*contact_name\\s*\\}\\}/g, contactName);\n  const body = fill(step.body);\n\n  const email = String(r.contact_email || '').trim();\n  const waId = String(r.contact_phone || '').replace(/\\D/g, '');\n  const onWhatsApp = !!(r.wa_conversation_id && r.wa_last_inbound_at && waId.length >= 8 && r.whatsapp_phone_number_id);\n  const wanted = step.channel === 'whatsapp' ? 'whatsapp' : 'email';\n  const channel = wanted === 'whatsapp'\n    ? (onWhatsApp ? 'whatsapp' : email ? 'email' : 'none')\n    : (email ? 'email' : onWhatsApp ? 'whatsapp' : 'none');\n  // A WhatsApp step sent by email needs a subject: the message's first line.\n  const firstLine = body.trim().split('\\n')[0].replace(/\\s+/g, ' ').trim();\n  const subject = fill(step.subject) || (firstLine.length > 70 ? firstLine.slice(0, 67).trimEnd() + '…' : firstLine) || 'Following up';\n\n  const mode = r.autonomy_rules?.send_follow_up?.mode === 'autonomous' ? 'autonomous' : 'approval_required';\n  out.push({\n    json: {\n      action: 'send',\n      channel,\n      run_id: r.run_id,\n      tenant_id: r.tenant_id,\n      contact_id: r.contact_id,\n      contact_email: email || null,\n      from_email: r.connected_gmail_address || null,\n      subject,\n      body,\n      to_wa_id: onWhatsApp ? waId : null,\n      phone_number_id: r.whatsapp_phone_number_id || null,\n      wa_conversation_id: r.wa_conversation_id || null,\n      wa_last_inbound_at: r.wa_last_inbound_at || null,\n      mode,\n      draft_status: mode === 'autonomous' ? 'auto_sent' : 'pending',\n      is_final: isFinal,\n      next_step_day_offset: nextStep ? (nextStep.day_offset ?? 0) : null,\n    },\n    pairedItem: i,\n  });\n});\nreturn out;"
       },
       "id": "9e1706bd-4fbd-4991-81cd-2072e13e8ebe",
       "name": "Determine Action",
@@ -183,7 +183,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        1120,
+        1568,
         0
       ],
       "notesInFlow": true,
@@ -224,7 +224,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1344,
+        1792,
         0
       ]
     },
@@ -237,7 +237,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1568,
+        2016,
         -96
       ]
     },
@@ -303,7 +303,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        1792,
+        2240,
         -96
       ],
       "onError": "continueRegularOutput",
@@ -311,14 +311,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// Passes through so Advance Run can read $('Determine Action').item.json for\n// run_id/is_final/next_step_day_offset regardless of which branch\n// (Autonomous? true or false) fed into it -- needed because a Gmail send\n// failure (continueOnFail) would otherwise still reach here with whatever\n// $json the failed HTTP node produced, not the original Determine Action data.\nreturn [{ json: $json }];"
+        "jsCode": "// Passes every item through so Advance Run can read $('Determine Action').item\n// for run_id/is_final/next_step_day_offset whichever branch fed it (email\n// sent, email waiting for approval, WhatsApp, or nothing to send) -- and\n// whatever $json the send step produced, even a failed one.\nreturn $input.all().map((it, i) => ({ json: it.json, pairedItem: i }));"
       },
       "id": "f77b5543-3dd0-4e1a-8ce5-489815635ff7",
       "name": "Merge Before Advance",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1792,
+        2464,
         96
       ]
     },
@@ -335,7 +335,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2016,
+        2688,
         0
       ],
       "notesInFlow": true,
@@ -346,6 +346,184 @@
         }
       },
       "notes": "KNOWN, DELIBERATE LIMITATION: this runs immediately after queuing the draft, regardless of whether an approval_required draft has actually been approved and sent yet by a human. If approvals lag, the sequence keeps advancing to the next scheduled step on time anyway rather than waiting -- drafts can pile up in the approvals queue while the schedule marches forward. Documented here and in the spec doc, not hidden. Fixing it properly would mean tying advancement to 15 (Send Approved Email) confirming an actual send, which would require editing an already-live production workflow -- deliberately out of scope for this version."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4e1df832-c605-5706-810f-052aedf14b49",
+              "leftValue": "={{ $json.channel === 'whatsapp' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "11732001-b302-5b8b-ac6e-5b331f32d212",
+      "name": "Send By WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ac447127-c87b-5fbe-946c-2341569a0265",
+              "leftValue": "={{ $json.channel === 'none' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b92898fb-4793-50f0-99af-c4976b501d30",
+      "name": "Nothing To Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0045: a follow-up by WhatsApp, in the client's WhatsApp conversation. Waits in\n-- Approvals unless follow-ups are automatic; 27 sends it (text within 24 hours of\n-- the client's last message, otherwise the elliot_follow_up template).\ninsert into whatsapp_drafts (tenant_id, conversation_id, contact_id, to_wa_id, phone_number_id, last_inbound_at, body, category, status, follow_up_run_id)\nvalues ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6::timestamptz, $7, 'follow_up', $8, $9::uuid)\nreturning id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.wa_conversation_id, $json.contact_id, $json.to_wa_id, $json.phone_number_id, $json.wa_last_inbound_at, $json.body, $json.mode === 'autonomous' ? 'approved' : 'pending', $json.run_id ] }}"
+        }
+      },
+      "id": "91f92345-4310-5ebf-b5e7-51bf94c561c1",
+      "name": "Insert WhatsApp Draft",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1344,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8708d25b-c406-51ce-8545-6d15cf892a98",
+              "leftValue": "={{ $('Determine Action').item.json.mode === 'autonomous' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2f927351-aff6-500c-88f0-1c29c812e706",
+      "name": "Autonomous WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "171fa894c0614981",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/171fa894c0614981"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "draft_id": "={{ $json.id }}",
+            "auto": true
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "draft_id",
+              "displayName": "draft_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "auto",
+              "displayName": "auto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "4af9491b-e548-5559-ab31-1d0054191f66",
+      "name": "Send WhatsApp",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1792,
+        260
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "notes": "Workflow 27 - Send Approved WhatsApp (same id as in 26 and 28)."
     }
   ],
   "pinData": {},
@@ -412,7 +590,7 @@
         ],
         [
           {
-            "node": "Insert Email Draft",
+            "node": "Send By WhatsApp?",
             "type": "main",
             "index": 0
           }
@@ -475,6 +653,82 @@
         [
           {
             "node": "Advance Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send By WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Insert WhatsApp Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nothing To Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nothing To Send?": {
+      "main": [
+        [
+          {
+            "node": "Merge Before Advance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Email Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert WhatsApp Draft": {
+      "main": [
+        [
+          {
+            "node": "Autonomous WhatsApp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Autonomous WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Before Advance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Merge Before Advance",
             "type": "main",
             "index": 0
           }

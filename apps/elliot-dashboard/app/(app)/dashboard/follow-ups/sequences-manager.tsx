@@ -159,13 +159,18 @@ function SequenceCard({
 
       <div className="px-5 py-4">
         {steps.length === 0 ? (
-          <p className="m-0 text-[13px] text-gray-500">No emails yet. Edit this sequence to add some.</p>
+          <p className="m-0 text-[13px] text-gray-500">No messages yet. Edit this sequence to add some.</p>
         ) : (
           <ol className="m-0 grid list-none gap-2 p-0">
             {steps.map((s, i) => (
               <li key={i} className="grid grid-cols-[64px_minmax(0,1fr)] items-baseline gap-3">
                 <span className="tabular text-[12.5px] text-gray-500">Day {s.day}</span>
-                <span className="truncate text-[13.5px] text-ink">{s.subject}</span>
+                <span className="truncate text-[13.5px] text-ink">
+                  {s.channel === "whatsapp" && (
+                    <span className="mr-1.5 rounded bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-accent-dark">WhatsApp</span>
+                  )}
+                  {s.subject}
+                </span>
               </li>
             ))}
           </ol>
@@ -184,7 +189,7 @@ function SequenceCard({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="m-0 max-w-xl text-[13px] text-gray-600">
               New leads that go quiet for {quietLabel(sequence.auto_enrol_after_hours)} are added automatically, unless
-              they&apos;ve booked a viewing, are converted or lost, or have no email address.
+              they&apos;ve booked a viewing, are converted or lost, or can&apos;t be reached (no email address and no WhatsApp chat).
               {!sequence.is_active && " Paused while this sequence is inactive."}
             </p>
             <button type="button" onClick={() => setAutoEnrol(false)} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
@@ -258,7 +263,7 @@ export default function SequencesManager({
 
       {showEmpty && (
         <EmptyState title="No sequences yet">
-          <p className="m-0 mb-4">A sequence is a short series of emails sent after a lead goes quiet. It stops as soon as they reply.</p>
+          <p className="m-0 mb-4">A sequence is a short series of emails or WhatsApp messages sent after a lead goes quiet. It stops as soon as they reply.</p>
           <button type="button" onClick={() => setEditing("new")} className={btn.primary}>
             Create your first sequence
           </button>

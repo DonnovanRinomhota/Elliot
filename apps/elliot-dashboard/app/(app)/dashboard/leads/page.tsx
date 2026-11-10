@@ -22,15 +22,18 @@ export default async function LeadsPage({
 }) {
   const supabase = createClient();
 
-  const [{ data: leads, error }, { data: sequences }, { data: runningRuns }] = await Promise.all([
+  const [{ data: leads, error }, { data: sequences }, { data: runningRuns }, { data: waChats }] = await Promise.all([
     supabase
       .from("leads")
-      .select("id, tenant_id, status, score, qualification_answers, intent, created_at, assigned_to, owner:tenant_users(full_name, email), contact:contacts(name, email, phone)")
+      .select("id, tenant_id, contact_id, status, score, qualification_answers, intent, created_at, assigned_to, owner:tenant_users(full_name, email), contact:contacts(name, email, phone)")
       .order("created_at", { ascending: false }),
     // For "Start follow-up": only active sequences can take new leads.
     supabase.from("follow_up_sequences").select("id, name, steps").eq("is_active", true).order("created_at"),
     supabase.from("follow_up_runs").select("id, lead_id, sequence:follow_up_sequences(name)").eq("status", "running"),
+    // 0045: clients who wrote on WhatsApp can get follow-ups there.
+    supabase.from("conversations").select("contact_id").eq("channel", "whatsapp"),
   ]);
+  const onWhatsApp = new Set(((waChats ?? []) as { contact_id: string | null }[]).map((c) => c.contact_id));
 
   if (error) {
     return <p className="text-[13px] text-alert">Failed to load leads: {error.message}</p>;
@@ -111,6 +114,7 @@ export default async function LeadsPage({
                 lead={lead}
                 sequences={startableSequences}
                 runningRun={runByLead.get(lead.id) ?? null}
+                onWhatsApp={onWhatsApp.has((lead as any).contact_id)}
               />
             ))}
           </ul>

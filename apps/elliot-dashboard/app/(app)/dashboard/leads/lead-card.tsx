@@ -83,7 +83,10 @@ export default function LeadCard({
   number,
   sequences,
   runningRun,
+  onWhatsApp = false,
 }: {
+  /** The client has written to the agency on WhatsApp, so follow-ups can go there (0045). */
+  onWhatsApp?: boolean;
   /** Position in the list (1, 2, 3...), shown in the first column. */
   number?: number;
   lead: Lead;
@@ -98,6 +101,8 @@ export default function LeadCard({
   const [showRaw, setShowRaw] = useState(false);
   const [sequenceId, setSequenceId] = useState(sequences[0]?.id ?? "");
   const hasEmail = !!lead.contact?.email?.trim();
+  // 0045: follow-ups go by email or, for clients who wrote on WhatsApp, by WhatsApp.
+  const reachable = hasEmail || onWhatsApp;
   const isClosed = CLOSED_STATUSES.includes(lead.status);
   const reasons = computeScoreReasons(lead);
   const hasAnswers = !!lead.qualification_answers && Object.keys(lead.qualification_answers).length > 0;
@@ -158,8 +163,8 @@ export default function LeadCard({
     ? runningRun.sequenceName
     : isClosed
       ? "Not needed"
-      : !hasEmail
-        ? "No email address"
+      : !reachable
+        ? "No email or WhatsApp"
         : "None";
 
   return (
@@ -280,7 +285,7 @@ export default function LeadCard({
           </div>
 
           <div>
-            <h3 className="m-0 mb-2 text-[13px] font-semibold text-ink">Follow-up emails</h3>
+            <h3 className="m-0 mb-2 text-[13px] font-semibold text-ink">Follow-ups</h3>
             {runningRun ? (
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-[13px] text-ink">In sequence: {runningRun.sequenceName}</span>
@@ -290,8 +295,8 @@ export default function LeadCard({
               </div>
             ) : isClosed ? (
               <p className="m-0 text-[13px] text-gray-500">This lead is {humanize(lead.status).toLowerCase()}, so no follow-up is needed.</p>
-            ) : !hasEmail ? (
-              <p className="m-0 text-[13px] text-gray-500">No email address, so this lead can&apos;t get email follow-ups.</p>
+            ) : !reachable ? (
+              <p className="m-0 text-[13px] text-gray-500">No email address and no WhatsApp chat, so this lead can&apos;t get follow-ups.</p>
             ) : sequences.length === 0 ? (
               <p className="m-0 text-[13px] text-gray-500">
                 Create a sequence in{" "}
