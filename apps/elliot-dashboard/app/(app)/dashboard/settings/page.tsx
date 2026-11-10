@@ -34,7 +34,7 @@ export default async function SettingsPage() {
     supabase.from("tenants").select("id, name, slug, industry, plan, status, timezone, avg_deal_value, assistant_mode").eq("id", tenantUser.tenant_id).single(),
     supabase
       .from("ai_config")
-      .select("tenant_id, autonomy_rules, connected_gmail_address, google_calendar_id, crm_webhook_url, escalation_notify_email, whatsapp_phone_number_id, alert_email_enabled, alert_email, alert_whatsapp_enabled, alert_whatsapp_number, reminders_enabled, booking_notice_minutes, booking_buffer_minutes, email_from_name, email_inbound_last_at, email_inbound_last_from, email_forwarding_code, email_forwarding_url, email_forwarding_code_at")
+      .select("tenant_id, autonomy_rules, connected_gmail_address, google_calendar_id, crm_webhook_url, escalation_notify_email, whatsapp_phone_number_id, alert_email_enabled, alert_email, alert_whatsapp_enabled, alert_whatsapp_number, reminders_enabled, booking_notice_minutes, booking_buffer_minutes, email_from_name, email_inbound_last_at, email_inbound_last_from, email_forwarding_code, email_forwarding_url, email_forwarding_code_at, calendar_status")
       .eq("tenant_id", tenantUser.tenant_id)
       .single(),
     // 0039: the agency's own sending domain, when the Elliot administrator has set one up.

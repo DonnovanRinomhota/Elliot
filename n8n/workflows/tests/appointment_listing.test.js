@@ -93,8 +93,8 @@ test('12: lookup finds the listing by id or reference and the lead owner', () =>
   assert.match(load.parameters.query, /l\.id::text = \$3 or lower\(l\.reference\) = lower\(\$3\)/);
   assert.match(load.parameters.query, /ld\.assigned_to/);
   const params = expr(load.parameters.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c', listing_id: ' W-1 ' } });
-  assert.deepStrictEqual(params, ['t', 'c', 'W-1', '', '']);
-  assert.deepStrictEqual(expr(load.parameters.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c' } }), ['t', 'c', '', '', '']);
+  assert.deepStrictEqual(params, ['t', 'c', 'W-1', '', '', undefined, undefined]); // 0042: + starts_at, ends_at
+  assert.deepStrictEqual(expr(load.parameters.options.queryReplacement, { json: { tenant_id: 't', contact_id: 'c', starts_at: 's', ends_at: 'e' } }), ['t', 'c', '', '', '', 's', 'e']);
 });
 
 test('12: calendar event has the property, address and agent', () => {
@@ -103,7 +103,7 @@ test('12: calendar event has the property, address and agent', () => {
   const ev = JSON.parse(expr(body, {
     nodes,
     json: { timezone: 'Europe/Warsaw', contact_name: 'Anna', contact_email: 'anna@x.test', listing_title: 'Flat in Mokotów', listing_reference: 'W-1',
-            listing_address: 'ul. Puławska 1, Mokotów, Warszawa', agent_email: 'ola@agency.test', agent_name: 'Ola Nowak' },
+            listing_address: 'ul. Puławska 1, Mokotów, Warszawa', agent_email: 'ola@agency.test', agent_invite: 'ola@agency.test', agent_name: 'Ola Nowak' },
   }));
   assert.strictEqual(ev.summary, 'Property viewing — Anna — Flat in Mokotów');
   assert.strictEqual(ev.location, 'ul. Puławska 1, Mokotów, Warszawa');
@@ -126,7 +126,7 @@ test('12: insert stores the listing; result reports it', () => {
     'Load Tenant + Contact Info': { timezone: 'Europe/Warsaw', listing_id: 'L1', listing_title: 'Flat', listing_address: 'ul. X 1' },
   };
   const params = expr(ins.parameters.options.queryReplacement, { nodes, json: { id: 'gcal1' } });
-  assert.strictEqual(params.length, 10); // 0033: + conversation_id; 0034: + email
+  assert.strictEqual(params.length, 12); // 0033: + conversation_id; 0034: + email; 0042: + agent, calendar
   assert.strictEqual(params[5], 'gcal1');
   assert.strictEqual(params[7], 'L1');
   nodes['Load Tenant + Contact Info'] = { timezone: 'UTC' };

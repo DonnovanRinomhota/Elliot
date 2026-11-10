@@ -11,7 +11,10 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "id": "27c01d1b-5b97-40d6-89a7-4c5b25556d35",
       "name": "Cancel Appointment Webhook",
       "webhookId": "cancel-appointment",
@@ -28,21 +31,27 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [224, -96],
+      "position": [
+        224,
+        -96
+      ],
       "id": "018525df-8c52-47b0-a1e4-26a5d2b0a78e",
       "name": "Validate Input"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "select\n  (select id from appointments where id = $1::uuid and tenant_id = $2::uuid) as appointment_id,\n  (select status from appointments where id = $1::uuid and tenant_id = $2::uuid) as status,\n  (select external_calendar_id from appointments where id = $1::uuid and tenant_id = $2::uuid) as external_calendar_id,\n  (select google_calendar_id from ai_config where tenant_id = $2::uuid) as google_calendar_id;",
+        "query": "select\n  (select id from appointments where id = $1::uuid and tenant_id = $2::uuid) as appointment_id,\n  (select status from appointments where id = $1::uuid and tenant_id = $2::uuid) as status,\n  (select external_calendar_id from appointments where id = $1::uuid and tenant_id = $2::uuid) as external_calendar_id,\n  -- 0042: the calendar the viewing was put in (an agent's), else the agency's.\n  coalesce((select nullif(booked_calendar_id, '') from appointments where id = $1::uuid and tenant_id = $2::uuid),\n           (select google_calendar_id from ai_config where tenant_id = $2::uuid)) as google_calendar_id;",
         "options": {
           "queryReplacement": "={{ [$json.appointment_id, $json.tenant_id] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [448, -96],
+      "position": [
+        448,
+        -96
+      ],
       "id": "dcc5605f-3927-4fa8-9527-31b96f8dde14",
       "name": "Load Appointment",
       "credentials": {
@@ -58,7 +67,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [672, -96],
+      "position": [
+        672,
+        -96
+      ],
       "id": "17c45aeb-8fb8-4a48-b2c2-2845b66fafe8",
       "name": "Check Appointment"
     },
@@ -88,7 +100,10 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [896, -96],
+      "position": [
+        896,
+        -96
+      ],
       "id": "75a700e8-eaae-4db6-9627-2bea3befb31e",
       "name": "Can Cancel?"
     },
@@ -102,7 +117,10 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1120, 96],
+      "position": [
+        1120,
+        96
+      ],
       "id": "a6fff3d5-f36c-4952-86a7-f330fa19f76f",
       "name": "Respond Error"
     },
@@ -132,7 +150,10 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1120, -192],
+      "position": [
+        1120,
+        -192
+      ],
       "id": "c827d06a-7a5b-443f-97e5-88f9af9d0d03",
       "name": "Has Calendar Event?"
     },
@@ -146,7 +167,10 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
-      "position": [1344, -288],
+      "position": [
+        1344,
+        -288
+      ],
       "id": "182fe649-f511-4d0f-82f3-276d02a483df",
       "name": "Delete Calendar Event",
       "credentials": {
@@ -164,7 +188,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1568, -288],
+      "position": [
+        1568,
+        -288
+      ],
       "id": "6753c212-b607-4312-b8d1-6281c6e1ff0f",
       "name": "Calendar Result"
     },
@@ -174,7 +201,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1344, -96],
+      "position": [
+        1344,
+        -96
+      ],
       "id": "6d87eb8e-f9eb-4e5a-9dc9-18d7d47c8efc",
       "name": "No Calendar Event"
     },
@@ -188,7 +218,10 @@
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1792, -192],
+      "position": [
+        1792,
+        -192
+      ],
       "id": "1e16be1a-3a24-4b82-9035-d4cd98f7c477",
       "name": "Mark Cancelled",
       "credentials": {
@@ -210,7 +243,10 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2016, -192],
+      "position": [
+        2016,
+        -192
+      ],
       "id": "3e021c34-5047-4446-a007-583bd674f347",
       "name": "Respond Result"
     }

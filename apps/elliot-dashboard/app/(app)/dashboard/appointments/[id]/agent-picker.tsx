@@ -42,7 +42,7 @@ export default function AgentPicker({ appointmentId, agentId, team }: { appointm
         ))}
       </select>
       <p className="m-0 min-h-[18px] text-[12px] text-gray-500" role="status">
-        {state === "saving" ? "Saving…" : state === "saved" ? "Saved." : ""}
+        {state === "saving" ? "Saving…" : state === "saved" ? "Saved. The Google Calendar event stays where it is: move it there if needed." : ""}
       </p>
       {error && (
         <p className="m-0 text-[13px] text-alert" role="alert">

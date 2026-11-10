@@ -1,0 +1,319 @@
+{
+  "name": "41 - Calendar Access Check",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calendar-check",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "60791dbd-d7f1-50e8-a957-a4fc12064a73",
+      "name": "Calendar Check Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "260b92a7-5a95-51e1-a750-a2aea2c8386f",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Elliot Internal Webhook Secret"
+        }
+      },
+      "notes": "The dashboard's Team page (Check calendars). Header Auth: Elliot Internal Webhook Secret."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0042: the agency's agents' calendars and its own (not 'primary').\nselect calendars_to_check($1::uuid) as calendars;",
+        "options": {
+          "queryReplacement": "={{ [ String($json.body.tenant_id || '') ] }}"
+        }
+      },
+      "id": "09ade8ae-2f34-5ef1-ab02-c3db9c4f599f",
+      "name": "Calendars To Check",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per calendar (an empty list still gives one, so Elliot's own\n// address is found and saved).\nlet list = $input.first().json.calendars;\nif (typeof list === 'string') { try { list = JSON.parse(list); } catch (e) { list = []; } }\nlist = Array.isArray(list) ? list : [];\nreturn list.length ? list.map((c) => ({ json: c })) : [{ json: { kind: 'none', calendar_id: '' } }];"
+      },
+      "id": "f60f1a43-6444-566c-8854-c8aec9993a3b",
+      "name": "Split Calendars",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ id: $json.calendar_id || 'primary' }) }}"
+      },
+      "id": "92575735-74de-551f-acff-53beb8e5a5f0",
+      "name": "Add To Elliot's Calendars",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      },
+      "notes": "Adds each shared calendar to Elliot's Google account (harmless if it's there already) and tells what it may do with it."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/freeBusy",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timeMin: new Date().toISOString(), timeMax: new Date(Date.now() + 86400000).toISOString(), items: $('Split Calendars').all().map((i) => i.json.calendar_id).filter(Boolean).map((id) => ({ id })) }) }}"
+      },
+      "id": "77f71b6c-53ac-5e97-9c45-a4a1f03ee5de",
+      "name": "Check Free Times",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/calendar/v3/users/me/calendarList/primary",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "4d36a238-d061-50ae-b176-6723463053e9",
+      "name": "Elliot's Google Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// What Elliot's Google account can do with each calendar (0042):\n//   ok         -- can see free times and add viewings\n//   read_only  -- shared, but only \"See all event details\" / free-busy\n//   not_shared -- not shared with Elliot's account (or the address is wrong)\n//   error      -- something else (Google's message is kept)\nconst list = $('Split Calendars').all().map((i) => i.json);\nconst added = $('Add To Elliot\\'s Calendars').all().map((i) => i.json);\nconst fb = $('Check Free Times').first().json;\nlet fbBody = fb.body;\nif (typeof fbBody === 'string') { try { fbBody = JSON.parse(fbBody); } catch (e) { fbBody = {}; } }\nconst cals = (fbBody && fbBody.calendars) || {};\nconst acct = $('Elliot\\'s Google Account').first().json;\nlet acctBody = acct.body;\nif (typeof acctBody === 'string') { try { acctBody = JSON.parse(acctBody); } catch (e) { acctBody = {}; } }\nconst results = list.filter((c) => c.calendar_id).map((c, i) => {\n  const a = added[i] || {};\n  let ab = a.body;\n  if (typeof ab === 'string') { try { ab = JSON.parse(ab); } catch (e) { ab = {}; } }\n  const st = Number(a.statusCode || 0);\n  const role = (st >= 200 && st < 300 && ab && ab.accessRole) || '';\n  const fbErr = cals[c.calendar_id] && cals[c.calendar_id].errors && cals[c.calendar_id].errors[0];\n  let status, error = '';\n  if (role === 'owner' || role === 'writer') status = 'ok';\n  else if (role === 'reader' || role === 'freeBusyReader') status = 'read_only';\n  else if (st === 404 || (fbErr && /notFound/i.test(fbErr.reason || ''))) status = 'not_shared';\n  else if (st === 409 && !fbErr) status = 'ok';\n  else {\n    status = 'error';\n    error = String((ab && ab.error && ab.error.message) || (fbErr && fbErr.reason) || `Google answered ${st || 'nothing'}`).slice(0, 300);\n  }\n  return { kind: c.kind, member_id: c.member_id || null, calendar_id: c.calendar_id, status, role, error };\n});\nreturn [{ json: { results, account_email: (acctBody && acctBody.id) || '' } }];"
+      },
+      "id": "00a7f55a-8fc3-5d3a-a5eb-e970e11d2379",
+      "name": "Read Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select record_calendar_checks($1::uuid, $2::jsonb, $3);",
+        "options": {
+          "queryReplacement": "={{ [ String($('Calendar Check Webhook').first().json.body.tenant_id || ''), JSON.stringify($json.results), $json.account_email ] }}"
+        }
+      },
+      "id": "2440798f-50ae-5d78-8ecf-8ca733d1fe9f",
+      "name": "Save Results",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1540,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, account_email: $('Read Results').first().json.account_email, results: $('Read Results').first().json.results }) }}",
+        "options": {}
+      },
+      "id": "218915fd-5036-51c7-a546-ee5b78b63889",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Calendar Check Webhook": {
+      "main": [
+        [
+          {
+            "node": "Calendars To Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendars To Check": {
+      "main": [
+        [
+          {
+            "node": "Split Calendars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Calendars": {
+      "main": [
+        [
+          {
+            "node": "Add To Elliot's Calendars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add To Elliot's Calendars": {
+      "main": [
+        [
+          {
+            "node": "Check Free Times",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Free Times": {
+      "main": [
+        [
+          {
+            "node": "Elliot's Google Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elliot's Google Account": {
+      "main": [
+        [
+          {
+            "node": "Read Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Results": {
+      "main": [
+        [
+          {
+            "node": "Save Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Results": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "description": "0042: can Elliot's Google account see and add viewings to each agent's calendar? Called from the Team page."
+  }
+}

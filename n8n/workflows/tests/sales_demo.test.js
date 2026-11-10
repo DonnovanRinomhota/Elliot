@@ -186,7 +186,7 @@ const callReq = { starts_at: '2026-11-12T09:00:00.000Z', ends_at: '2026-11-12T09
 
 test('12: the account mode is loaded', () => {
   assert.match(nodeOf(wf12, 'Load Tenant + Contact Info').parameters.query, /t\.name as tenant_name, t\.assistant_mode,/);
-  assert.strictEqual(nodeOf(wf12, 'HTTP Request').parameters.url, '=https://www.googleapis.com/calendar/v3/calendars/{{ $json.google_calendar_id }}/events?conferenceDataVersion=1');
+  assert.strictEqual(nodeOf(wf12, 'HTTP Request').parameters.url, '=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.google_calendar_id) }}/events?conferenceDataVersion=1');
 });
 
 test('12: a call becomes a calendar event with Google Meet and the agency details', () => {
@@ -200,7 +200,7 @@ test('12: a call becomes a calendar event with Google Meet and the agency detail
 
 test('12: a viewing event is unchanged (no Meet)', () => {
   const ev = JSON.parse(expr(nodeOf(wf12, 'HTTP Request').parameters.jsonBody, {
-    json: { ...info, assistant_mode: 'agency', listing_title: 'Studio', agent_email: 'ag@x.pl' },
+    json: { ...info, assistant_mode: 'agency', listing_title: 'Studio', agent_email: 'ag@x.pl', agent_invite: 'ag@x.pl' }, // 0042: Pick Calendar decides who's invited
     nodes: { 'When Executed by Another Workflow': { starts_at: 's', ends_at: 'e' } } }));
   assert.match(ev.summary, /^Property viewing — Anna Nowak — Studio$/);
   assert.ok(!ev.conferenceData);

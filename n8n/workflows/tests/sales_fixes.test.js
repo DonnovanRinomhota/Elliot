@@ -148,8 +148,9 @@ test('12: the email the client just gave is used for the confirmation and saved 
       'Load Tenant + Contact Info': { timezone: 'Europe/Warsaw', contact_email: 'new@x.pl' },
     },
   });
-  assert.strictEqual(p.length, 10);
+  assert.strictEqual(p.length, 12); // 0042: + agent and calendar
   assert.strictEqual(p[9], 'new@x.pl');
+  assert.deepStrictEqual(p.slice(10), ['', '']);
 });
 
 console.log(`\n${passed} passed`);
