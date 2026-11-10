@@ -26,6 +26,11 @@ test("an agency is closed until it allows access, and again after it runs out", 
   });
 });
 
+test("while the switch is off (testing), every agency is open", () => {
+  assert.deepEqual(supportAccessState(null, "agency", now, false), { open: true, reason: "not_required" });
+  assert.deepEqual(supportAccessState(null, "sales", now, false), { open: true, reason: "own_account" });
+});
+
 test("durations match the database", () => {
   assert.deepEqual(ACCESS_OPTIONS.map((o) => o.hours), [24, 168, 720]);
 });

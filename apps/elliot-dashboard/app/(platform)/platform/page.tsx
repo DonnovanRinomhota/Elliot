@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { accountState, monthlyRevenue, type AccountState, type TenantOverviewRow } from "@/lib/platform";
 import { PageHeader } from "../../_ui/ui";
 import AgenciesTable from "./agencies-table";
+import SupportSwitch from "./support-switch";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,10 @@ export default async function PlatformPage() {
   // The layout has already checked ADMIN_EMAILS. This reads across every
   // tenant, which is why it needs the service role.
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("platform_tenant_overview", { p_days: 30 });
+  const [{ data, error }, { data: settings }] = await Promise.all([
+    admin.rpc("platform_tenant_overview", { p_days: 30 }),
+    admin.from("platform_settings").select("support_permission_required").maybeSingle(),
+  ]);
   const rows = (data ?? []) as TenantOverviewRow[];
 
   const now = new Date();
@@ -56,6 +60,8 @@ export default async function PlatformPage() {
           </div>
         ))}
       </section>
+
+      <SupportSwitch required={settings?.support_permission_required ?? true} />
 
       <AgenciesTable rows={rows} />
     </div>

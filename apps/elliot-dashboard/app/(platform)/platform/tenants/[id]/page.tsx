@@ -21,7 +21,7 @@ const n = (v: number | string | null | undefined) => Number(v || 0);
 export default async function TenantDetailPage({ params }: { params: { id: string } }) {
   const admin = createAdminClient();
 
-  const [{ data: overview }, { data: tenant }, { data: users }, { data: errors }, { data: crmFailures }, { data: events }, { data: grant }, { data: visits }] =
+  const [{ data: overview }, { data: tenant }, { data: users }, { data: errors }, { data: crmFailures }, { data: events }, { data: grant }, { data: visits }, { data: settings }] =
     await Promise.all([
       admin.rpc("platform_tenant_overview", { p_days: 30 }),
       admin
@@ -62,13 +62,14 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
         .eq("tenant_id", params.id)
         .order("viewed_at", { ascending: false })
         .limit(8),
+      admin.from("platform_settings").select("support_permission_required").maybeSingle(),
     ]);
 
   if (!tenant) notFound();
   const row = ((overview ?? []) as TenantOverviewRow[]).find((r) => r.tenant_id === params.id);
   const state = row ? accountState(row) : accountState(tenant as any);
   const issues = row ? healthIssues(row, state) : [];
-  const access = supportAccessState(grant, (tenant as any).assistant_mode);
+  const access = supportAccessState(grant, (tenant as any).assistant_mode, new Date(), settings?.support_permission_required ?? true);
 
   const usage = row
     ? [
@@ -165,7 +166,9 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
               {access.open
                 ? access.reason === "own_account"
                   ? "Elliot's own account: open with two-step sign-in."
-                  : `Allowed until ${untilLabel(access.until, tenant.timezone || undefined)}${access.by ? ` by ${access.by}` : ""}.`
+                  : access.reason === "not_required"
+                    ? "Open: the agency's permission isn't required yet (testing). Turn it on under Agencies before real clients."
+                    : `Allowed until ${untilLabel(access.until, tenant.timezone || undefined)}${access.by ? ` by ${access.by}` : ""}.`
                 : access.reason === "expired"
                   ? `Off. Their last permission ended ${timeAgo(access.expiredAt!)}.`
                   : "Off. Their dashboard and clients' data stay closed to you."}
