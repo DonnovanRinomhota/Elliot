@@ -238,6 +238,18 @@ Production showed no runtime errors over the deploys and tests.
   notified an old hard-coded address; `ai_config.business_hours` had no
   migration.
 
+- 🟡 **Reminders and changes by message** (0038, workflows 37/38, 01/11
+  changed). Clients confirm, move or cancel their own bookings by message
+  (tool change_viewing; only their own, enforced in the database), reminders
+  at 17:00 for tomorrow (WhatsApp template or email, logged into the
+  conversation), and a minimum notice and buffer between viewings
+  (Settings → Viewings). Dashboard shows client confirmed / moved / cancelled /
+  reminder sent. Unit- and DB-tested (`viewing_changes.test.js`,
+  `test_0038_viewing_changes.sql`); pending live import and the
+  `viewing_reminder` template. Spec: `docs/workflow-specs/37-38-viewing-changes-reminders.md`.
+  Known limit: the no-overlap rule (0004) is per agency, so two agents can't
+  have viewings at the same time yet -- fix with per-agent calendars.
+
 ## Business / non-code
 
 Not something to build -- these are decisions, listed here so they don't

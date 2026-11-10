@@ -86,17 +86,17 @@ test('01: Elliot knows the client\'s upcoming viewings and their links', () => {
   const p = prompt({
     contact_id: 'c', name: 'Don', phone: '+48601', ready: true,
     upcoming_viewings: [
-      { when: 'Wed 11 Nov 2026, 14:00', title: 'Studio flat', address: 'Płochocińska 16A/72, Warszawa', listing_id: 'L1', url: null },
-      { when: 'Fri 13 Nov 2026, 14:00', title: 'Studio', address: null, listing_id: 'L2', url: 'https://agency.pl/l2' },
-      { when: 'Sat 14 Nov 2026, 10:00', title: null, address: null, listing_id: null, url: null },
+      { appointment_id: 'A1', when: 'Wed 11 Nov 2026, 14:00', title: 'Studio flat', address: 'Płochocińska 16A/72, Warszawa', listing_id: 'L1', url: null },
+      { appointment_id: 'A2', when: 'Fri 13 Nov 2026, 14:00', title: 'Studio', address: null, listing_id: 'L2', url: 'https://agency.pl/l2' },
+      { appointment_id: 'A3', client_confirmed: true, when: 'Sat 14 Nov 2026, 10:00', title: null, address: null, listing_id: null, url: null },
     ],
   }, 'whatsapp');
   assert.match(p, /UPCOMING VIEWINGS \(already booked for this client; don't book them again unless asked, and when they ask for photos or details of one, send its link\)/);
-  assert.match(p, new RegExp(`- Wed 11 Nov 2026, 14:00: Studio flat, Płochocińska 16A/72, Warszawa\\. Link with photos and details: ${DASH}/p/L1`));
-  assert.match(p, /- Fri 13 Nov 2026, 14:00: Studio\. Link with photos and details: https:\/\/agency\.pl\/l2/);
-  assert.match(p, /- Sat 14 Nov 2026, 10:00: viewing \(property not recorded\)\n/);
+  assert.match(p, new RegExp(`- Wed 11 Nov 2026, 14:00: Studio flat, Płochocińska 16A/72, Warszawa \\(appointment_id: A1\\)\\. Link with photos and details: ${DASH}/p/L1`));
+  assert.match(p, /- Fri 13 Nov 2026, 14:00: Studio \(appointment_id: A2\)\. Link with photos and details: https:\/\/agency\.pl\/l2/);
+  assert.match(p, /- Sat 14 Nov 2026, 10:00: viewing \(property not recorded\) \(appointment_id: A3, client confirmed\)\n/);
   const none = prompt({ contact_id: 'c', name: 'Don', ready: true });
-  assert.ok(!/UPCOMING VIEWINGS/.test(none));
+  assert.ok(!/UPCOMING VIEWINGS \(already booked/.test(none));
 });
 
 const resultText = (toolName, output) =>

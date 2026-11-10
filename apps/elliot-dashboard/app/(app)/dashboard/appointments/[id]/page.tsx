@@ -9,6 +9,7 @@ import {
   DEFAULT_TZ,
   bookedAtLabel,
   channelLabel,
+  clientNotes,
   dayKey,
   dayLabel,
   listingAddress,
@@ -17,7 +18,7 @@ import {
   type Appointment,
   type TeamMember,
 } from "@/lib/appointments";
-import { PageHeader, Panel, StatusBadge, btn } from "../../../../_ui/ui";
+import { Badge, PageHeader, Panel, StatusBadge, btn } from "../../../../_ui/ui";
 import AppointmentActions from "../appointment-actions";
 import AgentPicker from "./agent-picker";
 import ChangeListing from "./change-listing";
@@ -72,6 +73,11 @@ export default async function AppointmentPage({ params }: { params: { id: string
               {tz !== DEFAULT_TZ ? ` (${tz})` : ""}
             </span>
             <StatusBadge kind="appointment" value={a.status} />
+            {clientNotes(a, tz).map((n) => (
+              <Badge key={n.text} tone={n.tone === "ok" ? "ink" : n.tone === "warn" ? "brass" : "muted"}>
+                {n.text}
+              </Badge>
+            ))}
             <span className="basis-full text-[13px] text-gray-500 sm:basis-auto">
               Booked {bookedAtLabel(a.created_at, tz)}
               {a.conversation ? ` on ${channelLabel(a.conversation.channel)}` : ""}

@@ -6,9 +6,14 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "query": { "type": "string", "description": "Focused search query" }
+          "query": {
+            "type": "string",
+            "description": "Focused search query"
+          }
         },
-        "required": ["query"]
+        "required": [
+          "query"
+        ]
       }
     },
     {
@@ -20,19 +25,43 @@
           "contact": {
             "type": "object",
             "properties": {
-              "name": { "type": "string", "description": "The visitor's full name, if known" },
-              "email": { "type": "string", "description": "The visitor's email address, if known" },
-              "phone": { "type": "string", "description": "The visitor's phone number, if known" },
-              "company": { "type": "string", "description": "The visitor's company or organization, if known and relevant" }
+              "name": {
+                "type": "string",
+                "description": "The visitor's full name, if known"
+              },
+              "email": {
+                "type": "string",
+                "description": "The visitor's email address, if known"
+              },
+              "phone": {
+                "type": "string",
+                "description": "The visitor's phone number, if known"
+              },
+              "company": {
+                "type": "string",
+                "description": "The visitor's company or organization, if known and relevant"
+              }
             }
           },
           "qualification_answers": {
             "type": "object",
             "properties": {
-              "budget": { "type": "string", "description": "Any budget or price range the visitor has mentioned" },
-              "timeline": { "type": "string", "description": "How soon they are looking to act, e.g. this month, just browsing, ASAP" },
-              "property_type": { "type": "string", "description": "What type of property or service they are interested in" },
-              "intent_signal": { "type": "string", "description": "Any explicit signal of buying/booking intent, e.g. wants to schedule a viewing, ready to talk to an agent" }
+              "budget": {
+                "type": "string",
+                "description": "Any budget or price range the visitor has mentioned"
+              },
+              "timeline": {
+                "type": "string",
+                "description": "How soon they are looking to act, e.g. this month, just browsing, ASAP"
+              },
+              "property_type": {
+                "type": "string",
+                "description": "What type of property or service they are interested in"
+              },
+              "intent_signal": {
+                "type": "string",
+                "description": "Any explicit signal of buying/booking intent, e.g. wants to schedule a viewing, ready to talk to an agent"
+              }
             }
           }
         }
@@ -44,10 +73,19 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "date_range_start": { "type": "string", "description": "Start date in YYYY-MM-DD format" },
-          "date_range_end": { "type": "string", "description": "End date in YYYY-MM-DD format" }
+          "date_range_start": {
+            "type": "string",
+            "description": "Start date in YYYY-MM-DD format"
+          },
+          "date_range_end": {
+            "type": "string",
+            "description": "End date in YYYY-MM-DD format"
+          }
         },
-        "required": ["date_range_start", "date_range_end"]
+        "required": [
+          "date_range_start",
+          "date_range_end"
+        ]
       }
     },
     {
@@ -56,14 +94,73 @@
       "input_schema": {
         "type": "object",
         "properties": {
-          "contact_id": { "type": "string", "description": "The UUID of the contact this appointment is for" },
-          "starts_at": { "type": "string", "description": "ISO 8601 UTC datetime the appointment starts, e.g. 2026-08-17T10:00:00.000Z" },
-          "ends_at": { "type": "string", "description": "ISO 8601 UTC datetime the appointment ends" },
-          "notes": { "type": "string", "description": "Brief note on what the appointment is for, based on the conversation" },
-          "listing_id": { "type": "string", "description": "If the viewing is for a property from search_listings, its listing_id exactly as search_listings returned it. Leave out if it is not about one specific listing." },
-          "email": { "type": "string", "description": "The email address the visitor wants the confirmation sent to, if they gave one in this conversation. Leave out if they did not." }
+          "contact_id": {
+            "type": "string",
+            "description": "The UUID of the contact this appointment is for"
+          },
+          "starts_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC datetime the appointment starts, e.g. 2026-08-17T10:00:00.000Z"
+          },
+          "ends_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC datetime the appointment ends"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Brief note on what the appointment is for, based on the conversation"
+          },
+          "listing_id": {
+            "type": "string",
+            "description": "If the viewing is for a property from search_listings, its listing_id exactly as search_listings returned it. Leave out if it is not about one specific listing."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address the visitor wants the confirmation sent to, if they gave one in this conversation. Leave out if they did not."
+          }
         },
-        "required": ["contact_id", "starts_at", "ends_at"]
+        "required": [
+          "contact_id",
+          "starts_at",
+          "ends_at"
+        ]
+      }
+    },
+    {
+      "name": "change_viewing",
+      "description": "Confirm, move or cancel one of the client's own upcoming bookings (listed under UPCOMING VIEWINGS with their appointment_id). confirm = they say they are coming. reschedule = they agreed a new time that check_availability returned. cancel = they clearly asked to cancel. Only for their own bookings; the team and the calendar are updated automatically.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "appointment_id": {
+            "type": "string",
+            "description": "The appointment_id from UPCOMING VIEWINGS"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "confirm",
+              "reschedule",
+              "cancel"
+            ]
+          },
+          "new_starts_at": {
+            "type": "string",
+            "description": "For reschedule: ISO 8601 start, exactly as returned by check_availability"
+          },
+          "new_ends_at": {
+            "type": "string",
+            "description": "For reschedule: ISO 8601 end, exactly as returned by check_availability"
+          },
+          "reason": {
+            "type": "string",
+            "description": "For cancel or reschedule: the reason, if they gave one"
+          }
+        },
+        "required": [
+          "appointment_id",
+          "action"
+        ]
       }
     }
   ],

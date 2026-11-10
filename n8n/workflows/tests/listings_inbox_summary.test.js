@@ -72,7 +72,7 @@ test('01: search_listings is offered, allowed and routed to Search Listings', ()
   assert.ok(tool, 'tool definition missing');
   assert.deepStrictEqual(tool.input_schema.properties.transaction_type.enum, ['sale', 'rent']);
   assert.ok(tool.input_schema.properties.move_in_by, 'move_in_by filter missing (0028)');
-  assert.strictEqual(payload.tools.length, 6);
+  assert.strictEqual(payload.tools.length, 7); // + change_viewing (0038)
 
   const allowed = run(nodeOf(wf01, 'Extract Tool Call').parameters.jsCode, {
     json: { content: [{ type: 'tool_use', id: 't1', name: 'search_listings', input: { location: 'Mokotów' } }] },
@@ -80,7 +80,7 @@ test('01: search_listings is offered, allowed and routed to Search Listings', ()
   assert.strictEqual(allowed[0].json.decision, 'auto_approved');
 
   const rules = nodeOf(wf01, 'Route by Tool').parameters.rules.values;
-  assert.strictEqual(rules.length, 6);
+  assert.strictEqual(rules.length, 7); // + change_viewing (0038)
   assert.strictEqual(rules[5].conditions.conditions[0].rightValue, 'search_listings');
   assert.strictEqual(wf01.connections['Route by Tool'].main[5][0].node, 'Search Listings');
   assert.strictEqual(wf01.connections['Search Listings'].main[0][0].node, 'Build Tool Result Message');

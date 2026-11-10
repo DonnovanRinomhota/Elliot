@@ -106,9 +106,9 @@ test('01: demo agency = agency prompt plus a demo note; real agencies unchanged'
   assert.ok(!/getelliot\.eu/.test(agency.split('VISITOR:')[0].replace(/https:\/\/app\.getelliot\.eu/g, '')), 'agency prompt changed');
 });
 
-test('01: sales gets 5 tools (no listings) with call types; agencies keep all 6 unchanged', () => {
+test('01: sales gets 6 tools (no listings) with call types; agencies keep all 7', () => {
   const s = tools('sales');
-  assert.deepStrictEqual(s.map((t) => t.name), ['search_company_knowledge', 'capture_lead', 'check_availability', 'book_appointment', 'escalate_to_human']);
+  assert.deepStrictEqual(s.map((t) => t.name), ['search_company_knowledge', 'capture_lead', 'check_availability', 'book_appointment', 'escalate_to_human', 'change_viewing']);
   const check = s.find((t) => t.name === 'check_availability');
   assert.deepStrictEqual(check.input_schema.properties.call_type.enum, ['intro', 'demo']);
   assert.deepStrictEqual(check.input_schema.required, ['call_type', 'date_range_start', 'date_range_end']);
@@ -116,7 +116,7 @@ test('01: sales gets 5 tools (no listings) with call types; agencies keep all 6 
   assert.deepStrictEqual(book.input_schema.required, ['contact_id', 'call_type', 'starts_at', 'ends_at', 'email']);
   assert.ok(!('listing_id' in book.input_schema.properties));
   const a = tools('agency');
-  assert.strictEqual(a.length, 6);
+  assert.strictEqual(a.length, 7);
   assert.ok(a.find((t) => t.name === 'book_appointment').input_schema.properties.listing_id);
   assert.deepStrictEqual(tools('demo').map((t) => t.name), a.map((t) => t.name));
 });

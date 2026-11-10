@@ -1,6 +1,6 @@
-import { StatusBadge } from "../../../_ui/ui";
+import { Badge, StatusBadge } from "../../../_ui/ui";
 import { contactLabel } from "@/lib/contacts";
-import { DEFAULT_TZ, bookedAtLabel, channelLabel, dayKey, dayLabel, personName, timeRange, type Appointment } from "@/lib/appointments";
+import { DEFAULT_TZ, bookedAtLabel, channelLabel, clientNotes, dayKey, dayLabel, personName, timeRange, type Appointment } from "@/lib/appointments";
 import { APPOINTMENT_GRID } from "./grid";
 import AppointmentActions from "./appointment-actions";
 import { ListingLine } from "./viewing-bits";
@@ -51,8 +51,13 @@ export default function AppointmentCard({ appointment, number }: { appointment: 
           {a.agent ? <span className="text-gray-700">{personName(a.agent)}</span> : <span className="font-medium text-brass-dark">Unassigned</span>}
         </div>
 
-        <div>
+        <div className="flex flex-wrap items-start gap-1">
           <StatusBadge kind="appointment" value={a.status} />
+          {clientNotes(a, tz).map((n) => (
+            <Badge key={n.text} tone={n.tone === "ok" ? "ink" : n.tone === "warn" ? "brass" : "muted"}>
+              {n.text}
+            </Badge>
+          ))}
         </div>
 
         <AppointmentActions id={a.id} status={a.status} startsAt={a.starts_at} />

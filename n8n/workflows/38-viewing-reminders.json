@@ -1,0 +1,422 @@
+{
+  "name": "38 - Viewing Reminders",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 17 * * *"
+            }
+          ]
+        }
+      },
+      "id": "63408128-4d5f-5b39-8033-2a330be68163",
+      "name": "Every Day at 17:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "notes": "Workflow time zone is Europe/Warsaw (Settings). One run a day: reminders for tomorrow's viewings."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from due_viewing_reminders();",
+        "options": {}
+      },
+      "id": "d9886413-4d17-5413-b6e3-00ac739e22ab",
+      "name": "Viewings Tomorrow",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst fmt = (iso, tz, locale) => new Date(iso).toLocaleString(locale, { timeZone: tz || 'Europe/Warsaw', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst rawEmail = (to, subject, body) => Buffer.from(\n  [`To: ${to}`, `Subject: =?UTF-8?B?${b64(subject)}?=`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'].join('\\r\\n') +\n  '\\r\\n\\r\\n' + b64(body)).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\n// One reminder per viewing tomorrow (0038). WhatsApp when the client wrote on\n// WhatsApp (template 'viewing_reminder', so it arrives outside the 24-hour\n// window), otherwise email. Calls with the Elliot team: email with the Meet link.\nconst r = $json;\nconst tz = r.timezone || 'Europe/Warsaw';\nconst polish = /[ąćęłńóśźż]|\\b(dzień|dobry|mieszkanie|prezentacj|proszę|dziękuję|cześć|witam|jutro)\\b/i.test(r.last_client_message || '');\nconst lang = r.last_client_message ? (polish ? 'pl' : 'en') : 'pl';\nconst isCall = r.assistant_mode === 'sales';\nconst first = String(r.contact_name || '').trim().split(/\\s+/)[0] || '';\nconst time = (loc) => new Date(r.starts_at).toLocaleTimeString(loc, { timeZone: tz, hour: '2-digit', minute: '2-digit' });\nconst day = (loc) => new Date(r.starts_at).toLocaleDateString(loc, { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long' });\nconst place = [r.listing_title, r.listing_address].filter(Boolean).join(', ');\nconst meet = ((r.notes || '').match(/Google Meet: (\\S+)/) || [])[1] || null;\nconst phone = String(r.contact_phone || '').replace(/\\D/g, '');\nconst useWhatsApp = !isCall && r.conversation_channel === 'whatsapp' && phone.length >= 8 && !!r.whatsapp_phone_number_id;\nconst email = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(r.contact_email || '')) ? r.contact_email : null;\n\nconst en = isCall\n  ? `Reminder: your call with Elliot is tomorrow, ${day('en-GB')} at ${time('en-GB')} (Warsaw time).${meet ? ` Google Meet: ${meet}` : ''} Reply if you need another time.`\n  : `Reminder: your viewing with ${r.tenant_name} is tomorrow, ${day('en-GB')} at ${time('en-GB')}${place ? `, ${place}` : ''}. Reply to confirm, or tell us if you need to change or cancel it.`;\nconst pl = isCall\n  ? `Przypomnienie: rozmowa z Elliot jutro, ${day('pl-PL')}, o ${time('pl-PL')}.${meet ? ` Google Meet: ${meet}` : ''} Jeśli potrzebny jest inny termin, prosimy o odpowiedź.`\n  : `Przypomnienie: prezentacja z ${r.tenant_name} jutro, ${day('pl-PL')}, o ${time('pl-PL')}${place ? `, ${place}` : ''}. Prosimy o potwierdzenie albo informację, jeśli trzeba zmienić lub odwołać termin.`;\nconst logText = lang === 'pl' ? pl : en;\n\nlet out = { appointment_id: r.appointment_id, conversation_id: r.conversation_id || null, log_text: logText, email };\nif (useWhatsApp) {\n  out = { ...out, channel: 'whatsapp', to: phone, sender_id: r.whatsapp_phone_number_id, lang,\n    params: [first || (lang === 'pl' ? 'Państwo' : 'there'), r.tenant_name, `${day(lang === 'pl' ? 'pl-PL' : 'en-GB')}, ${time('en-GB')}`, place || (lang === 'pl' ? 'adres w potwierdzeniu' : 'see your confirmation')]\n      .map((p) => String(p).replace(/\\s+/g, ' ').trim().slice(0, 200)) };\n} else if (email) {\n  out = { ...out, channel: 'email' };\n} else {\n  out = { ...out, channel: 'none' };\n}\nif (email) {\n  const subject = isCall ? `Reminder: your call with Elliot tomorrow at ${time('en-GB')}` : `Reminder: viewing tomorrow at ${time('en-GB')}${r.listing_title ? ' – ' + r.listing_title : ''}`;\n  const body = `Hi${first ? ' ' + first : ''},\\n\\n${en}\\n\\n${isCall ? 'Donnovan, Elliot' : r.tenant_name}\\n\\n----------------------------------------\\n\\nDzień dobry${first ? ' ' + first : ''},\\n\\n${pl}\\n\\n${isCall ? 'Donnovan, Elliot' : r.tenant_name}\\n`;\n  out.raw_message = rawEmail(email, subject, body);\n}\nreturn { json: out };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "7e1e8b9f-66e2-52ab-966a-dd27950c07ca",
+      "name": "Build Reminder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8795e581-7076-5129-8f85-d4012dc3cf4f",
+              "leftValue": "={{ $json.channel === 'whatsapp' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dc05ed11-0202-5048-9551-133c719ce852",
+      "name": "WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v20.0/' + $json.sender_id + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.to, type: 'template', template: { name: 'viewing_reminder', language: { code: $json.lang }, components: [ { type: 'body', parameters: $json.params.map((t) => ({ type: 'text', text: t })) } ] } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a6784558-97b1-5aa7-bec9-93a954178744",
+      "name": "Send WhatsApp Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_CRED_ID",
+          "name": "WhatsApp Cloud API token"
+        }
+      },
+      "notes": "Template 'viewing_reminder' (en and pl) must be approved in WhatsApp Manager.",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta accepted the template? If not and there's an email, the email goes instead.\nconst r = $json;\nconst b = $('Build Reminder').item.json;\nconst st = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nconst err = body && body.error;\nconst ok = st >= 200 && st < 300 && !err;\nconst why = ok ? '' : (err ? `${err.message || 'refused'}${err.code ? ` (code ${err.code})` : ''}` : `HTTP ${st || 'no response'}`);\nreturn { json: { ...b, ok, channel: ok ? 'whatsapp' : b.channel, error: why, fallback: !ok && !!b.email } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "b7e0e752-9de9-5076-80ba-83a55a4df02b",
+      "name": "Check WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a9f437ae-3cbb-56af-bba0-12d0465acf71",
+              "leftValue": "={{ $json.fallback === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c5be7b1d-c248-5e6c-abc8-6a7ed731b3c9",
+      "name": "WhatsApp Failed, Email Instead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "37398476-dbf0-5171-9f32-f4ba9a519512",
+              "leftValue": "={{ $json.channel === 'email' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fcab80e5-ae89-55b0-8de0-e355695a2e29",
+      "name": "Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $('Build Reminder').item.json.raw_message }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "41d9ffe5-aa94-5ace-bd2b-923dc378c06a",
+      "name": "Send Email Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        340
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UEVuaDdqEf2Zd7CE",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gmail answered 2xx = sent.\nconst r = $json;\nconst b = $('Build Reminder').item.json;\nconst st = Number(r.statusCode || 0);\nconst ok = st >= 200 && st < 300;\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nreturn { json: { ...b, ok, channel: 'email', error: ok ? '' : ((body && body.error && body.error.message) || `HTTP ${st || 'no response'}`) } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "4466d42e-a974-5e5c-88de-2aa8af269274",
+      "name": "Check Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Sent: logged into the conversation (so a reply has context). Failed: audit log,\n-- which the health alerts (workflow 33) pick up. No contact details: marked as done.\nselect record_viewing_reminder($1::uuid, $2, $3::boolean, $4, nullif($5, '')::uuid);",
+        "options": {
+          "queryReplacement": "={{ [ $json.appointment_id, $json.channel, ($json.ok === true || $json.channel === 'none') ? 'true' : 'false', ($json.ok === true) ? $json.log_text : ($json.error || ''), $json.conversation_id || '' ] }}"
+        }
+      },
+      "id": "3defe9a3-f8aa-55f8-ba1b-349745901517",
+      "name": "Record Reminder",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1980,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Day at 17:00": {
+      "main": [
+        [
+          {
+            "node": "Viewings Tomorrow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Viewings Tomorrow": {
+      "main": [
+        [
+          {
+            "node": "Build Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Reminder": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Reminder": {
+      "main": [
+        [
+          {
+            "node": "Check WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Failed, Email Instead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Reminder": {
+      "main": [
+        [
+          {
+            "node": "Check Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email": {
+      "main": [
+        [
+          {
+            "node": "Record Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Failed, Email Instead?": {
+      "main": [
+        [
+          {
+            "node": "Send Email Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email?": {
+      "main": [
+        [
+          {
+            "node": "Send Email Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Warsaw"
+  },
+  "tags": []
+}

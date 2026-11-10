@@ -1,0 +1,805 @@
+{
+  "name": "37 - Client Viewing Changes",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"tenant_id\": \"uuid\",\n  \"contact_id\": \"uuid of the client (from the conversation)\",\n  \"appointment_id\": \"uuid\",\n  \"action\": \"confirm | reschedule | cancel\",\n  \"new_starts_at\": \"ISO (reschedule)\",\n  \"new_ends_at\": \"ISO (reschedule)\",\n  \"reason\": \"optional\",\n  \"conversation_id\": \"uuid\",\n  \"channel\": \"whatsapp | email | chat_widget\"\n}"
+      },
+      "id": "3c888f24-6e9b-5575-9351-90b49d5caed4",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// From workflow 01's change_viewing tool. contact_id comes from the\n// conversation (not from the model), so only the client's own bookings match.\nconst i = $input.first().json;\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst fail = (error) => [{ json: { ok: false, error } }];\nif (!uuid.test(String(i.tenant_id || ''))) return fail('missing agency');\nif (!uuid.test(String(i.contact_id || ''))) return fail('the client is not identified yet, so their bookings can\\'t be found');\nif (!uuid.test(String(i.appointment_id || ''))) return fail('that booking id is not valid; use an appointment_id from UPCOMING VIEWINGS');\nif (!['confirm', 'reschedule', 'cancel'].includes(i.action)) return fail('action must be confirm, reschedule or cancel');\nreturn [{ json: { ok: true, tenant_id: i.tenant_id, contact_id: i.contact_id, appointment_id: i.appointment_id, action: i.action,\n  new_starts_at: i.new_starts_at || '', new_ends_at: i.new_ends_at || '', reason: String(i.reason || '').slice(0, 300),\n  conversation_id: i.conversation_id || '', channel: i.channel || '' } }];\n"
+      },
+      "id": "076a1dec-d583-5c9a-bf0d-99b8aa4dfe54",
+      "name": "Validate Change",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "abadc7af-600a-5395-8fff-2cfc86990202",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7316c1bc-d3ae-5aea-b953-c340794f8022",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Only the client's own booking (0038).\nselect * from client_appointment($1::uuid, $2::uuid, $3::uuid);",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.contact_id, $json.appointment_id ] }}"
+        }
+      },
+      "id": "c460d7b6-daf6-509f-8fe9-10c2d1687912",
+      "name": "Load Booking",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        220
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst fmt = (iso, tz, locale) => new Date(iso).toLocaleString(locale, { timeZone: tz || 'Europe/Warsaw', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst rawEmail = (to, subject, body) => Buffer.from(\n  [`To: ${to}`, `Subject: =?UTF-8?B?${b64(subject)}?=`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'].join('\\r\\n') +\n  '\\r\\n\\r\\n' + b64(body)).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\n// One row when the booking is this client's, nothing otherwise.\nconst r = $input.first().json || {};\nconst v = $('Validate Change').first().json;\nconst fail = (error) => [{ json: { ok: false, action: v.action, error } }];\nif (!r.appointment_id) return fail('no booking with that id for this client');\nif (r.status !== 'confirmed') return fail(`that booking is already ${String(r.status).replace('_', ' ')}`);\nif (new Date(r.starts_at) < new Date()) return fail('that booking is in the past');\nconst out = { ok: true, ...v, info: r, when: fmt(r.starts_at, r.timezone, 'en-GB'),\n  has_event: !!(r.google_calendar_id && r.external_calendar_id) };\nif (v.action === 'reschedule') {\n  const s = new Date(v.new_starts_at), e = new Date(v.new_ends_at);\n  if (isNaN(s) || isNaN(e) || e <= s) return fail('the new time is missing or not valid; call check_availability and use one of its slots');\n  const notice = Number(r.booking_notice_minutes) || 0;\n  if (s < new Date(Date.now() + notice * 60000)) return fail(`the new time is too soon (bookings need ${notice} minutes' notice)`);\n  out.new_when = fmt(v.new_starts_at, r.timezone, 'en-GB');\n}\nreturn [{ json: out }];\n"
+      },
+      "id": "497295d9-70be-574e-9c7e-6e1f6fd8dcea",
+      "name": "Check Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f6ccf885-886c-54bd-97ef-8c9cb1eddaad",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0dc9a9f2-965e-54b5-a0e2-37659398bdda",
+      "name": "Booking OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ffe585e9-f172-5976-97ea-72022b14d1b1",
+              "leftValue": "={{ $json.action === 'confirm' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "af0915f8-4e56-51be-b6cb-971a63f20ca5",
+      "name": "Confirm?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select client_confirm_appointment($1::uuid, $2::uuid, $3::uuid) as done;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.contact_id, $json.appointment_id ] }}"
+        }
+      },
+      "id": "c55d1c87-e4e1-5046-8745-aac52977fa6d",
+      "name": "Mark Confirmed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1540,
+        40
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b85e3314-2415-5ed4-99e1-b7ec4f02a015",
+              "leftValue": "={{ $json.action === 'cancel' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ef8cb409-a24c-5333-8844-6e75da694549",
+      "name": "Cancel?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3782a833-66f6-54e0-81ba-a9b47e277317",
+              "leftValue": "={{ $json.has_event === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f012ce33-b10d-5db7-8c12-7df6a2a5b6ce",
+      "name": "Cancel: Has Event?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent($json.info.google_calendar_id) + '/events/' + encodeURIComponent($json.info.external_calendar_id) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "3c7c8260-c26c-5007-a4e2-5bc105d291e2",
+      "name": "Delete Calendar Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        100
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select client_cancel_appointment($1::uuid, $2::uuid, $3::uuid) as done;",
+        "options": {
+          "queryReplacement": "={{ [ $('Check Booking').first().json.tenant_id, $('Check Booking').first().json.contact_id, $('Check Booking').first().json.appointment_id ] }}"
+        }
+      },
+      "id": "ccf7d4ca-d9b5-5ff8-b772-88fa9734a85e",
+      "name": "Mark Cancelled",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2200,
+        160
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Checks for clashes (no two confirmed viewings at once) before touching the calendar.\nselect client_reschedule_appointment($1::uuid, $2::uuid, $3::uuid, $4::timestamptz, $5::timestamptz) as result;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, $json.contact_id, $json.appointment_id, $json.new_starts_at, $json.new_ends_at ] }}"
+        }
+      },
+      "id": "14eca311-c2fc-5cab-ae50-d2166464acc5",
+      "name": "Move In Dashboard",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1760,
+        360
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e4cf9530-af41-556b-bc0e-6356eb944a8a",
+              "leftValue": "={{ $json.result && $json.result.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "211f2bb2-5c57-5f2f-bad1-f2bb81dc4848",
+      "name": "Moved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4b63a575-ef28-55a8-a7e6-9472ba83923c",
+              "leftValue": "={{ $('Check Booking').first().json.has_event === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "54608f0c-f3f7-56d6-b6cc-5133a52d0f70",
+      "name": "Move: Has Event?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent($('Check Booking').first().json.info.google_calendar_id) + '/events/' + encodeURIComponent($('Check Booking').first().json.info.external_calendar_id) + '?sendUpdates=all' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ start: { dateTime: $('Check Booking').first().json.new_starts_at, timeZone: $('Check Booking').first().json.info.timezone }, end: { dateTime: $('Check Booking').first().json.new_ends_at, timeZone: $('Check Booking').first().json.info.timezone } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d556b97e-445e-5bda-adad-2ebac7ce634f",
+      "name": "Move Calendar Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        240
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      },
+      "notes": "sendUpdates=all: the client and agent get Google's updated invitation too.",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst fmt = (iso, tz, locale) => new Date(iso).toLocaleString(locale, { timeZone: tz || 'Europe/Warsaw', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst rawEmail = (to, subject, body) => Buffer.from(\n  [`To: ${to}`, `Subject: =?UTF-8?B?${b64(subject)}?=`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'].join('\\r\\n') +\n  '\\r\\n\\r\\n' + b64(body)).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\n// After a cancel or a move: tell the agent (or the agency's alert address) and\n// email the client. Demo agency: client only, marked DEMO.\nconst c = $('Check Booking').first().json;\nconst i = c.info;\nconst tz = i.timezone;\nconst isCall = i.assistant_mode === 'sales';\nconst isDemo = i.assistant_mode === 'demo';\nconst noun = isCall ? 'call' : 'viewing';\nlet calendar = 'no_event';\nif (c.action === 'reschedule' && c.has_event) {\n  try {\n    const p = $('Move Calendar Event').first().json;\n    const st = Number(p.statusCode || 0);\n    calendar = st >= 200 && st < 300 ? 'updated' : 'failed';\n  } catch (e) { calendar = 'failed'; }\n}\nif (c.action === 'cancel' && c.has_event) {\n  try {\n    const d = $('Delete Calendar Event').first().json;\n    const st = Number(d.statusCode || 0);\n    calendar = (st >= 200 && st < 300) || st === 404 || st === 410 ? 'deleted' : 'failed';\n  } catch (e) { calendar = 'failed'; }\n}\nconst first = String(i.contact_name || '').trim().split(/\\s+/)[0] || '';\nconst place = [i.listing_title, i.listing_address].filter(Boolean).join(', ');\nconst via = { whatsapp: 'WhatsApp', email: 'email', chat_widget: 'the website chat' }[c.channel] || 'chat';\nconst convo = c.conversation_id ? `\\nConversation: https://app.getelliot.eu/dashboard/conversations/${c.conversation_id}` : '';\nconst emails = [];\nconst team = isDemo ? null : (i.agent_email || i.notify_email);\nconst newWhenPl = c.new_starts_at ? fmt(c.new_starts_at, tz, 'pl-PL') : '';\nconst whenPl = fmt(i.starts_at, tz, 'pl-PL');\n\nif (c.action === 'cancel') {\n  if (team) emails.push({ to: team, kind: 'team',\n    subject: `Cancelled by the client: ${i.contact_name || 'client'}, ${c.when}`,\n    body: `${i.contact_name || 'The client'} cancelled their ${noun} on ${c.when}${place ? ` (${place})` : ''} via ${via}.` +\n      (c.reason ? `\\nReason: ${c.reason}` : '') + `\\nThe calendar entry was ${calendar === 'failed' ? 'NOT removed, please delete it by hand' : 'removed'}.` + convo + '\\n' });\n  if (i.contact_email) emails.push({ to: i.contact_email, kind: 'client',\n    subject: `${isDemo ? '[DEMO] ' : ''}Cancelled: your ${noun} on ${c.when}`,\n    body: `Hi${first ? ' ' + first : ''},\\n\\n${isDemo ? 'This is a DEMO from getelliot.eu.\\n\\n' : ''}your ${noun} on ${c.when}${place ? ` (${place})` : ''} is cancelled, as you asked. ` +\n      `If you'd like another time, just reply.\\n\\n${i.tenant_name}\\n\\n----------------------------------------\\n\\n` +\n      `Dzień dobry${first ? ' ' + first : ''},\\n\\n${isDemo ? 'To jest DEMO z getelliot.eu.\\n\\n' : ''}zgodnie z prośbą odwołaliśmy termin ${whenPl}${place ? ` (${place})` : ''}. ` +\n      `Jeśli chcą Państwo umówić inny, wystarczy odpowiedzieć.\\n\\n${i.tenant_name}\\n` });\n} else {\n  if (team) emails.push({ to: team, kind: 'team',\n    subject: `Moved by the client: ${i.contact_name || 'client'}, now ${c.new_when}`,\n    body: `${i.contact_name || 'The client'} moved their ${noun}${place ? ` (${place})` : ''} via ${via}:\\nwas ${c.when}\\nnow ${c.new_when}` +\n      (c.reason ? `\\nReason: ${c.reason}` : '') +\n      `\\nThe calendar entry was ${calendar === 'failed' ? 'NOT updated, please move it by hand' : calendar === 'updated' ? 'updated' : 'not there (no calendar event)'}.` + convo + '\\n' });\n  if (i.contact_email) emails.push({ to: i.contact_email, kind: 'client',\n    subject: `${isDemo ? '[DEMO] ' : ''}New time: your ${noun} on ${c.new_when}`,\n    body: `Hi${first ? ' ' + first : ''},\\n\\n${isDemo ? 'This is a DEMO from getelliot.eu.\\n\\n' : ''}your ${noun}${place ? ` (${place})` : ''} has moved to ${c.new_when}.` +\n      `${/Google Meet: (\\S+)/.test(i.notes || '') ? `\\nGoogle Meet: ${(i.notes.match(/Google Meet: (\\S+)/) || [])[1]}` : ''}\\n\\nNeed another change? Just reply.\\n\\n${i.tenant_name}\\n\\n----------------------------------------\\n\\n` +\n      `Dzień dobry${first ? ' ' + first : ''},\\n\\n${isDemo ? 'To jest DEMO z getelliot.eu.\\n\\n' : ''}nowy termin${place ? ` (${place})` : ''}: ${newWhenPl}.\\n\\nJeśli trzeba coś zmienić, wystarczy odpowiedzieć.\\n\\n${i.tenant_name}\\n` });\n}\nreturn emails.length\n  ? emails.map((e) => ({ json: { ...e, calendar, raw_message: rawEmail(e.to, e.subject, e.body) } }))\n  : [{ json: { to: null, calendar } }];\n"
+      },
+      "id": "3fc6ea77-dd33-5ce9-986f-3724a03eaa3d",
+      "name": "Build Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a7fbb391-c568-5893-b3f3-48364e48c46c",
+              "leftValue": "={{ !!$json.to }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "aa1ac341-db2c-5249-ae58-bc50bce14f8c",
+      "name": "Any Emails?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2860,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d85815fa-8c63-5dc9-9bc7-e31a4c2662b4",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        200
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UEVuaDdqEf2Zd7CE",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Back to workflow 01's Build Tool Result Message.\nconst safe = (n) => { try { return $(n).first().json; } catch (e) { return null; } };\nconst safeAll = (n) => { try { return $(n).all().map((x) => x.json); } catch (e) { return []; } };\nconst v = safe('Validate Change') || {};\nconst c = safe('Check Booking');\nif (!v.ok) return [{ json: { success: false, action: v.action, error: v.error } }];\nif (!c || !c.ok) return [{ json: { success: false, action: v.action, error: (c && c.error) || 'not found' } }];\nif (c.action === 'confirm') {\n  const done = safe('Mark Confirmed');\n  return [{ json: done && done.done ? { success: true, action: 'confirm', when: c.when } : { success: false, action: 'confirm', error: 'the booking changed meanwhile' } }];\n}\nif (c.action === 'reschedule') {\n  const m = (safe('Move In Dashboard') || {}).result || {};\n  if (!m.ok) {\n    const why = { slot_unavailable: 'that time was just taken; offer other times', in_the_past: 'that time is in the past', not_found: 'the booking changed meanwhile' };\n    return [{ json: { success: false, action: 'reschedule', error: why[m.error] || m.error || 'could not move it' } }];\n  }\n}\nif (c.action === 'cancel' && !(safe('Mark Cancelled') || {}).done) {\n  return [{ json: { success: false, action: 'cancel', error: 'the booking changed meanwhile' } }];\n}\nconst built = safeAll('Build Emails');\nconst sent = safeAll('Send Email');\nconst clientIdx = built.findIndex((e) => e.kind === 'client');\nconst clientSent = clientIdx >= 0 && sent[clientIdx] && Number(sent[clientIdx].statusCode) >= 200 && Number(sent[clientIdx].statusCode) < 300;\nreturn [{ json: { success: true, action: c.action, when: c.action === 'reschedule' ? c.new_when : c.when, previous_when: c.when,\n  calendar: (built[0] || {}).calendar || 'no_event', email_sent_to: clientSent ? built[clientIdx].to : null } }];\n"
+      },
+      "id": "6d4a8195-24bd-5973-b24b-151efa22a525",
+      "name": "Change Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        300
+      ],
+      "executeOnce": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Change": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Booking": {
+      "main": [
+        [
+          {
+            "node": "Check Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Booking": {
+      "main": [
+        [
+          {
+            "node": "Booking OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Confirmed": {
+      "main": [
+        [
+          {
+            "node": "Change Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Mark Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Cancelled": {
+      "main": [
+        [
+          {
+            "node": "Build Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move In Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Moved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Build Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Emails": {
+      "main": [
+        [
+          {
+            "node": "Any Emails?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Change Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Load Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Change Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking OK?": {
+      "main": [
+        [
+          {
+            "node": "Confirm?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Change Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm?": {
+      "main": [
+        [
+          {
+            "node": "Mark Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancel?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel?": {
+      "main": [
+        [
+          {
+            "node": "Cancel: Has Event?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Move In Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel: Has Event?": {
+      "main": [
+        [
+          {
+            "node": "Delete Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Moved?": {
+      "main": [
+        [
+          {
+            "node": "Move: Has Event?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Change Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move: Has Event?": {
+      "main": [
+        [
+          {
+            "node": "Move Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Emails?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Change Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
