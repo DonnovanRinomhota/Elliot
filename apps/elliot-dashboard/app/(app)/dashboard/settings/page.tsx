@@ -29,6 +29,7 @@ export default async function SettingsPage() {
     { data: supportVisits },
     me,
     adminView,
+    { data: permissionRequired },
   ] = await Promise.all([
     supabase.from("tenants").select("id, name, slug, industry, plan, status, timezone, avg_deal_value, assistant_mode").eq("id", tenantUser.tenant_id).single(),
     supabase
@@ -48,6 +49,7 @@ export default async function SettingsPage() {
       .limit(20),
     getMembership(supabase, user.id),
     getAdminView(supabase),
+    supabase.rpc("support_permission_required"),
   ]);
 
   if (tenantError || !tenant) {
@@ -71,6 +73,7 @@ export default async function SettingsPage() {
             canChange={me?.role === "admin"}
             timeZone={tenant.timezone || "Europe/Warsaw"}
             viewingAsSupport={!!adminView}
+            required={permissionRequired !== false}
           />
         </div>
       )}

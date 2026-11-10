@@ -1,4 +1,9 @@
-# Owner and agency separation (0040)
+# Owner and agency separation (0040, 0041)
+
+> **Testing mode (0041).** The "agency's permission" rule has a switch on the
+> control panel's Agencies page. It starts **off**: you can open any agency's
+> dashboard (two-step sign-in still needed, visits still recorded). Click
+> **Require permission** before your first real client.
 
 **Control panel** (`/platform`, you only): agencies, plans, payments, usage
 counts, AI cost, health and alerts. Business figures, not the agencies'

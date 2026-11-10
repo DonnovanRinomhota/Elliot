@@ -15,12 +15,14 @@ export default function SupportAccessCard({
   canChange,
   timeZone,
   viewingAsSupport,
+  required = true,
 }: {
   grant: Grant;
   visits: Visit[];
   canChange: boolean;
   timeZone: string;
   viewingAsSupport: boolean;
+  required?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -78,6 +80,11 @@ export default function SupportAccessCard({
           </span>
         </p>
 
+        {!required && (
+          <p className="m-0 mb-3 rounded-lg bg-brass-soft px-3 py-2 text-[12.5px] text-brass-dark">
+            Elliot is in testing: the Elliot team can currently open your dashboard without this permission. Every visit is still listed below.
+          </p>
+        )}
         {viewingAsSupport ? (
           <p className="m-0 mb-3 text-[12.5px] text-gray-500">Only the agency&apos;s own admins can change this.</p>
         ) : !canChange ? (

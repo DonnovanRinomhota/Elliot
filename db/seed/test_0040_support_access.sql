@@ -19,6 +19,8 @@ create or replace function pg_temp.as_user(p_uid text, p_email text, p_aal text)
 $$;
 
 delete from support_access_grants where tenant_id = '99999999-0000-0000-0000-000000000401';
+-- 0041: these checks are about the switch being on.
+update platform_settings set support_permission_required = true;
 
 do $$
 declare n int; t uuid; until timestamptz;

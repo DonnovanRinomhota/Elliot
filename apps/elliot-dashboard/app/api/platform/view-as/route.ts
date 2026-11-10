@@ -22,7 +22,8 @@ export async function POST(request: Request) {
   const { data: tenant } = await admin.from("tenants").select("id, name, assistant_mode").eq("id", tenantId).maybeSingle();
   if (!tenant) return NextResponse.json({ success: false, error: "Agency not found." }, { status: 404 });
   const { data: grant } = await admin.from("support_access_grants").select("expires_at, granted_by_email").eq("tenant_id", tenant.id).maybeSingle();
-  const access = supportAccessState(grant, tenant.assistant_mode);
+  const { data: settings } = await admin.from("platform_settings").select("support_permission_required").maybeSingle();
+  const access = supportAccessState(grant, tenant.assistant_mode, new Date(), settings?.support_permission_required ?? true);
   if (!access.open) {
     return NextResponse.json(
       { success: false, error: `${tenant.name} hasn't allowed support access. They can turn it on in Settings → Elliot support access.` },
