@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
         }
       },
       "id": "2b200f8f-5040-42c6-9876-bb8f4027375b",
       "name": "Every 15 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "notes": "Matches the interval named in docs/architecture.md section 4. Adjust freely in n8n -- this doesn't need a code change, just edit the trigger node directly."
     },
     {
@@ -24,7 +32,10 @@
       "name": "Query Due Runs",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [224, 0],
+      "position": [
+        224,
+        0
+      ],
       "notesInFlow": true,
       "credentials": {
         "postgres": {
@@ -42,18 +53,29 @@
       "name": "Determine Action",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [448, 0]
+      "position": [
+        448,
+        0
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
           "conditions": [
             {
               "id": "cond-replied",
               "leftValue": "={{ $json.action }}",
               "rightValue": "stop_replied",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -64,18 +86,29 @@
       "name": "Contact Replied?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [672, 0]
+      "position": [
+        672,
+        0
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
           "conditions": [
             {
               "id": "cond-complete",
               "leftValue": "={{ $json.action }}",
               "rightValue": "complete",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -86,33 +119,56 @@
       "name": "No Next Step?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [896, 96]
+      "position": [
+        896,
+        96
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
         "query": "update follow_up_runs\nset status = 'stopped', stop_reason = 'contact_replied', next_run_at = null, updated_at = now()\nwhere id = $1;",
-        "options": { "queryReplacement": "={{ [$json.run_id] }}" }
+        "options": {
+          "queryReplacement": "={{ [$json.run_id] }}"
+        }
       },
       "id": "ff152e87-4b73-402f-985c-1b6cdc7d015d",
       "name": "Stop Run (Replied)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [896, -96],
-      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } }
+      "position": [
+        896,
+        -96
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "executeQuery",
         "query": "update follow_up_runs\nset status = 'completed', next_run_at = null, updated_at = now()\nwhere id = $1;",
-        "options": { "queryReplacement": "={{ [$json.run_id] }}" }
+        "options": {
+          "queryReplacement": "={{ [$json.run_id] }}"
+        }
       },
       "id": "720ed208-2c21-414c-a446-a20c76f69110",
       "name": "Complete Run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1120, 192],
-      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } }
+      "position": [
+        1120,
+        192
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -126,21 +182,37 @@
       "name": "Insert Email Draft",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1120, 0],
+      "position": [
+        1120,
+        0
+      ],
       "notesInFlow": true,
-      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } },
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
       "notes": "ALWAYS insert a draft, regardless of autonomy mode -- full audit trail either way, matching the project's core design principle (every AI decision logged). status is 'auto_sent' or 'pending' depending on mode (set upstream in Determine Action). The 'pending' case surfaces in the dashboard's existing Pending Approvals screen for free -- no new UI needed."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
           "conditions": [
             {
               "id": "cond-autonomous",
               "leftValue": "={{ $('Determine Action').item.json.mode }}",
               "rightValue": "autonomous",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -151,7 +223,10 @@
       "name": "Autonomous?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1344, 0]
+      "position": [
+        1344,
+        0
+      ]
     },
     {
       "parameters": {
@@ -161,25 +236,77 @@
       "name": "Build Raw Email",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1568, -96]
+      "position": [
+        1568,
+        -96
+      ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gmailOAuth2",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
-        "options": {}
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "39 - Send Email"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $json.tenant_id }}",
+            "audience": "client",
+            "raw_message": "={{ $json.raw_message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "audience",
+              "displayName": "audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "raw_message",
+              "displayName": "raw_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
-      "id": "86304d59-6713-49e7-b2aa-097806102dcf",
-      "name": "Send via Gmail",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1792, -96],
-      "notes": "Same known limitation as everywhere else in this codebase: one shared Gmail credential per workflow, not dynamic per-tenant. Whichever tenant's inbox this credential belongs to is the only one that can actually autonomous-send today. continueOnFail:true -- the draft row is already saved, so a send failure never loses the record, and the run still advances below regardless (see Advance Run's note on this tradeoff).",
+      "id": "9edbb30a-0ba8-5d91-8296-e34576f984d3",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1792,
+        -96
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Pick '39 - Send Email' in Workflow after importing.",
       "continueOnFail": true
     },
     {
@@ -190,7 +317,10 @@
       "name": "Merge Before Advance",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1792, 96]
+      "position": [
+        1792,
+        96
+      ]
     },
     {
       "parameters": {
@@ -204,52 +334,152 @@
       "name": "Advance Run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2016, 0],
+      "position": [
+        2016,
+        0
+      ],
       "notesInFlow": true,
-      "credentials": { "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" } },
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
       "notes": "KNOWN, DELIBERATE LIMITATION: this runs immediately after queuing the draft, regardless of whether an approval_required draft has actually been approved and sent yet by a human. If approvals lag, the sequence keeps advancing to the next scheduled step on time anyway rather than waiting -- drafts can pile up in the approvals queue while the schedule marches forward. Documented here and in the spec doc, not hidden. Fixing it properly would mean tying advancement to 15 (Send Approved Email) confirming an actual send, which would require editing an already-live production workflow -- deliberately out of scope for this version."
     }
   ],
   "pinData": {},
   "connections": {
     "Every 15 Minutes": {
-      "main": [[{ "node": "Query Due Runs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Query Due Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Query Due Runs": {
-      "main": [[{ "node": "Determine Action", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Determine Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Determine Action": {
-      "main": [[{ "node": "Contact Replied?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Contact Replied?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Contact Replied?": {
       "main": [
-        [{ "node": "Stop Run (Replied)", "type": "main", "index": 0 }],
-        [{ "node": "No Next Step?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Stop Run (Replied)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Next Step?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "No Next Step?": {
       "main": [
-        [{ "node": "Complete Run", "type": "main", "index": 0 }],
-        [{ "node": "Insert Email Draft", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Complete Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Email Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Insert Email Draft": {
-      "main": [[{ "node": "Autonomous?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Autonomous?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Autonomous?": {
       "main": [
-        [{ "node": "Build Raw Email", "type": "main", "index": 0 }],
-        [{ "node": "Merge Before Advance", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Build Raw Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Before Advance",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Build Raw Email": {
-      "main": [[{ "node": "Send via Gmail", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Send via Gmail": {
-      "main": [[{ "node": "Merge Before Advance", "type": "main", "index": 0 }]]
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Merge Before Advance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Merge Before Advance": {
-      "main": [[{ "node": "Advance Run", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Advance Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,

@@ -262,9 +262,9 @@ test('18: contact-form requests become sales leads and go to the platform alert 
   const r = run(js, { json: { name: 'A', company: 'C', email: 'a@x.pl', industry: 'Real Estate', employees: '1–10', notify_to: 'me@x.pl', created_at: 'now' } })[0].json;
   assert.match(fromB64url(r.raw_message), /^To: me@x\.pl\r\n/);
   assert.deepStrictEqual(next(wf18, 'Build Notification Email'), ['Has Notify Address?']);
-  assert.deepStrictEqual(next(wf18, 'Has Notify Address?', 0), ['Send Notification via Gmail']);
+  assert.deepStrictEqual(next(wf18, 'Has Notify Address?', 0), ['Send Notification']);
   assert.deepStrictEqual(next(wf18, 'Has Notify Address?', 1), ['Respond to Webhook']);
-  assert.strictEqual(nodeOf(wf18, 'Send Notification via Gmail').onError, 'continueRegularOutput');
+  assert.strictEqual(nodeOf(wf18, 'Send Notification').onError, 'continueRegularOutput');
 });
 
 // ── 35 ──

@@ -72,26 +72,71 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gmailOAuth2",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
-        "options": {}
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "39 - Send Email"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "",
+            "audience": "team",
+            "raw_message": "={{ $json.raw_message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "audience",
+              "displayName": "audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "raw_message",
+              "displayName": "raw_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
-      "id": "6127ff19-f9cf-4b88-9d30-e19fd6fd2270",
-      "name": "Send Notification via Gmail",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "6171dae0-cf98-5c91-b452-c24bdcd404e2",
+      "name": "Send Notification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
       "position": [
         896,
         0
       ],
-      "notes": "TODO: set up an internal (non-tenant) Gmail OAuth2 credential for this -- separate from any tenant's connected inbox used in 15/16. Requires gmail.send scope. If this node fails, the demo request row is already saved (previous node), so a lead is never silently lost even if notification delivery breaks -- worth checking demo_requests directly if you suspect notifications are down.",
-      "continueOnFail": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "notes": "Pick '39 - Send Email' in Workflow after importing.",
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -188,7 +233,7 @@
         ]
       ]
     },
-    "Send Notification via Gmail": {
+    "Send Notification": {
       "main": [
         [
           {
@@ -203,7 +248,7 @@
       "main": [
         [
           {
-            "node": "Send Notification via Gmail",
+            "node": "Send Notification",
             "type": "main",
             "index": 0
           }

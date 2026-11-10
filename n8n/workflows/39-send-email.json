@@ -1,0 +1,317 @@
+{
+  "name": "39 - Send Email",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"tenant_id\": \"agency uuid, or empty for Elliot's own notifications\",\n  \"audience\": \"client | team\",\n  \"raw_message\": \"the base64url RFC 2822 email the caller built (as for Gmail), or leave empty and fill the fields below\",\n  \"to\": \"\",\n  \"subject\": \"\",\n  \"text\": \"\",\n  \"in_reply_to\": \"\",\n  \"references\": \"\"\n}"
+      },
+      "id": "a8bcfc12-882e-5777-91f2-d581593b1f68",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0039: the agency's name and Elliot address (or its own domain) and where replies go.\nselect email_sender(nullif($1, '')::uuid, $2) as sender;",
+        "options": {
+          "queryReplacement": "={{ [ String($json.tenant_id || ''), $json.audience === 'team' ? 'team' : 'client' ] }}"
+        }
+      },
+      "id": "e20c6e25-52d5-5b81-9333-b94a665934c3",
+      "name": "Load Sender",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns what the calling workflow built into a Resend email (0039). Callers\n// still build the same raw RFC 2822 message they used to hand to Gmail, so\n// this reads To / Cc / Subject / In-Reply-To / References and the text from\n// it; or they pass to / subject / text directly. Who it's from comes from the\n// database: the agency's name and Elliot address (or its own domain), with\n// Reply-To the agency's own address so a client's answer reaches the agency.\nconst input = $('When Executed by Another Workflow').first().json;\nlet sender = $input.first().json.sender || {};\nif (typeof sender === 'string') { try { sender = JSON.parse(sender); } catch (e) { sender = {}; } }\n\nfunction fromB64(s) {\n  return Buffer.from(String(s || '').replace(/-/g, '+').replace(/_/g, '/').replace(/\\s+/g, ''), 'base64').toString('utf8');\n}\nfunction decodeWords(v) {\n  return String(v || '')\n    .replace(/=\\?UTF-8\\?B\\?([^?]*)\\?=/gi, (m, b) => Buffer.from(b, 'base64').toString('utf8'))\n    .replace(/=\\?UTF-8\\?Q\\?([^?]*)\\?=/gi, (m, q) => Buffer.from(q.replace(/_/g, ' ').replace(/=([0-9A-F]{2})/gi, (x, h) => String.fromCharCode(parseInt(h, 16))), 'latin1').toString('utf8'));\n}\nfunction parseRaw(rawB64) {\n  const raw = fromB64(rawB64).replace(/\\r\\n/g, '\\n');\n  const cut = raw.indexOf('\\n\\n');\n  const head = cut >= 0 ? raw.slice(0, cut) : raw;\n  let body = cut >= 0 ? raw.slice(cut + 2) : '';\n  const headers = {};\n  head.replace(/\\n[ \\t]+/g, ' ').split('\\n').forEach((line) => {\n    const i = line.indexOf(':');\n    if (i > 0) headers[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();\n  });\n  if (/base64/i.test(headers['content-transfer-encoding'] || '')) body = Buffer.from(body.replace(/\\s+/g, ''), 'base64').toString('utf8');\n  return { headers, body };\n}\nconst list = (v) => (Array.isArray(v) ? v : String(v || '').split(','))\n  .map((a) => String(a).trim()).filter((a) => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(a.replace(/^.*<|>$/g, '')));\nconst quote = (name) => `\"${String(name || 'Elliot').replace(/[\\r\\n]+/g, ' ').replace(/[\"\\\\]/g, '').trim().slice(0, 80)}\"`;\n\nconst parsed = input.raw_message ? parseRaw(input.raw_message) : { headers: {}, body: '' };\nconst h = parsed.headers;\nconst to = list(input.to || h.to);\nconst cc = list(input.cc || h.cc);\nconst subject = decodeWords(input.subject || h.subject || '').trim() || '(no subject)';\nconst text = String(input.text || parsed.body || '').replace(/\\r\\n/g, '\\n');\nconst inReplyTo = String(input.in_reply_to || h['in-reply-to'] || '').trim();\nconst references = String(input.references || h.references || inReplyTo).trim();\nconst address = String(sender.address || 'notifications@mail.getelliot.eu');\n\nconst email = {\n  from: `${quote(sender.name)} <${address}>`,\n  to,\n  subject,\n  text,\n};\nif (cc.length) email.cc = cc;\nif (sender.reply_to) email.reply_to = [String(sender.reply_to)];\nconst headers = {};\nif (inReplyTo) headers['In-Reply-To'] = inReplyTo;\nif (references) headers['References'] = references;\nif (Object.keys(headers).length) email.headers = headers;\n\n// The same email for Gmail, used only if Resend fails on an email for the\n// agency's own team (never for clients: they'd get it from the wrong address).\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst gmailRaw = Buffer.from([\n  `To: ${to.join(', ')}`,\n  cc.length ? `Cc: ${cc.join(', ')}` : null,\n  `Subject: =?UTF-8?B?${b64(subject)}?=`,\n  inReplyTo ? `In-Reply-To: ${inReplyTo}` : null,\n  references ? `References: ${references}` : null,\n  'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64',\n].filter(Boolean).join('\\r\\n') + '\\r\\n\\r\\n' + b64(text)).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\nreturn [{ json: {\n  ok_to_send: to.length > 0,\n  audience: input.audience === 'team' ? 'team' : 'client',\n  tenant_id: input.tenant_id || null,\n  email,\n  gmail_raw: gmailRaw,\n} }];\n"
+      },
+      "id": "84fa0655-115e-538e-8747-b94b6be07481",
+      "name": "Build Resend Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "345b97b0-1d14-5055-8b6c-f914e5d4089e",
+              "leftValue": "={{ $json.ok_to_send === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "da961965-ea71-5897-9e13-6c978cf6ebb0",
+      "name": "Has Recipient?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.email) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "8965c91d-a5e8-5b25-a1a9-c0faf0db9dfe",
+      "name": "Send via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Resend API key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "notes": "Credential: Resend API key (Header Auth: Authorization = Bearer re_...)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0e302d34-4beb-5547-91cc-5735ee3da676",
+              "leftValue": "={{ !(Number($json.statusCode) >= 200 && Number($json.statusCode) < 300) && $('Build Resend Email').first().json.audience === 'team' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0f375bfe-e4e2-56d2-a47e-5ec33b6346e5",
+      "name": "Team Email Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $('Build Resend Email').first().json.gmail_raw }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "7c2d6b17-8117-5c49-82aa-412724e2a482",
+      "name": "Send via Gmail (team fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        100
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UEVuaDdqEf2Zd7CE",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Only for emails to the agency's own team, if Resend is down. Clients never get an email from this Gmail."
+    },
+    {
+      "parameters": {
+        "jsCode": "// What goes back to the calling workflow, in one shape whichever way it went:\n// { ok, statusCode, id, error, body: { id, error }, provider }. Callers read\n// statusCode + body (like an HTTP response) or id + error.\nconst built = $('Build Resend Email').first().json;\nconst read = (name) => { try { return $(name).first().json; } catch (e) { return null; } };\nconst resend = read('Send via Resend');\nconst gmail = read('Send via Gmail (team fallback)');\nfunction outcome(r, provider) {\n  if (!r) return null;\n  const status = Number(r.statusCode || 0);\n  let body = r.body;\n  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\n  const ok = status >= 200 && status < 300 && !!(body && body.id);\n  const message = ok ? null : (body && (body.message || (body.error && body.error.message)))\n    || (r.error && (r.error.message || String(r.error))) || `HTTP ${status || 'no response'}`;\n  return { ok, status, id: ok ? body.id : null, message: message ? `${provider}: ${String(message).slice(0, 300)}` : null, provider };\n}\nlet res;\nif (!built.ok_to_send) res = { ok: false, status: 0, id: null, message: 'no valid recipient', provider: 'none' };\nelse {\n  const a = outcome(resend, 'Resend');\n  const b = outcome(gmail, 'Gmail');\n  res = b ? { ...b, message: b.ok ? null : `${a && a.message}; ${b.message}` } : a;\n}\nconst error = res.ok ? null : { message: res.message };\nreturn [{ json: {\n  ok: res.ok,\n  statusCode: res.ok ? 200 : (res.status || 502),\n  id: res.id,\n  error,\n  body: res.ok ? { id: res.id } : { error },\n  provider: res.provider,\n  from: built.email.from,\n  to: built.email.to,\n} }];\n"
+      },
+      "id": "26bd1ad6-9c67-5488-9ef2-32326f539f50",
+      "name": "Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Load Sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Sender": {
+      "main": [
+        [
+          {
+            "node": "Build Resend Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Resend Email": {
+      "main": [
+        [
+          {
+            "node": "Has Recipient?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Recipient?": {
+      "main": [
+        [
+          {
+            "node": "Send via Resend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Resend": {
+      "main": [
+        [
+          {
+            "node": "Team Email Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Team Email Failed?": {
+      "main": [
+        [
+          {
+            "node": "Send via Gmail (team fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Gmail (team fallback)": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false,
+  "meta": {
+    "description": "Every email Elliot sends for an agency (0039): via Resend, from the agency's name and Elliot address."
+  }
+}

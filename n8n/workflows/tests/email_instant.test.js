@@ -119,7 +119,8 @@ test('16: the agency is found by any recipient, ignoring case; unknown mailboxes
   const log = nodeOf(wf16, 'Log Unmatched Mailbox').parameters;
   assert.match(log.query, /'email_unmatched_mailbox'/);
   const claim = nodeOf(wf16, 'Claim Message').parameters;
-  assert.match(claim.query, /claim_whatsapp_message\(\$1, 'gmail:' \|\| \$2\)/);
+  // 0039: keyed by Message-ID (shared with workflow 40), Gmail's id when there is none.
+  assert.match(claim.query, /claim_whatsapp_message\(\$1, case when \$2 <> '' then 'email:' \|\| lower\(btrim\(\$2\)\) else 'gmail:' \|\| \$3 end\)/);
 });
 
 test('16: Elliot is asked as an email conversation with the sender\'s email', () => {

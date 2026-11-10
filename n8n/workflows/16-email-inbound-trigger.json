@@ -247,9 +247,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- Each email is answered once, even if Gmail hands it over again (0032/0035).\nselect claim_whatsapp_message($1, 'gmail:' || $2) as is_new;",
+        "query": "-- Each email is answered once, even if Gmail hands it over again (0032/0035).\n-- 0039: keyed by the email's own Message-ID, like workflow 40, so an email that\n-- also arrives through the forwarding address isn't answered twice.\nselect claim_whatsapp_message($1, case when $2 <> '' then 'email:' || lower(btrim($2)) else 'gmail:' || $3 end) as is_new;",
         "options": {
-          "queryReplacement": "={{ [ $('Lookup Tenant by Mailbox').first().json.tenant_id, $('Extract Email Fields').first().json.gmail_message_id ] }}"
+          "queryReplacement": "={{ [ $('Lookup Tenant by Mailbox').first().json.tenant_id, $('Extract Email Fields').first().json.rfc_message_id || '', $('Extract Email Fields').first().json.gmail_message_id ] }}"
         }
       },
       "id": "fc1bb7dc-365b-525c-995f-bf1d89531dad",

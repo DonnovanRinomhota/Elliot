@@ -97,7 +97,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Builds the raw RFC 2822 message for Gmail's send API (base64url-encoded), threaded as a reply.\n// TODO: confirm the 'from' address should be the tenant's connected Gmail account, not a hardcoded value.\nconst d = $json;\n\nconst raw =\n  `To: ${d.to_email}\\r\\n` +\n  `Subject: ${d.subject}\\r\\n` +\n  `In-Reply-To: ${d.gmail_message_id}\\r\\n` +\n  `References: ${d.gmail_message_id}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${d.body}`;\n\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\nreturn [{ json: { ...d, raw_message: encoded } }];"
+        "jsCode": "// Builds the raw RFC 2822 message for Gmail's send API (base64url-encoded), threaded as a reply.\n// Sent by workflow 39 (0039): from the agency's name, Reply-To the agency's address.\nconst d = $json;\n\nconst raw =\n  `To: ${d.to_email}\\r\\n` +\n  `Subject: ${d.subject}\\r\\n` +\n  `In-Reply-To: ${d.gmail_message_id}\\r\\n` +\n  `References: ${d.gmail_message_id}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${d.body}`;\n\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\nreturn [{ json: { ...d, raw_message: encoded } }];"
       },
       "id": "c68d9a88-4fee-4f3c-bcb7-96213a722e70",
       "name": "Build Gmail Message",
@@ -110,30 +110,70 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "gmailOAuth2",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message, threadId: $json.gmail_thread_id }) }}",
-        "options": {}
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "39 - Send Email"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $('Load Draft').first().json.tenant_id }}",
+            "audience": "client",
+            "raw_message": "={{ $json.raw_message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "audience",
+              "displayName": "audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "raw_message",
+              "displayName": "raw_message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
-      "id": "794af480-a7a7-4a14-a5cb-6de5824511c1",
-      "name": "Send via Gmail API",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "d5bba1f7-4fe7-5e8f-a7d0-7ab424a21067",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
       "position": [
         368,
         -48
       ],
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "UEVuaDdqEf2Zd7CE",
-          "name": "Gmail account"
-        }
-      },
-      "notes": "TODO: set up the tenant's Gmail OAuth2 credential (Predefined Credential Type -> Gmail OAuth2 API), same pattern established for Google Calendar in 11/12. Requires gmail.send scope."
+      "onError": "continueRegularOutput",
+      "notes": "Pick '39 - Send Email' in Workflow after importing."
     },
     {
       "parameters": {
@@ -464,14 +504,14 @@
       "main": [
         [
           {
-            "node": "Send via Gmail API",
+            "node": "Send Email",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send via Gmail API": {
+    "Send Email": {
       "main": [
         [
           {

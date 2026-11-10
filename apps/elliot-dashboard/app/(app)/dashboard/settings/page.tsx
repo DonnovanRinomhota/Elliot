@@ -20,13 +20,15 @@ export default async function SettingsPage() {
     return <p className="text-sm text-alert">No tenant found for this account.</p>;
   }
 
-  const [{ data: tenant, error: tenantError }, { data: aiConfig, error: configError }] = await Promise.all([
-    supabase.from("tenants").select("id, name, industry, plan, status, timezone, avg_deal_value").eq("id", tenantUser.tenant_id).single(),
+  const [{ data: tenant, error: tenantError }, { data: aiConfig, error: configError }, { data: sendingIdentity }] = await Promise.all([
+    supabase.from("tenants").select("id, name, slug, industry, plan, status, timezone, avg_deal_value").eq("id", tenantUser.tenant_id).single(),
     supabase
       .from("ai_config")
-      .select("tenant_id, autonomy_rules, connected_gmail_address, google_calendar_id, crm_webhook_url, escalation_notify_email, whatsapp_phone_number_id, alert_email_enabled, alert_email, alert_whatsapp_enabled, alert_whatsapp_number, reminders_enabled, booking_notice_minutes, booking_buffer_minutes")
+      .select("tenant_id, autonomy_rules, connected_gmail_address, google_calendar_id, crm_webhook_url, escalation_notify_email, whatsapp_phone_number_id, alert_email_enabled, alert_email, alert_whatsapp_enabled, alert_whatsapp_number, reminders_enabled, booking_notice_minutes, booking_buffer_minutes, email_from_name, email_inbound_last_at, email_inbound_last_from, email_forwarding_code, email_forwarding_url, email_forwarding_code_at")
       .eq("tenant_id", tenantUser.tenant_id)
       .single(),
+    // 0039: the agency's own sending domain, when the Elliot administrator has set one up.
+    supabase.from("email_sending_identities").select("from_address").eq("tenant_id", tenantUser.tenant_id).maybeSingle(),
   ]);
 
   if (tenantError || !tenant) {
@@ -36,7 +38,12 @@ export default async function SettingsPage() {
   return (
     <div>
       <PageHeader title="Settings" description="Your business details, what Elliot may do on its own, and connected services." />
-      <SettingsForm tenant={tenant} aiConfig={aiConfig} configError={configError?.message ?? null} />
+      <SettingsForm
+        tenant={tenant}
+        aiConfig={aiConfig}
+        configError={configError?.message ?? null}
+        ownFromAddress={sendingIdentity?.from_address ?? null}
+      />
     </div>
   );
 }
