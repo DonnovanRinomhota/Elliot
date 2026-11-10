@@ -1,0 +1,136 @@
+{
+  "name": "36 - Demo Clean-up",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "d7c15e01-0659-5180-9cba-23c18e55ac16",
+      "name": "Every Night at 03:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Calendar events of demo bookings older than 3 days (0037).\nselect * from demo_cleanup_events();",
+        "options": {}
+      },
+      "id": "2fada296-abe1-5f8d-9554-9f094c8e38ef",
+      "name": "Demo Events To Delete",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        -80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent($json.calendar_id) + '/events/' + encodeURIComponent($json.event_id) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "287c686b-e801-5540-b2f7-29223b1f2fa0",
+      "name": "Delete Demo Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        -80
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      },
+      "notes": "Only the demo agency's calendar: the events come from demo_cleanup_events().",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Visitors' conversations, contacts, leads and bookings older than 3 days.\n-- Listings and settings stay.\nselect demo_cleanup() as result;",
+        "options": {}
+      },
+      "id": "2bc70e80-85ac-594f-bdda-496e07aebf1c",
+      "name": "Delete Old Demo Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        120
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Runs after the calendar events are deleted (second branch)."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Night at 03:30": {
+      "main": [
+        [
+          {
+            "node": "Demo Events To Delete",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete Old Demo Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demo Events To Delete": {
+      "main": [
+        [
+          {
+            "node": "Delete Demo Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

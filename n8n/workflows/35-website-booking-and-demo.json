@@ -1,0 +1,1025 @@
+{
+  "name": "35 - Website Booking & Demo Access",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "consultation-slots",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "72e86ed5-7de7-5144-80d8-f6cf9d6982f2",
+      "name": "Slots Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        -400
+      ],
+      "notes": "getelliot.eu/book asks for free times: ?type=intro|demo. Public; only returns free times.",
+      "webhookId": "ea89e3ee-fd95-59ac-a2a0-c2a4cd72e0f9"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst TYPES = { intro: { minutes: 15, en: '15-minute intro call', pl: '15-minutowa rozmowa wstępna' },\n                demo: { minutes: 30, en: '30-minute live demo', pl: '30-minutowa prezentacja na żywo' } };\nconst clean = (v, max = 200) => String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max);\nconst EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n// GET /webhook/consultation-slots?type=intro|demo[&days=14]\nconst q = ($input.first().json.query || {});\nconst type = TYPES[q.type] ? q.type : 'intro';\nconst days = Math.min(Math.max(parseInt(q.days, 10) || 14, 1), 31);\nconst start = new Date();\nconst end = new Date(start.getTime() + days * 86400000);\nconst ymd = (d) => d.toISOString().slice(0, 10);\nreturn [{ json: { type, minutes: TYPES[type].minutes, date_range_start: ymd(start), date_range_end: ymd(end) } }];\n"
+      },
+      "id": "3d214435-12f5-51c6-bd51-56672da2f09d",
+      "name": "Validate Slots Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -980,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select sales_tenant_id() as tenant_id;",
+        "options": {}
+      },
+      "id": "8f030dbe-e08d-58f1-a487-2ff041d58ff1",
+      "name": "Find Sales Account",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -760,
+        -400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a46ce26f-b1ec-59fb-9aec-4b9f9935ab5a",
+              "leftValue": "={{ !!$json.tenant_id }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4a3df7a9-3010-57dd-bb00-f68b0fc05013",
+      "name": "Sales Account Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -540,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "D94fGN3AjCPhGzCb",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/D94fGN3AjCPhGzCb",
+          "cachedResultName": "11 - Check Availability"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $json.tenant_id }}",
+            "date_range_start": "={{ $('Validate Slots Request').first().json.date_range_start }}",
+            "date_range_end": "={{ $('Validate Slots Request').first().json.date_range_end }}",
+            "duration_minutes": "={{ $('Validate Slots Request').first().json.minutes }}",
+            "min_notice_minutes": "120"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "date_range_start",
+              "displayName": "date_range_start",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "date_range_end",
+              "displayName": "date_range_end",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "duration_minutes",
+              "displayName": "duration_minutes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "min_notice_minutes",
+              "displayName": "min_notice_minutes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "6e33d839-3e4d-5f1e-9dc5-86aed1dce2ed",
+      "name": "Free Times Via 11",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -320,
+        -480
+      ],
+      "notes": "Workflow 11, the same free-time logic Elliot uses in the chat. Select 11 here after importing if it shows an error."
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// What the booking page shows: free slots, grouped by day by the page itself.\nconst r = $input.first().json || {};\nconst req = $('Validate Slots Request').first().json;\nconst slots = (r.available_slots || []).slice(0, 120);\nreturn [{ json: { code: 200, body: { success: true, type: req.type, minutes: req.minutes, timezone: r.timezone || 'Europe/Warsaw', slots } } }];\n"
+      },
+      "id": "d6713959-4f7a-51a1-990e-4fd431e34749",
+      "name": "Slots Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      },
+      "id": "99945c80-8818-53b4-83b3-2c1f7508aa7d",
+      "name": "Respond Slots",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        120,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book-consultation",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "2936607e-b9e6-5e20-aff1-675fd36dcbac",
+      "name": "Book Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        0
+      ],
+      "notes": "getelliot.eu/book sends the chosen time and the form. Public, validated, honeypot against bots.",
+      "webhookId": "36c35b5a-d0a2-5b99-b4b0-5a2c4c776571"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst TYPES = { intro: { minutes: 15, en: '15-minute intro call', pl: '15-minutowa rozmowa wstępna' },\n                demo: { minutes: 30, en: '30-minute live demo', pl: '30-minutowa prezentacja na żywo' } };\nconst clean = (v, max = 200) => String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max);\nconst EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n// POST /webhook/book-consultation from getelliot.eu/book:\n// { type, starts_at, name, email, phone?, agency, agents?, listings?, crm?, message?, lang?, website (honeypot) }\nconst b = $input.first().json.body || {};\nconst fail = (code, error) => [{ json: { ok: false, code, error } }];\nif (clean(b.website)) return fail(400, 'Something went wrong. Please try again.');   // bots fill hidden fields\nconst type = TYPES[b.type] ? b.type : null;\nif (!type) return fail(400, 'Choose an intro call or a live demo.');\nconst start = new Date(b.starts_at);\nif (isNaN(start.getTime())) return fail(400, 'Choose a time.');\nif (start.getTime() < Date.now() + 60 * 60000) return fail(409, 'That time is too soon. Please choose another.');\nconst name = clean(b.name, 120);\nconst email = clean(b.email, 200).toLowerCase();\nconst agency = clean(b.agency, 160);\nif (!name) return fail(400, 'Please enter your name.');\nif (!EMAIL.test(email)) return fail(400, 'Please enter a valid email address.');\nif (!agency) return fail(400, 'Please enter your agency name.');\nconst end = new Date(start.getTime() + TYPES[type].minutes * 60000);\nconst details = { call_type: type, agency, agents: clean(b.agents, 40) || undefined, listings: clean(b.listings, 40) || undefined,\n                  crm: clean(b.crm, 80) || undefined, lang: b.lang === 'pl' ? 'pl' : 'en' };\nreturn [{ json: {\n  ok: true, type, name, email, agency, phone: clean(b.phone, 40), message: clean(b.message, 1000),\n  starts_at: start.toISOString(), ends_at: end.toISOString(), details, details_json: JSON.stringify(details),\n} }];\n"
+      },
+      "id": "32dae963-61d6-5683-aa16-92908fca6fc3",
+      "name": "Validate Booking",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -980,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "15de39d1-cc58-5a2c-a979-c41f211a6591",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b40cfff9-905d-5e58-b3ed-e3aa97420360",
+      "name": "Booking Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Contact + HOT lead in the Elliot sales account (0037).\nselect upsert_sales_lead($1, $2, $3, $4, $5::jsonb, 'consultation_booking') as contact_id,\n       sales_tenant_id() as tenant_id, sales_notify_email() as notify_to;",
+        "options": {
+          "queryReplacement": "={{ [ $json.name, $json.email, $json.phone || '', $json.agency, $json.details_json ] }}"
+        }
+      },
+      "id": "534a907c-de18-5b33-ab19-3dce5a9a9742",
+      "name": "Save Booking Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -540,
+        -80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "94196d79-63a4-53a9-94b2-967dd9c9da25",
+              "leftValue": "={{ !!$json.contact_id }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "080c044e-3f8a-55b1-81d2-0b80114abd35",
+      "name": "Booking Account Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -320,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "VNROj5sGjnwdFidx",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/VNROj5sGjnwdFidx",
+          "cachedResultName": "12 - Book Appointment"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "tenant_id": "={{ $json.tenant_id }}",
+            "contact_id": "={{ $json.contact_id }}",
+            "starts_at": "={{ $('Validate Booking').first().json.starts_at }}",
+            "ends_at": "={{ $('Validate Booking').first().json.ends_at }}",
+            "notes": "={{ $('Validate Booking').first().json.message }}",
+            "listing_id": "",
+            "conversation_id": "",
+            "email": "={{ $('Validate Booking').first().json.email }}",
+            "kind": "consultation",
+            "details": "={{ $('Validate Booking').first().json.details_json }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "tenant_id",
+              "displayName": "tenant_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "contact_id",
+              "displayName": "contact_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "starts_at",
+              "displayName": "starts_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "ends_at",
+              "displayName": "ends_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "listing_id",
+              "displayName": "listing_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "kind",
+              "displayName": "kind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "cdb22fa8-cd32-57b7-81ba-90bf76e0ed03",
+      "name": "Book Via 12",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -100,
+        -160
+      ],
+      "notes": "Workflow 12: Google Meet, calendar event, appointment in the dashboard, confirmation email. Select 12 here after importing if it shows an error."
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// 12's answer -> the booking page. A slot taken a moment ago is 409, so the\n// page reloads the free times.\nconst r = $input.first().json || {};\nconst v = $('Validate Booking').first().json;\nif (r.success) {\n  return [{ json: { code: 200, notify: true, body: {\n    success: true, starts_at: r.starts_at, ends_at: r.ends_at, type: v.type,\n    meet_link: r.meet_link || null, confirmation_sent_to: r.confirmation_sent_to || null,\n  } } }];\n}\nconst taken = /slot_unavailable|no longer available|overlap/i.test(String(r.error || ''));\nreturn [{ json: { code: taken ? 409 : 502, notify: false, body: { success: false,\n  error: taken ? 'Someone just booked that time. Please choose another.' : 'We couldn\\'t book that just now. Please try again or write to hello@getelliot.eu.' } } }];\n"
+      },
+      "id": "a21f0ff1-5cb7-5d7c-b0cd-e18a75307cf1",
+      "name": "Booking Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      },
+      "id": "d10f1c20-34a6-533a-97bd-66d26f8ad00e",
+      "name": "Respond Booking",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        340,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "demo-access",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "42d05761-71e9-5baa-95c7-9e4b0f466cf2",
+      "name": "Demo Access Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        400
+      ],
+      "notes": "getelliot.eu/demo: the visitor's details unlock the live demo chat.",
+      "webhookId": "f4cfcab6-ae29-5ff2-bbd9-11c76aa8cbb9"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst TYPES = { intro: { minutes: 15, en: '15-minute intro call', pl: '15-minutowa rozmowa wstępna' },\n                demo: { minutes: 30, en: '30-minute live demo', pl: '30-minutowa prezentacja na żywo' } };\nconst clean = (v, max = 200) => String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max);\nconst EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n// POST /webhook/demo-access from getelliot.eu/demo: { name, email, phone?, agency, lang?, website (honeypot) }\nconst b = $input.first().json.body || {};\nconst fail = (code, error) => [{ json: { ok: false, code, error } }];\nif (clean(b.website)) return fail(400, 'Something went wrong. Please try again.');\nconst name = clean(b.name, 120);\nconst email = clean(b.email, 200).toLowerCase();\nconst agency = clean(b.agency, 160);\nif (!name) return fail(400, 'Please enter your name.');\nif (!EMAIL.test(email)) return fail(400, 'Please enter a valid email address.');\nif (!agency) return fail(400, 'Please enter your agency name.');\nreturn [{ json: { ok: true, name, email, agency, phone: clean(b.phone, 40), lang: b.lang === 'pl' ? 'pl' : 'en' } }];\n"
+      },
+      "id": "9f6e7c37-8522-586f-897c-844a4edaba6b",
+      "name": "Validate Demo Access",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -980,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "182f0b41-116a-5f4f-a85a-4968be16dda2",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cb7efba0-8ca1-59d9-a44b-d1b7c467cb7d",
+      "name": "Demo Request Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -760,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- A lead for you (Elliot sales account), and the demo agency's slug for the chat.\nselect upsert_sales_lead($1, $2, $3, $4, jsonb_build_object('lang', $5::text), 'live_demo') as contact_id,\n       (select slug from demo_tenant()) as demo_slug, sales_notify_email() as notify_to;",
+        "options": {
+          "queryReplacement": "={{ [ $json.name, $json.email, $json.phone || '', $json.agency, $json.lang ] }}"
+        }
+      },
+      "id": "3f26a4c9-c899-5a3b-bf91-e9740f7d8429",
+      "name": "Save Demo Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -540,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.demo_slug ? { success: true, tenant_slug: $json.demo_slug } : { success: false, error: 'The demo is not available right now.' }) }}",
+        "options": {
+          "responseCode": "={{ $json.demo_slug ? 200 : 503 }}"
+        }
+      },
+      "id": "d2b6c0da-dccc-5e24-b74d-f25e5f13ce39",
+      "name": "Respond Demo Access",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
+        "options": {
+          "responseCode": "={{ $json.code || 400 }}"
+        }
+      },
+      "id": "059660a5-a790-5b7f-98d5-23bdbba795bd",
+      "name": "Respond Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'Booking is not available right now. Please write to hello@getelliot.eu.' }) }}",
+        "options": {
+          "responseCode": "503"
+        }
+      },
+      "id": "ae1df05c-cd83-5f33-8f4b-9df08359e641",
+      "name": "Respond Not Set Up",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'Booking is not available right now.' }) }}",
+        "options": {
+          "responseCode": "503"
+        }
+      },
+      "id": "ffa39fa7-7dbb-5a53-9bc5-b8be5dff37b1",
+      "name": "Respond No Sales Account",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Booking or demo visitor, for the notification email.\nlet kind = 'demo';\ntry { $('Booking Response').first(); kind = 'booking'; } catch (e) { /* demo path */ }\nconst notifyTo = kind === 'booking' ? $('Save Booking Lead').first().json.notify_to : $('Save Demo Lead').first().json.notify_to;\nconst worth = kind === 'booking' ? $('Booking Response').first().json.notify === true : !!$('Save Demo Lead').first().json.demo_slug;\nreturn [{ json: { kind, send: worth && !!notifyTo } }];"
+      },
+      "id": "d691ef44-1529-538e-a07d-965e53dc5f3a",
+      "name": "Which Request?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ba0bf669-6917-5f17-9616-dec18e75be9f",
+              "leftValue": "={{ $json.send === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f5724184-877b-5867-b003-2c9ea7464e67",
+      "name": "Tell Owner?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        780,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Tells you (the platform alert email, Control panel → Health & alerts) about\n// a new booking or demo visitor. Sent after the visitor already has their answer.\nconst kind = $('Which Request?').first().json.kind;\nconst lead = kind === 'booking' ? $('Save Booking Lead').first().json : $('Save Demo Lead').first().json;\nconst v = kind === 'booking' ? $('Validate Booking').first().json : $('Validate Demo Access').first().json;\nconst fmt = (iso) => new Date(iso).toLocaleString('en-GB', { timeZone: 'Europe/Warsaw', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });\nlet subject, lines;\nif (kind === 'booking') {\n  const r = $('Book Via 12').first().json || {};\n  subject = `New ${v.type === 'demo' ? 'live demo' : 'intro call'}: ${v.agency}, ${fmt(v.starts_at)}`;\n  lines = [`${v.name} (${v.email}${v.phone ? ', ' + v.phone : ''}) booked a ${v.type === 'demo' ? '30-minute live demo' : '15-minute intro call'}.`, '',\n    `When: ${fmt(v.starts_at)} (Warsaw)`, r.meet_link ? `Google Meet: ${r.meet_link}` : null,\n    `Agency: ${v.agency}`, v.details.agents ? `Agents: ${v.details.agents}` : null, v.details.listings ? `Listings: ${v.details.listings}` : null,\n    v.details.crm ? `CRM: ${v.details.crm}` : null, v.message ? `Message: ${v.message}` : null, '',\n    'It is in your Google Calendar and in your Elliot dashboard (Appointments, Leads).'];\n} else {\n  subject = `Demo opened: ${v.agency} (${v.name})`;\n  lines = [`${v.name} (${v.email}${v.phone ? ', ' + v.phone : ''}) from ${v.agency} opened the live demo on getelliot.eu.`, '',\n    'They are in your Elliot dashboard under Leads. A good moment to follow up.'];\n}\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst raw = [`To: ${lead.notify_to}`, `Subject: =?UTF-8?B?${b64(subject)}?=`, 'MIME-Version: 1.0',\n  'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'].join('\\r\\n') + '\\r\\n\\r\\n' +\n  b64(lines.filter((l) => l !== null).join('\\n') + '\\n');\nreturn [{ json: { to: lead.notify_to, subject, raw_message: Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '') } }];\n"
+      },
+      "id": "161f0e92-9799-55f8-b851-9307cebab492",
+      "name": "Build Owner Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "e1f2f3ea-06eb-5f09-9100-5f41e6998643",
+      "name": "Send Owner Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1220,
+        40
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UEVuaDdqEf2Zd7CE",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Goes to the email in Control panel → Health & alerts.",
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Slots Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Slots Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Slots Request": {
+      "main": [
+        [
+          {
+            "node": "Find Sales Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Sales Account": {
+      "main": [
+        [
+          {
+            "node": "Sales Account Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Free Times Via 11": {
+      "main": [
+        [
+          {
+            "node": "Slots Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slots Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Booking": {
+      "main": [
+        [
+          {
+            "node": "Booking Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Booking Lead": {
+      "main": [
+        [
+          {
+            "node": "Booking Account Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Via 12": {
+      "main": [
+        [
+          {
+            "node": "Booking Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Booking": {
+      "main": [
+        [
+          {
+            "node": "Which Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demo Access Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Demo Access",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Demo Access": {
+      "main": [
+        [
+          {
+            "node": "Demo Request Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Demo Lead": {
+      "main": [
+        [
+          {
+            "node": "Respond Demo Access",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Demo Access": {
+      "main": [
+        [
+          {
+            "node": "Which Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which Request?": {
+      "main": [
+        [
+          {
+            "node": "Tell Owner?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Owner Email": {
+      "main": [
+        [
+          {
+            "node": "Send Owner Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sales Account Exists?": {
+      "main": [
+        [
+          {
+            "node": "Free Times Via 11",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond No Sales Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Valid?": {
+      "main": [
+        [
+          {
+            "node": "Save Booking Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Account Exists?": {
+      "main": [
+        [
+          {
+            "node": "Book Via 12",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Not Set Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demo Request Valid?": {
+      "main": [
+        [
+          {
+            "node": "Save Demo Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell Owner?": {
+      "main": [
+        [
+          {
+            "node": "Build Owner Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

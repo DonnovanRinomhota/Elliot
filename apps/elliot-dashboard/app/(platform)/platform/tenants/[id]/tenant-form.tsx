@@ -14,6 +14,7 @@ type Tenant = {
   monthly_price: number | string | null;
   contact_email: string | null;
   notes: string | null;
+  assistant_mode?: string | null;
 };
 
 const PLANS = [
@@ -22,6 +23,13 @@ const PLANS = [
   ["pro", "Pro"],
   ["enterprise", "Enterprise"],
   ["complimentary", "Complimentary (no charge)"],
+];
+// 0037: what Elliot is for this account. Agencies are "agency"; the other two
+// are getelliot.eu's own accounts.
+const MODES = [
+  ["agency", "Estate agency (normal)"],
+  ["sales", "Elliot's own website assistant (getelliot.eu)"],
+  ["demo", "Public demo agency (getelliot.eu/demo)"],
 ];
 const STATUSES = [
   ["active", "Active: Elliot answers chats"],
@@ -42,6 +50,7 @@ export default function TenantForm({ tenant }: { tenant: Tenant }) {
     monthly_price: tenant.monthly_price == null ? "" : String(tenant.monthly_price),
     contact_email: tenant.contact_email ?? "",
     notes: tenant.notes ?? "",
+    assistant_mode: tenant.assistant_mode ?? "agency",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +143,21 @@ export default function TenantForm({ tenant }: { tenant: Tenant }) {
             <label className={label} htmlFor="t-price">Monthly price (€, net)</label>
             <input id="t-price" inputMode="decimal" value={form.monthly_price} onChange={set("monthly_price")} className="h-9 w-full px-3" />
           </div>
+        )}
+      </div>
+      <div>
+        <label className={label} htmlFor="t-mode">Account type</label>
+        <select id="t-mode" value={form.assistant_mode} onChange={set("assistant_mode")} className="h-9 w-full px-3">
+          {MODES.map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+        {form.assistant_mode !== "agency" && (
+          <p className="m-0 mt-1 text-[12.5px] text-gray-500">
+            {form.assistant_mode === "sales"
+              ? "Answers questions about Elliot and books intro calls and demos with Google Meet. Only one account should be this."
+              : "Sample agency for the live demo. Visitors' chats and bookings are deleted after 3 days. Only one account should be this."}
+          </p>
         )}
       </div>
       <div>

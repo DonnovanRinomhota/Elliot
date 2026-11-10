@@ -67,7 +67,7 @@ test('01: visitor message goes through the takeover check before Claude', () => 
 
 test('01: search_listings is offered, allowed and routed to Search Listings', () => {
   const expr = nodeOf(wf01, 'Call Claude').parameters.jsonBody.replace(/^=\{\{/, '').replace(/\}\}$/, '');
-  const payload = JSON.parse(new Function('$json', `return ${expr}`)({ system_prompt: 's', claude_messages: [] }));
+  const payload = JSON.parse(new Function('$json', '$', `return ${expr}`)({ system_prompt: 's', claude_messages: [] }, () => ({ first: () => ({ json: { assistant_mode: 'agency' } }) })));
   const tool = payload.tools.find((t) => t.name === 'search_listings');
   assert.ok(tool, 'tool definition missing');
   assert.deepStrictEqual(tool.input_schema.properties.transaction_type.enum, ['sale', 'rent']);

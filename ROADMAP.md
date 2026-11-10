@@ -227,6 +227,17 @@ Production showed no runtime errors over the deploys and tests.
   (`health_alerts.test.js`, `test_0036_health.sql`); pending live import.
   Spec: `docs/workflow-specs/33-health-check.md`.
 
+- 🟡 **getelliot.eu split: sales assistant, call booking, live demo**
+  (0037, workflows 01/11/12/18 changed, 35/36 new, Elliot-web /book and
+  /demo). Accounts now have a mode: agency (unchanged, verified byte-for-byte
+  against the previous prompt and tools), sales (Elliot's own chat, 15/30-min
+  Google Meet calls) and demo (sample agency, DEMO emails, 3-day clean-up).
+  Unit- and DB-tested (`sales_demo.test.js`, `test_0037_sales_demo.sql`),
+  website flows tested in a browser against mocked webhooks; pending live
+  import. Spec: `docs/website-sales-and-demo.md`. Also fixed: workflow 18
+  notified an old hard-coded address; `ai_config.business_hours` had no
+  migration.
+
 ## Business / non-code
 
 Not something to build -- these are decisions, listed here so they don't

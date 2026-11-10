@@ -21,7 +21,7 @@ export default async function AlertsPage() {
   ]);
 
   const checks: HealthCheck[] = (status as any)?.checks ?? [];
-  const headline = healthHeadline((status as any)?.status, checks);
+  const headline = healthHeadline((status as any)?.status, checks, (status as any)?.expected_every_minutes);
   const when = (iso: string | null | undefined) =>
     iso ? formatDate(iso, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Warsaw" }) : "";
 
@@ -29,7 +29,7 @@ export default async function AlertsPage() {
     <div className="grid max-w-3xl gap-6">
       <PageHeader
         title="System health and alerts"
-        description="Elliot checks Claude, Gmail, Calendar, WhatsApp, the database and knowledge search every 15 minutes, and tells you when something breaks."
+        description="Elliot regularly checks Claude, Gmail, Calendar, WhatsApp, the database and knowledge search (workflow 33), and tells you when something breaks."
       />
 
       {(settingsError || statusError) && (
