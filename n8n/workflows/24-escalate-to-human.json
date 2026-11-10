@@ -103,9 +103,10 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "",
+          "value": "gwZAVRJ6G4iph76o",
           "mode": "list",
-          "cachedResultName": "39 - Send Email"
+          "cachedResultName": "39 - Send Email",
+          "cachedResultUrl": "/workflow/gwZAVRJ6G4iph76o"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -164,7 +165,6 @@
         -96
       ],
       "onError": "continueRegularOutput",
-      "notes": "Pick '39 - Send Email' in Workflow after importing.",
       "continueOnFail": true
     },
     {
