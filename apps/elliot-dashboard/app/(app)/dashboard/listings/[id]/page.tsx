@@ -23,6 +23,11 @@ export default async function EditListingPage({ params }: { params: { id: string
             : "Elliot hasn't suggested this listing to anyone yet."
         }
       />
+      {listing.source === "asari" && (
+        <p className="mb-4 max-w-2xl rounded-lg bg-accent-soft px-3 py-2 text-[12.5px] text-accent-dark">
+          From ASARI CRM. Make changes in ASARI: Elliot copies them within the hour, and changes made here are replaced on the next update.
+        </p>
+      )}
       <ListingForm tenantId={tenantId} listing={listing} />
     </div>
   );

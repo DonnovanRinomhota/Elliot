@@ -4,6 +4,8 @@ import { getAdminView, getCurrentTenantId, getMembership } from "@/lib/tenant";
 import { PageHeader } from "../../../_ui/ui";
 import SettingsForm from "./settings-form";
 import SupportAccessCard from "./support-access-card";
+import AsariCard from "./asari-card";
+import type { AsariStatus } from "@/lib/asari";
 
 export default async function SettingsPage() {
   const supabase = createClient();
@@ -30,6 +32,7 @@ export default async function SettingsPage() {
     me,
     adminView,
     { data: permissionRequired },
+    { data: asariStatus },
   ] = await Promise.all([
     supabase.from("tenants").select("id, name, slug, industry, plan, status, timezone, avg_deal_value, assistant_mode").eq("id", tenantUser.tenant_id).single(),
     supabase
@@ -50,6 +53,8 @@ export default async function SettingsPage() {
     getMembership(supabase, user.id),
     getAdminView(supabase),
     supabase.rpc("support_permission_required"),
+    // 0044: ASARI CRM connection, without the token.
+    supabase.rpc("asari_status"),
   ]);
 
   if (tenantError || !tenant) {
@@ -65,6 +70,13 @@ export default async function SettingsPage() {
         configError={configError?.message ?? null}
         ownFromAddress={sendingIdentity?.from_address ?? null}
       />
+      <div className="max-w-2xl">
+        <AsariCard
+          status={(asariStatus as AsariStatus | null) ?? { connected: false }}
+          canChange={me?.role === "admin" || !!adminView}
+          timeZone={tenant.timezone || "Europe/Warsaw"}
+        />
+      </div>
       {(tenant as { assistant_mode?: string }).assistant_mode === "agency" && (
         <div className="max-w-2xl">
           <SupportAccessCard
