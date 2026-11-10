@@ -27,6 +27,9 @@ type AiConfig = {
   alert_email?: string | null;
   alert_whatsapp_enabled?: boolean | null;
   alert_whatsapp_number?: string | null;
+  reminders_enabled?: boolean | null;
+  booking_notice_minutes?: number | null;
+  booking_buffer_minutes?: number | null;
 } | null;
 
 // Matches the actions this codebase actually checks a mode for (main agent's
@@ -97,6 +100,11 @@ export default function SettingsForm({
     whatsapp_phone_number_id: aiConfig?.whatsapp_phone_number_id ?? "",
   });
   const [notifyEmail, setNotifyEmail] = useState(aiConfig?.escalation_notify_email ?? "");
+  const [viewings, setViewings] = useState({
+    reminders_enabled: aiConfig?.reminders_enabled ?? true,
+    booking_notice_minutes: String(aiConfig?.booking_notice_minutes ?? 120),
+    booking_buffer_minutes: String(aiConfig?.booking_buffer_minutes ?? 30),
+  });
   const [alerts, setAlerts] = useState({
     email_enabled: !!aiConfig?.alert_email_enabled,
     email: aiConfig?.alert_email ?? "",
@@ -166,6 +174,22 @@ export default function SettingsForm({
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, notifications: error.message }));
     setSaved("notifications");
+  }
+
+  async function saveViewings() {
+    setSaving("viewings");
+    setErrors((e) => ({ ...e, viewings: "" }));
+    const { error } = await supabase
+      .from("ai_config")
+      .update({
+        reminders_enabled: viewings.reminders_enabled,
+        booking_notice_minutes: Number(viewings.booking_notice_minutes),
+        booking_buffer_minutes: Number(viewings.booking_buffer_minutes),
+      })
+      .eq("tenant_id", tenant.id);
+    setSaving(null);
+    if (error) return setErrors((e) => ({ ...e, viewings: error.message }));
+    setSaved("viewings");
   }
 
   async function saveAlerts() {
@@ -318,13 +342,62 @@ export default function SettingsForm({
         {errors.notifications && <p className="mb-2 text-[12.5px] text-alert">{errors.notifications}</p>}
         <SaveButton saving={saving === "notifications"} saved={saved === "notifications"} onClick={saveNotifications} />
       </Card>
+      <Card title="Viewings" description="When clients can book, and the reminder they get the day before.">
+        <label className="mb-4 flex cursor-pointer items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={viewings.reminders_enabled}
+            onChange={(e) => { setSaved(null); setViewings({ ...viewings, reminders_enabled: e.target.checked }); }}
+          />
+          <span>
+            Remind clients the day before
+            <span className="block text-[12.5px] text-gray-500">
+              At 17:00, on WhatsApp if that&apos;s where they wrote, otherwise by email. They can reply to confirm, move or
+              cancel, and Elliot handles it and tells the agent.
+            </span>
+          </span>
+        </label>
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass} htmlFor="s-notice">Earliest booking</label>
+            <select
+              id="s-notice"
+              className={inputClass}
+              value={viewings.booking_notice_minutes}
+              onChange={(e) => { setSaved(null); setViewings({ ...viewings, booking_notice_minutes: e.target.value }); }}
+            >
+              {[["0", "Any time"], ["60", "1 hour from now"], ["120", "2 hours from now"], ["240", "4 hours from now"], ["720", "12 hours from now"], ["1440", "Next day"]].map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="s-buffer">Gap between viewings</label>
+            <select
+              id="s-buffer"
+              className={inputClass}
+              value={viewings.booking_buffer_minutes}
+              onChange={(e) => { setSaved(null); setViewings({ ...viewings, booking_buffer_minutes: e.target.value }); }}
+            >
+              {[["0", "None"], ["15", "15 minutes"], ["30", "30 minutes"], ["45", "45 minutes"], ["60", "1 hour"]].map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p className="-mt-2 mb-4 text-[12.5px] text-gray-400">The gap is kept free before and after everything in the calendar, for travel between properties.</p>
+        {errors.viewings && <p className="mb-2 text-[12.5px] text-alert">{errors.viewings}</p>}
+        <SaveButton saving={saving === "viewings"} saved={saved === "viewings"} onClick={saveViewings} />
+      </Card>
+
       <Card
         title="Problem alerts"
         description="Get told when something goes wrong with your clients' messages, so nobody is left waiting."
       >
         <p className="m-0 mb-4 text-[13px] text-gray-600">
           For example: a reply to a client couldn&apos;t be sent, Elliot couldn&apos;t answer a message, or a viewing
-          couldn&apos;t be booked. Checked every 15 minutes. Your Elliot administrator is always told as well.
+          couldn&apos;t be booked. Checked regularly. Your Elliot administrator is always told as well.
         </p>
         <div className="mb-4 rounded-lg border border-gray-100 p-3">
           <label className="flex cursor-pointer items-center gap-2 text-sm">

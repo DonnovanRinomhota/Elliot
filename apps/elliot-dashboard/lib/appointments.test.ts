@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   addDays,
+  clientNotes,
   addMonths,
   dayKey,
   groupByDay,
@@ -91,4 +92,17 @@ test("when and where a viewing was booked", () => {
   assert.equal(channelLabel("chat_widget"), "website chat");
   assert.equal(channelLabel("phone_call"), "phone call");
   assert.equal(channelLabel(null), null);
+});
+
+test("what the client did shows on the viewing (0038)", () => {
+  const base = { status: "confirmed", reminder_sent_at: null, reminder_channel: null, client_confirmed_at: null, cancelled_by: null, previous_starts_at: null };
+  assert.deepEqual(clientNotes(base, "Europe/Warsaw"), []);
+  assert.deepEqual(clientNotes({ ...base, client_confirmed_at: "2026-11-11T16:05:00Z", reminder_sent_at: "2026-11-11T16:00:00Z", reminder_channel: "whatsapp" }, "Europe/Warsaw"), [
+    { text: "Client confirmed", tone: "ok" },
+    { text: "Reminder sent by WhatsApp", tone: "muted" },
+  ]);
+  assert.deepEqual(clientNotes({ ...base, previous_starts_at: "2026-11-12T09:00:00Z" }, "Europe/Warsaw"), [{ text: "Client moved it from 12 Nov, 10:00", tone: "muted" }]);
+  assert.deepEqual(clientNotes({ ...base, reminder_sent_at: "x", reminder_channel: "failed:email" }, "Europe/Warsaw"), [{ text: "Reminder failed", tone: "warn" }]);
+  assert.deepEqual(clientNotes({ ...base, reminder_sent_at: "x", reminder_channel: "none" }, "Europe/Warsaw"), []);
+  assert.deepEqual(clientNotes({ ...base, status: "cancelled", cancelled_by: "client", client_confirmed_at: "x" }, "Europe/Warsaw"), [{ text: "Cancelled by the client", tone: "warn" }]);
 });

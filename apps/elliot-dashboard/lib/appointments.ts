@@ -10,6 +10,7 @@ export const DEFAULT_TZ = "Europe/Warsaw";
 /** Columns for an appointment with its client, listing and agent. */
 export const APPOINTMENT_SELECT =
   "id, starts_at, ends_at, timezone, status, notes, created_at, listing_id, agent_id, conversation_id, " +
+  "reminder_sent_at, reminder_channel, client_confirmed_at, cancelled_by, previous_starts_at, " +
   "contact:contacts(id, name, email, phone), " +
   "listing:listings(id, title, reference, address, district, city, photos, image_url, url, price, currency, transaction_type, rooms, area_m2, floor), " +
   "agent:tenant_users(id, full_name, email), " +
@@ -49,7 +50,35 @@ export type Appointment = {
   /** The conversation the viewing was booked in (0033); null for older or manual bookings. */
   conversation_id?: string | null;
   conversation?: { id: string; channel: string } | null;
+  /** 0038: what the client did, and the reminder the day before. */
+  reminder_sent_at?: string | null;
+  reminder_channel?: string | null;
+  client_confirmed_at?: string | null;
+  cancelled_by?: string | null;
+  previous_starts_at?: string | null;
 };
+
+type ClientNoteInput = Pick<
+  Appointment,
+  "status" | "reminder_sent_at" | "reminder_channel" | "client_confirmed_at" | "cancelled_by" | "previous_starts_at"
+>;
+
+/**
+ * What the client did with a viewing, for the card and the detail page:
+ * "Cancelled by the client", "Client confirmed", "Client moved it from …",
+ * "Reminder sent on WhatsApp", "Reminder failed". tone: ok | warn | muted.
+ */
+export function clientNotes(a: ClientNoteInput, tz: string): { text: string; tone: "ok" | "warn" | "muted" }[] {
+  const out: { text: string; tone: "ok" | "warn" | "muted" }[] = [];
+  if (a.status === "cancelled" && a.cancelled_by === "client") out.push({ text: "Cancelled by the client", tone: "warn" });
+  if (a.status === "confirmed" && a.client_confirmed_at) out.push({ text: "Client confirmed", tone: "ok" });
+  if (a.previous_starts_at) out.push({ text: `Client moved it from ${bookedAtLabel(a.previous_starts_at, tz, false)}`, tone: "muted" });
+  if (a.status === "confirmed" && a.reminder_sent_at && a.reminder_channel) {
+    if (a.reminder_channel.startsWith("failed")) out.push({ text: "Reminder failed", tone: "warn" });
+    else if (a.reminder_channel !== "none") out.push({ text: `Reminder sent by ${channelLabel(a.reminder_channel) ?? a.reminder_channel}`, tone: "muted" });
+  }
+  return out;
+}
 
 const CHANNEL_LABEL: Record<string, string> = { whatsapp: "WhatsApp", chat_widget: "website chat", email: "email", sms: "SMS" };
 

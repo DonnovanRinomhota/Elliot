@@ -24,7 +24,7 @@ export default async function SettingsPage() {
     supabase.from("tenants").select("id, name, industry, plan, status, timezone, avg_deal_value").eq("id", tenantUser.tenant_id).single(),
     supabase
       .from("ai_config")
-      .select("tenant_id, autonomy_rules, connected_gmail_address, google_calendar_id, crm_webhook_url, escalation_notify_email, whatsapp_phone_number_id, alert_email_enabled, alert_email, alert_whatsapp_enabled, alert_whatsapp_number")
+      .select("tenant_id, autonomy_rules, connected_gmail_address, google_calendar_id, crm_webhook_url, escalation_notify_email, whatsapp_phone_number_id, alert_email_enabled, alert_email, alert_whatsapp_enabled, alert_whatsapp_number, reminders_enabled, booking_notice_minutes, booking_buffer_minutes")
       .eq("tenant_id", tenantUser.tenant_id)
       .single(),
   ]);

@@ -29,7 +29,11 @@ directly: he sets Elliot up, watches how it performs and adjusts it with them.
 - **Qualifies buyers and renters**: budget, area, size, timing and financing,
   and marks each lead hot, warm or cold so the team knows who to call first.
 - **Books viewings** in free slots of the agency's Google Calendar, picks the
-  agent, and emails the client a confirmation in English and Polish.
+  agent, and emails the client a confirmation in English and Polish. The
+  agency sets the earliest booking time and a gap between viewings for travel.
+- **Reminds clients the day before** (WhatsApp or email). Clients can reply
+  to confirm, move or cancel; Elliot does it, updates the calendar and tells
+  the agent.
 - **Alerts the team immediately** when a client asks for a person, wants
   something only a person can do, or is a hot lead, with a summary and the
   full conversation.
