@@ -27,6 +27,7 @@ test("account state", () => {
 test("AI cost uses per-million-token prices", () => {
   assert.equal(aiCostUsd(1_000_000, 0, { input: 3, output: 15 }), 3);
   assert.equal(aiCostUsd(2_000_000, 100_000, { input: 3, output: 15 }), 7.5);
+  if (!process.env.AI_PRICE_INPUT_PER_MTOK) assert.equal(aiCostUsd(1_000_000, 100_000), 3, "Sonnet 5 defaults: $2 in, $10 out");
 });
 
 test("health issues", () => {
