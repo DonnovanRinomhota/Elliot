@@ -218,6 +218,14 @@ Production showed no runtime errors over the deploys and tests.
 - 🟡 WhatsApp inbound (25) now verifies Meta's `X-Hub-Signature-256`.
   Unit-tested with real HMACs; pending a live Meta number (same as the rest
   of WhatsApp).
+- 🟡 **Health checks and alerts** (workflows 33/34, migration 0036) -- every
+  15 minutes checks Claude, Voyage, Gmail, Calendar, WhatsApp and the
+  database, plus failures logged by other workflows; alerts by email (Resend,
+  Gmail fallback) and WhatsApp template, each switchable, for the platform
+  (Control panel → Health & alerts) and per agency (Settings → Problem
+  alerts). `/webhook/health` for an uptime monitor. Unit- and DB-tested
+  (`health_alerts.test.js`, `test_0036_health.sql`); pending live import.
+  Spec: `docs/workflow-specs/33-health-check.md`.
 
 ## Business / non-code
 

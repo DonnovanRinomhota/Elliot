@@ -1,0 +1,897 @@
+{
+  "name": "33 - Health Check & Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "5009a827-7406-503d-8cde-9b927f5d666d",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Also the database check: if this fails, 'Summarize Checks' reports it.\n-- whatsapp_check_id: which WhatsApp number to test the token against.\nselect s.whatsapp_sender_id,\n       coalesce(nullif(btrim(s.whatsapp_sender_id), ''),\n                (select ac.whatsapp_phone_number_id from ai_config ac\n                 where nullif(btrim(ac.whatsapp_phone_number_id), '') is not null limit 1)) as whatsapp_check_id\nfrom platform_alert_settings s where s.id;",
+        "options": {}
+      },
+      "id": "a3cd33dc-3e34-52b7-9d98-b17ee4461c79",
+      "name": "Load Alert Settings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1180,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 1, messages: [ { role: 'user', content: 'ping' } ] }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "8334e4b4-f177-5ce0-be79-cac06d565e9b",
+      "name": "Check Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -960,
+        0
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "ONpVZEdZ4bnOMO3X",
+          "name": "Anthropic account"
+        }
+      },
+      "notes": "A one-token request with the same key and model as workflow 01. Costs a fraction of a cent per day.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.voyageai.com/v1/embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ input: ['ping'], model: 'voyage-4-lite', input_type: 'query' }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "5d8eba8e-86fe-5385-9e37-c10986073a17",
+      "name": "Check Voyage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -740,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ogmUkMs4GkHYSNLz",
+          "name": "Voyage AI API Key (Authorization header)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "ef39e88d-b892-5a40-b1a9-541172570452",
+      "name": "Check Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -520,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UEVuaDdqEf2Zd7CE",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Reads the mailbox profile only. Fails when the Google login has expired.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "c6adf046-19bc-5486-baa5-cae9d5ebef77",
+      "name": "Check Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -300,
+        0
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "GbHEZpAP7jofidkz",
+          "name": "Elliot Google Calendar"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.facebook.com/v20.0/' + ($('Load Alert Settings').first().json.whatsapp_check_id || 'me') + '?fields=id' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "91aeac5d-8e5a-5117-9ec4-f11074a9cced",
+      "name": "Check WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -80,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_CRED_ID",
+          "name": "WhatsApp Cloud API token"
+        }
+      },
+      "notes": "Skipped in the summary when no WhatsApp number is set up anywhere.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns each check's HTTP answer into { key, label, ok, detail }.\n// Every check node has \"continue on error\" + full response, so a dead\n// service, an expired login or a missing credential shows up here as a\n// failure instead of stopping the workflow.\nfunction get(name) {\n  try { return $(name).first().json; } catch (e) { return null; }\n}\nfunction parse(body) {\n  if (typeof body !== 'string') return body;\n  try { return JSON.parse(body); } catch (e) { return body; }\n}\nfunction message(body) {\n  const b = parse(body);\n  if (!b) return '';\n  if (typeof b === 'string') return b.slice(0, 160);\n  const e = b.error;\n  if (e && typeof e === 'object') return String(e.message || e.status || JSON.stringify(e)).slice(0, 160);\n  return String(e || b.error_description || b.detail || b.message || '').slice(0, 160);\n}\nfunction judge(key, label, nodeName, opts = {}) {\n  const r = get(nodeName);\n  if (!r) return { key, label, ok: false, detail: 'the check did not run' };\n  if (r.error && !r.statusCode) {\n    const m = typeof r.error === 'object' ? (r.error.message || JSON.stringify(r.error)) : String(r.error);\n    return { key, label, ok: false, detail: m.slice(0, 200) };\n  }\n  const status = Number(r.statusCode || 0);\n  if (status >= 200 && status < 300) return { key, label, ok: true, detail: '' };\n  if (opts.okStatuses && opts.okStatuses.includes(status)) return { key, label, ok: true, detail: `busy (HTTP ${status})` };\n  const m = message(r.body);\n  const hint = opts.hints && opts.hints[status] ? ` -- ${opts.hints[status]}` : '';\n  return { key, label, ok: false, detail: `HTTP ${status || 'no response'}${m ? ': ' + m : ''}${hint}` };\n}\n\nconst results = [];\nconst settings = get('Load Alert Settings') || {};\nif (settings.error && !('whatsapp_sender_id' in settings)) {\n  const m = typeof settings.error === 'object' ? settings.error.message : String(settings.error);\n  results.push({ key: 'database', label: 'Database (Supabase)', ok: false, detail: String(m).slice(0, 200) });\n} else {\n  results.push({ key: 'database', label: 'Database (Supabase)', ok: true, detail: '' });\n}\nresults.push(judge('claude', 'Claude (Elliot\\'s replies)', 'Check Claude', {\n  okStatuses: [429, 529],\n  hints: { 401: 'the API key was rejected; put a valid key in n8n\\'s \"Anthropic account\" credential',\n           400: 'often means the Claude credit balance has run out' },\n}));\nresults.push(judge('voyage', 'Voyage AI (knowledge search)', 'Check Voyage', {\n  okStatuses: [429],\n  hints: { 401: 'the Voyage API key was rejected' },\n}));\nresults.push(judge('gmail', 'Gmail (email replies and notifications)', 'Check Gmail', {\n  hints: { 401: 'the Gmail login has expired; reconnect \"Gmail account\" in n8n' },\n}));\nresults.push(judge('calendar', 'Google Calendar (viewings)', 'Check Calendar', {\n  hints: { 401: 'the Calendar login has expired; reconnect \"Elliot Google Calendar\" in n8n' },\n}));\nif (settings.whatsapp_check_id) {\n  results.push(judge('whatsapp', 'WhatsApp (Meta)', 'Check WhatsApp', {\n    hints: { 401: 'the WhatsApp token has expired or was revoked; update \"WhatsApp Cloud API token\" in n8n' },\n  }));\n}\nreturn [{ json: { results, results_json: JSON.stringify(results) } }];\n"
+      },
+      "id": "cbc1a308-96af-521f-9ae0-842354c60c66",
+      "name": "Summarize Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Decides what changed and who to tell (0036). Nothing to send = no rows.\nselect * from health_alert_plan($1::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [ $json.results_json ] }}"
+        }
+      },
+      "id": "5c3afda6-a20a-5a1a-a828-3f058d43fadd",
+      "name": "Plan Alerts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        360,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e5f846bf-228a-5533-9a91-c7f0cf2c1fe8",
+              "leftValue": "={{ $json.channel === 'email' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fd4a0fd8-8f21-5cc0-9988-3ccd97dc03f9",
+      "name": "Is Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        580,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: 'Elliot Alerts <alerts@getelliot.eu>', to: [ $json.recipient ], subject: $json.subject, text: String($json.body || $json.short || '') }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "c7545e2a-09ae-5215-8107-907058c5179d",
+      "name": "Send via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        -120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Resend API key"
+        }
+      },
+      "notes": "Resend sends from alerts@getelliot.eu, so alerts still arrive when Gmail is what broke. Not set up yet = falls back to Gmail.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// One alert per item. Resend answers { id } when it accepted the email.\n// If Resend isn't set up yet or refused it, fall back to Gmail -- unless\n// Gmail is what's broken, in which case WhatsApp is the other route.\nconst r = $json;\nconst a = $('Is Email?').item.json;\nconst status = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nconst ok = status >= 200 && status < 300 && body && body.id;\nlet why = '';\nif (!ok) {\n  if (r.error && !status) why = typeof r.error === 'object' ? (r.error.message || 'request failed') : String(r.error);\n  else why = `HTTP ${status || 'no response'}${body && body.message ? ': ' + body.message : ''}`;\n}\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst raw = [\n  `To: ${a.recipient}`,\n  `Subject: =?UTF-8?B?${b64(a.subject)}?=`,\n  'MIME-Version: 1.0',\n  'Content-Type: text/plain; charset=UTF-8',\n  'Content-Transfer-Encoding: base64',\n].join('\\r\\n') + '\\r\\n\\r\\n' + b64(String(a.body || a.short || '') + '\\n');\nreturn { json: {\n  channel: 'email',\n  recipient: a.recipient,\n  ok: !!ok,\n  detail: ok ? 'via Resend' : `Resend: ${String(why).slice(0, 150)}`,\n  raw_message: Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, ''),\n} };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "cf577c9b-443b-5ce3-af62-bb63806a83b1",
+      "name": "Check Email Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fb139aea-b286-5772-b3fc-9c03857e00f5",
+              "leftValue": "={{ $json.ok !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "60309313-e091-556e-93e5-6b613b1bab15",
+      "name": "Resend Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1240,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ raw: $json.raw_message }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "cec0fe17-4e2b-594b-8a05-61935728853d",
+      "name": "Send via Gmail (fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1460,
+        -200
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UEVuaDdqEf2Zd7CE",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// The Gmail fallback after Resend failed.\nconst r = $json;\nconst prev = $('Check Email Result').item.json;\nconst status = Number(r.statusCode || 0);\nconst ok = status >= 200 && status < 300;\nlet reason = '';\nif (!ok) {\n  let body = r.body;\n  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\n  reason = r.error && !status ? (r.error.message || String(r.error))\n    : `HTTP ${status || 'no response'}${body && body.error && body.error.message ? ': ' + body.error.message : ''}`;\n}\nreturn { json: {\n  channel: 'email',\n  recipient: prev.recipient,\n  ok,\n  detail: ok ? `via Gmail (${prev.detail})` : `${prev.detail}; Gmail: ${String(reason).slice(0, 150)}`,\n} };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "2feeaef7-bb6a-572f-a49e-27572c7ddc6a",
+      "name": "Check Gmail Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v20.0/' + $json.sender_id + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.recipient, type: 'template', template: { name: 'elliot_alert', language: { code: 'en' }, components: [ { type: 'body', parameters: [ { type: 'text', text: String($json.short || $json.subject || 'Elliot alert').replace(/\\s+/g, ' ').trim().slice(0, 900) } ] } ] } }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "0d96825d-c3f2-594c-bbd0-2938f97ccec2",
+      "name": "Send WhatsApp Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        120
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_CRED_ID",
+          "name": "WhatsApp Cloud API token"
+        }
+      },
+      "notes": "Uses the approved 'elliot_alert' template, so it arrives even when you haven't written to Elliot's number in the last 24 hours.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta answers { messages: [{ id }] } when it accepted the template message.\nconst r = $json;\nconst a = $('Is Email?').item.json;\nconst status = Number(r.statusCode || 0);\nlet body = r.body;\nif (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { /* not JSON */ } }\nconst err = body && typeof body === 'object' ? body.error : null;\nconst ok = status >= 200 && status < 300 && !err;\nlet detail = '';\nif (!ok) {\n  detail = err ? `${err.message || 'refused'}${err.code ? ` (code ${err.code})` : ''}`\n    : (r.error && !status ? (r.error.message || String(r.error)) : `HTTP ${status || 'no response'}`);\n  if (err && Number(err.code) === 132001) detail += ' -- create the \"elliot_alert\" template in WhatsApp Manager';\n  if (err && Number(err.code) === 131030) detail += ' -- on the test number, add this phone as an allowed recipient';\n}\nreturn { json: { channel: 'whatsapp', recipient: a.recipient, ok, detail: String(detail).slice(0, 300) } };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "43f6db9f-78cd-597d-ae2d-27b83ffd52c8",
+      "name": "Check WhatsApp Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select record_alert_delivery($1, $2::boolean, $3, $4);",
+        "options": {
+          "queryReplacement": "={{ [ $json.channel, $json.ok ? 'true' : 'false', $json.detail || '', $json.recipient || '' ] }}"
+        }
+      },
+      "id": "37e9d5e7-b1c5-5752-bf1b-1f5d084f19ff",
+      "name": "Record Delivery",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1900,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "notes": "Shown in the Control panel under Alerts, so a WhatsApp or email route that silently fails is visible."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "health-test-alert",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "fe66d5a1-10a2-5676-8c72-2f14104fe345",
+      "name": "Test Alert Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1400,
+        360
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Elliot Internal Webhook Secret"
+        }
+      },
+      "notes": "The Control panel's 'Send test alert' button. Answers straight away; results appear in the Control panel.",
+      "webhookId": "e95fb40b-5af1-5cc7-8d81-5d0e9613d24b"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select * from health_test_alert();",
+        "options": {}
+      },
+      "id": "d1fd4d37-0b86-5d77-ab9e-d962215d3d60",
+      "name": "Load Test Alert",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1180,
+        360
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "health",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c18c99d6-a530-5ff1-b92d-f46bb756ae4d",
+      "name": "Health Status Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1400,
+        620
+      ],
+      "notes": "For an uptime monitor (e.g. UptimeRobot, keyword 'all_ok'). Only says which checks pass -- no customer data.",
+      "webhookId": "cdb8ba0d-6adb-5f17-bd19-f202f36d4e4f"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select health_status() as status;",
+        "options": {}
+      },
+      "id": "4c1e12ec-772f-5ebf-8c84-2175021c4ce4",
+      "name": "Read Health Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1180,
+        620
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.status || { status: 'database_unreachable' }) }}",
+        "options": {
+          "responseCode": "={{ $json.status ? 200 : 503 }}"
+        }
+      },
+      "id": "08c0def3-3329-5d66-b93a-c49c5eb4e132",
+      "name": "Respond Health Status",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -960,
+        620
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Load Alert Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Alert Settings": {
+      "main": [
+        [
+          {
+            "node": "Check Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Claude": {
+      "main": [
+        [
+          {
+            "node": "Check Voyage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Voyage": {
+      "main": [
+        [
+          {
+            "node": "Check Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Gmail": {
+      "main": [
+        [
+          {
+            "node": "Check Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Calendar": {
+      "main": [
+        [
+          {
+            "node": "Check WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Summarize Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Checks": {
+      "main": [
+        [
+          {
+            "node": "Plan Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Alerts": {
+      "main": [
+        [
+          {
+            "node": "Is Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Email?": {
+      "main": [
+        [
+          {
+            "node": "Send via Resend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send WhatsApp Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Resend": {
+      "main": [
+        [
+          {
+            "node": "Check Email Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Result": {
+      "main": [
+        [
+          {
+            "node": "Resend Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resend Failed?": {
+      "main": [
+        [
+          {
+            "node": "Send via Gmail (fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Gmail (fallback)": {
+      "main": [
+        [
+          {
+            "node": "Check Gmail Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Gmail Result": {
+      "main": [
+        [
+          {
+            "node": "Record Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Alert": {
+      "main": [
+        [
+          {
+            "node": "Check WhatsApp Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check WhatsApp Result": {
+      "main": [
+        [
+          {
+            "node": "Record Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Alert Webhook": {
+      "main": [
+        [
+          {
+            "node": "Load Test Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Test Alert": {
+      "main": [
+        [
+          {
+            "node": "Is Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Status Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Health Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Health Status": {
+      "main": [
+        [
+          {
+            "node": "Respond Health Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
