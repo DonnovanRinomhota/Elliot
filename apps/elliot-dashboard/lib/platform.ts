@@ -83,14 +83,16 @@ export function relativeDays(iso: string, now: Date = new Date()): string {
   return d > 0 ? `in ${d} days` : `${-d} days ago`;
 }
 
-// Claude prices per million tokens, in USD. Defaults are Sonnet-class
-// list prices at the time of writing -- CHECK anthropic.com/pricing for the
-// model workflow 01 uses and override with AI_PRICE_INPUT_PER_MTOK /
-// AI_PRICE_OUTPUT_PER_MTOK in Vercel if they differ.
+// Claude prices per million tokens, in USD. Defaults are Claude Sonnet 5's
+// list prices (Nov 2026: $2 in, $10 out), the model workflow 01 uses. Cached
+// tokens are already logged at their real cost by workflow 01 (reads 0.1x,
+// writes 1.25x), so the input price covers them. CHECK anthropic.com/pricing
+// and override with AI_PRICE_INPUT_PER_MTOK / AI_PRICE_OUTPUT_PER_MTOK in
+// Vercel if they change.
 export function aiPrices() {
   return {
-    input: Number(process.env.AI_PRICE_INPUT_PER_MTOK || 3),
-    output: Number(process.env.AI_PRICE_OUTPUT_PER_MTOK || 15),
+    input: Number(process.env.AI_PRICE_INPUT_PER_MTOK || 2),
+    output: Number(process.env.AI_PRICE_OUTPUT_PER_MTOK || 10),
   };
 }
 

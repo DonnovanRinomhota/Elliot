@@ -250,6 +250,13 @@ Production showed no runtime errors over the deploys and tests.
   Known limit: the no-overlap rule (0004) is per agency, so two agents can't
   have viewings at the same time yet -- fix with per-agent calendars.
 
+- 🟡 **Lower running costs** (workflow 01). Prompt caching on tools,
+  instructions and the conversation (re-reads at 0.1x the price), cached
+  tokens logged at their real cost, and plain thank-yous ("thanks", "dziękuję", 👍)
+  answered without calling Claude (never after a question or a reminder).
+  Dashboard AI cost now uses Sonnet 5 prices ($2 / $10 per million). Tested in
+  `token_savings.test.js`; pending live import.
+
 ## Business / non-code
 
 Not something to build -- these are decisions, listed here so they don't
