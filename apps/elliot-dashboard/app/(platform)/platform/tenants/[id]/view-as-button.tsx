@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { btn } from "../../../../_ui/ui";
 
-// Opens this agency's dashboard exactly as they see it (8 hours, or until
-// "Exit" in the banner). Useful for support: no password sharing.
-export default function ViewAsButton({ tenantId, tenantName }: { tenantId: string; tenantName: string }) {
+// Opens this agency's dashboard exactly as they see it (8 hours at most, never
+// past the agency's permission, or until "Exit" in the banner). 0040: only
+// when the agency allows support access; each part opened is shown to them.
+export default function ViewAsButton({ tenantId, tenantName, allowed = true }: { tenantId: string; tenantName: string; allowed?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +30,13 @@ export default function ViewAsButton({ tenantId, tenantName }: { tenantId: strin
   return (
     <div className="flex items-center gap-3">
       {error && <span className="text-[13px] text-alert">{error}</span>}
-      <button type="button" onClick={start} disabled={busy} className={btn.primary} title={`See ${tenantName}'s dashboard as they do`}>
+      <button
+        type="button"
+        onClick={start}
+        disabled={busy || !allowed}
+        className={btn.primary}
+        title={allowed ? `See ${tenantName}'s dashboard as they do` : `${tenantName} hasn't allowed support access`}
+      >
         {busy ? "Opening…" : "Open their dashboard"}
       </button>
     </div>

@@ -11,14 +11,14 @@ export default async function ActivityPage({ searchParams }: { searchParams: { p
   const { data: events, error } = await admin
     .from("audit_log")
     .select("id, tenant_id, actor_id, event_type, details, created_at, tenant:tenants(name)")
-    .or("event_type.like.platform.%,event_type.like.team.%")
+    .or("event_type.like.platform.%,event_type.like.team.%,event_type.like.support.%")
     .order("created_at", { ascending: false })
     .limit(1200);
   const pg = paginate(events ?? [], searchParams.page);
 
   return (
     <div>
-      <PageHeader title="Activity log" description="Who changed what: plans, statuses, payments, dashboard visits and team changes." />
+      <PageHeader title="Activity log" description="Who changed what: plans, statuses, payments, dashboard visits, support access and team changes." />
       {error && <p className="text-[13px] text-alert">Couldn&apos;t load: {error.message}</p>}
       {!events?.length ? (
         <EmptyState title="Nothing recorded yet">Changes you make in the control panel will show up here.</EmptyState>

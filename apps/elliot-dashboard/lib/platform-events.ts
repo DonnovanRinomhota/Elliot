@@ -7,6 +7,10 @@ export function describeEvent(type: string, details: any): string {
       return `Updated ${Object.keys(details?.changes ?? {}).map((k) => humanize(k).toLowerCase()).join(", ") || "account"}`;
     case "platform.view_as_started":
       return "Opened their dashboard (view as)";
+    case "support.access_granted":
+      return `Allowed support access for ${details?.hours === 24 ? "24 hours" : details?.hours === 168 ? "7 days" : details?.hours === 720 ? "30 days" : "a while"}`;
+    case "support.access_revoked":
+      return "Turned support access off";
     case "platform.alerts_updated":
       return `Changed alert settings (email ${details?.email ?? "?"}, WhatsApp ${details?.whatsapp ?? "?"})`;
     case "team.member_invited":

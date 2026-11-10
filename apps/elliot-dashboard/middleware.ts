@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAdminEmail } from "@/lib/admin";
 
 const PUBLIC_AUTH_ROUTES = ["/login", "/forgot-password", "/reset-password"];
 
@@ -28,8 +29,8 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isDashboardRoute =
-    request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/platform");
+  const path = request.nextUrl.pathname;
+  const isDashboardRoute = path.startsWith("/dashboard") || path.startsWith("/platform") || path.startsWith("/two-step");
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
 
   if (isDashboardRoute && !user) {
@@ -42,6 +43,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  // 0040: while a platform admin is inside an agency's dashboard (with the
+  // agency's permission), each part they open is recorded for the agency to
+  // see in Settings. The database decides whether a view is active and keeps
+  // one entry per part per 30 minutes; for everyone else this does nothing.
+  const isPrefetch = request.headers.get("next-router-prefetch") === "1" || request.headers.get("purpose") === "prefetch";
+  if (user && isAdminEmail(user.email) && !isPrefetch && (path === "/" || path.startsWith("/dashboard"))) {
+    await supabase.rpc("log_support_visit", { p_path: path });
+  }
+
   return response;
 }
 
@@ -50,5 +60,5 @@ export async function middleware(request: NextRequest) {
 // silently falls back to matching every route instead of erroring, so this
 // is worth getting right rather than "cleaning up" later).
 export const config = {
-  matcher: ["/dashboard/:path*", "/platform/:path*", "/platform", "/login", "/forgot-password", "/reset-password"],
+  matcher: ["/", "/dashboard/:path*", "/platform/:path*", "/platform", "/two-step", "/login", "/forgot-password", "/reset-password"],
 };

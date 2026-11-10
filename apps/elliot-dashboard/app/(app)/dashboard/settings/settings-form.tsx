@@ -411,7 +411,7 @@ export default function SettingsForm({
             <div className="mt-2 flex flex-col gap-3">
               <div>
                 <strong className="text-gray-700">Gmail or Google Workspace</strong>
-                <ol className="m-0 mt-1 pl-5">
+                <ol className="m-0 mt-1 list-decimal pl-5">
                   <li>Settings (gear) → See all settings → Forwarding and POP/IMAP → Add a forwarding address.</li>
                   <li>Paste the address above → Next → Proceed.</li>
                   <li>Google sends a confirmation code to Elliot. Refresh this page after a minute: the code appears above. Enter it in Gmail and click Verify.</li>
@@ -420,7 +420,7 @@ export default function SettingsForm({
               </div>
               <div>
                 <strong className="text-gray-700">Outlook or Microsoft 365</strong>
-                <ol className="m-0 mt-1 pl-5">
+                <ol className="m-0 mt-1 list-decimal pl-5">
                   <li>Settings → Mail → Forwarding → Enable forwarding.</li>
                   <li>Paste the address above, tick &ldquo;Keep a copy of forwarded messages&rdquo;, Save.</li>
                   <li>On a company Microsoft 365 account, your IT administrator may need to allow forwarding to outside addresses.</li>
