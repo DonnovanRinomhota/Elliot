@@ -25,7 +25,7 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
       admin.rpc("platform_tenant_overview", { p_days: 30 }),
       admin
         .from("tenants")
-        .select("id, name, slug, industry, plan, status, timezone, created_at, trial_ends_at, paid_until, monthly_price, contact_email, notes")
+        .select("id, name, slug, industry, plan, status, timezone, created_at, trial_ends_at, paid_until, monthly_price, contact_email, notes, assistant_mode")
         .eq("id", params.id)
         .maybeSingle(),
       admin

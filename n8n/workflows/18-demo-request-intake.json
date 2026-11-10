@@ -35,7 +35,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "insert into demo_requests (name, company, email, website, industry, employees, automate)\nvalues ($1, $2, $3, $4, $5, $6, $7)\nreturning *;",
+        "query": "-- 0037: also a lead in the Elliot sales account (if it exists), and the\n-- notification goes to the platform alert email (Control panel → Health & alerts).\nwith ins as (\n    insert into demo_requests (name, company, email, website, industry, employees, automate)\n    values ($1, $2, $3, $4, $5, $6, $7)\n    returning *\n)\nselect ins.*,\n       upsert_sales_lead(ins.name, ins.email, null, ins.company,\n           jsonb_build_object('employees', ins.employees, 'industry', ins.industry, 'website', ins.website, 'wants', ins.automate),\n           'contact_form') as sales_contact_id,\n       sales_notify_email() as notify_to\nfrom ins;",
         "options": {
           "queryReplacement": "={{ [$json.name, $json.company, $json.email, $json.website, $json.industry, $json.employees, $json.automate] }}"
         }
@@ -59,7 +59,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Builds the raw RFC 2822 notification email (base64url-encoded) for Gmail's send API.\n// Reuses the same message-building approach as workflow 15's 'Build Gmail Message'.\n// TODO: set NOTIFY_TO to wherever the team wants these to land (an inbox, or a\n// shared alias). Hardcoded here deliberately rather than per-request, since this\n// always goes to the same place regardless of who submitted the form.\nconst d = $json;\nconst NOTIFY_TO = 'team@spiritustec.com';\n\nconst subject = `New demo request: ${d.company}`;\nconst body =\n  `New demo request from the marketing site.\\n\\n` +\n  `Name: ${d.name}\\n` +\n  `Company: ${d.company}\\n` +\n  `Email: ${d.email}\\n` +\n  `Website: ${d.website || '(not provided)'}\\n` +\n  `Industry: ${d.industry}\\n` +\n  `Employees: ${d.employees}\\n` +\n  `Wants to automate: ${d.automate || '(not provided)'}\\n` +\n  `Submitted: ${d.created_at}`;\n\nconst raw =\n  `To: ${NOTIFY_TO}\\r\\n` +\n  `Subject: ${subject}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${body}`;\n\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\nreturn [{ json: { ...d, raw_message: encoded } }];"
+        "jsCode": "// Builds the raw RFC 2822 notification email (base64url-encoded) for Gmail's send API.\n// Reuses the same message-building approach as workflow 15's 'Build Gmail Message'.\n// TODO: set NOTIFY_TO to wherever the team wants these to land (an inbox, or a\n// shared alias). Hardcoded here deliberately rather than per-request, since this\n// always goes to the same place regardless of who submitted the form.\nconst d = $json;\nconst NOTIFY_TO = d.notify_to; // 0037: the platform alert email, not a hard-coded address\n\nconst subject = `New demo request: ${d.company}`;\nconst body =\n  `New demo request from the marketing site.\\n\\n` +\n  `Name: ${d.name}\\n` +\n  `Company: ${d.company}\\n` +\n  `Email: ${d.email}\\n` +\n  `Website: ${d.website || '(not provided)'}\\n` +\n  `Industry: ${d.industry}\\n` +\n  `Employees: ${d.employees}\\n` +\n  `Wants to automate: ${d.automate || '(not provided)'}\\n` +\n  `Submitted: ${d.created_at}`;\n\nconst raw =\n  `To: ${NOTIFY_TO}\\r\\n` +\n  `Subject: ${subject}\\r\\n` +\n  `Content-Type: text/plain; charset=UTF-8\\r\\n\\r\\n` +\n  `${body}`;\n\nconst encoded = Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n\nreturn [{ json: { ...d, raw_message: encoded } }];"
       },
       "id": "8aab99e5-1976-488d-b10f-3fc47342a427",
       "name": "Build Notification Email",
@@ -90,7 +90,8 @@
         0
       ],
       "notes": "TODO: set up an internal (non-tenant) Gmail OAuth2 credential for this -- separate from any tenant's connected inbox used in 15/16. Requires gmail.send scope. If this node fails, the demo request row is already saved (previous node), so a lead is never silently lost even if notification delivery breaks -- worth checking demo_requests directly if you suspect notifications are down.",
-      "continueOnFail": true
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -105,6 +106,39 @@
       "position": [
         1120,
         0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-has-notify-to",
+              "leftValue": "={{ !!$json.notify_to }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5c0f4f6e-0370-4b63-9c1e-180000000001",
+      "name": "Has Notify Address?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        796,
+        160
       ]
     }
   ],
@@ -147,7 +181,7 @@
       "main": [
         [
           {
-            "node": "Send Notification via Gmail",
+            "node": "Has Notify Address?",
             "type": "main",
             "index": 0
           }
@@ -156,6 +190,24 @@
     },
     "Send Notification via Gmail": {
       "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Notify Address?": {
+      "main": [
+        [
+          {
+            "node": "Send Notification via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Respond to Webhook",

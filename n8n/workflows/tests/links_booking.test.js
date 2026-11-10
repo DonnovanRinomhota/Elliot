@@ -158,7 +158,8 @@ test('12: the conversation and the listing\'s own page are looked up and stored'
 
   const out = run(nodeOf(wf12, 'Format Results').parameters.jsCode, {
     json: { id: 'a1', starts_at: 's', ends_at: 'e', status: 'confirmed', listing_id: 'L1' },
-    nodes: { 'Load Tenant + Contact Info': { listing_title: 'Studio', listing_address: 'X 1', listing_url: null } },
+    nodes: { 'Load Tenant + Contact Info': { listing_title: 'Studio', listing_address: 'X 1', listing_url: null },
+             'When Executed by Another Workflow': { kind: '' }, 'HTTP Request': {} },
   })[0].json;
   assert.strictEqual(out.listing_link, `${DASH}/p/L1`);
 });

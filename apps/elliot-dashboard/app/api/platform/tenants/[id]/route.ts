@@ -7,6 +7,7 @@ import { getPlatformAdmin, logPlatformEvent } from "@/lib/platform-auth";
 
 const PLANS = ["trial", "starter", "pro", "enterprise", "complimentary"];
 const STATUSES = ["active", "suspended", "cancelled"];
+const MODES = ["agency", "sales", "demo"];
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const user = await getPlatformAdmin();
@@ -23,6 +24,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!name) return NextResponse.json({ success: false, error: "Agency name is required." }, { status: 400 });
   if (!PLANS.includes(body.plan)) return NextResponse.json({ success: false, error: "Unknown plan." }, { status: 400 });
   if (!STATUSES.includes(body.status)) return NextResponse.json({ success: false, error: "Unknown status." }, { status: 400 });
+  const mode = body.assistant_mode || "agency";
+  if (!MODES.includes(mode)) return NextResponse.json({ success: false, error: "Unknown account type." }, { status: 400 });
 
   const date = (v: string | undefined) => {
     if (!v) return null;
@@ -55,6 +58,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     monthly_price: price,
     contact_email: email || null,
     notes: String(body.notes ?? "").trim() || null,
+    assistant_mode: mode,
   };
 
   const admin = createAdminClient();

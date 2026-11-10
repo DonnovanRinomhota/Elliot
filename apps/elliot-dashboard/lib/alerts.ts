@@ -71,7 +71,11 @@ export type HealthCheck = {
 };
 
 /** The headline for the Control panel's status box. */
-export function healthHeadline(status: string | null | undefined, checks: HealthCheck[]): { tone: "ok" | "bad" | "unknown"; text: string } {
+export function healthHeadline(
+  status: string | null | undefined,
+  checks: HealthCheck[],
+  everyMinutes?: number | null
+): { tone: "ok" | "bad" | "unknown"; text: string } {
   if (!checks.length || status === "unknown") {
     return { tone: "unknown", text: "No checks yet. Import and publish workflow 33; it runs every 15 minutes." };
   }
@@ -80,7 +84,10 @@ export function healthHeadline(status: string | null | undefined, checks: Health
     return { tone: "bad", text: `${failing.length} of ${checks.length} checks failing: ${failing.map((c) => c.label).join(", ")}` };
   }
   if (status === "stale") {
-    return { tone: "bad", text: "The last check is more than 45 minutes old. Is workflow 33 still published in n8n?" };
+    return { tone: "bad", text: "No check has run when one was expected. Is workflow 33 still published in n8n?" };
   }
-  return { tone: "ok", text: `All ${checks.length} checks passing` };
+  const every = everyMinutes && everyMinutes > 0
+    ? everyMinutes < 60 ? ` · checked every ${everyMinutes} minutes` : ` · checked every ${Math.round(everyMinutes / 60)} hour${Math.round(everyMinutes / 60) === 1 ? "" : "s"}`
+    : "";
+  return { tone: "ok", text: `All ${checks.length} checks passing${every}` };
 }

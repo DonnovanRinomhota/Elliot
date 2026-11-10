@@ -46,7 +46,7 @@ const wf12 = load('12-book-appointment.json');
 
 test('01: book_appointment takes an optional listing_id and passes it to 12', () => {
   const body = nodeOf(wf01, 'Call Claude').parameters.jsonBody.replace(/^=\{\{/, '').replace(/\}\}$/, '');
-  const payload = JSON.parse(new Function('$json', `return ${body}`)({ system_prompt: 's', claude_messages: [] }));
+  const payload = JSON.parse(new Function('$json', '$', `return ${body}`)({ system_prompt: 's', claude_messages: [] }, () => ({ first: () => ({ json: { assistant_mode: 'agency' } }) })));
   const tool = payload.tools.find((t) => t.name === 'book_appointment');
   assert.ok(tool.input_schema.properties.listing_id, 'listing_id missing');
   assert.ok(!tool.input_schema.required.includes('listing_id'), 'listing_id must stay optional');

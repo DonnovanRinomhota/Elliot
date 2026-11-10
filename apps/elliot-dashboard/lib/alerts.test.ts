@@ -47,4 +47,6 @@ test("status headline", () => {
     text: "1 of 2 checks failing: Claude",
   });
   assert.equal(healthHeadline("stale", [ok]).tone, "bad");
+  assert.equal(healthHeadline("all_ok", [ok], 180).text, "All 1 checks passing · checked every 3 hours");
+  assert.equal(healthHeadline("all_ok", [ok], 15).text, "All 1 checks passing · checked every 15 minutes");
 });
