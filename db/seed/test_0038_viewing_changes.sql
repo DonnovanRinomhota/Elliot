@@ -39,7 +39,7 @@ do $$
 declare n int; r record; j jsonb; ok boolean;
 begin
   -- 1. Elliot sees the ids of the client's viewings.
-  j := identify_chat_visitor('99999999-0000-0000-0000-000000000381', '99999999-2222-0000-0000-000000000381', null, null, null);
+  j := identify_chat_visitor('99999999-0000-0000-0000-000000000381', '99999999-2222-0000-0000-000000000381', null, null, null, true); -- 0047: verified channel
   if jsonb_array_length(j->'upcoming_viewings') <> 2 or j->'upcoming_viewings'->0->>'appointment_id' <> '99999999-3333-0000-0000-000000000381'
      or (j->'upcoming_viewings'->0->>'client_confirmed')::boolean then
     raise exception '1: %', j; end if;

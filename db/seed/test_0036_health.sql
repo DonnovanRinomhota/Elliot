@@ -117,7 +117,8 @@ begin
   if n <> 0 then raise exception '9: summary sent twice'; end if;
 
   -- 10. Status JSON for the /health webhook.
-  update health_check_state set checked_at = now() - interval '2 hours';
+  -- Since 0037 "stale" is judged against the usual gap between checks (here 15 minutes).
+  update health_check_state set checked_at = now() - interval '2 hours', prev_checked_at = now() - interval '2 hours 15 minutes';
   if health_status()->>'status' <> 'stale' then raise exception '10: % (checks were in the past, expected stale)', health_status()->>'status'; end if;
   update health_check_state set checked_at = now();
   if health_status()->>'status' <> 'all_ok' then raise exception '10: %', health_status(); end if;
