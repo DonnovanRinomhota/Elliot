@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import PasswordInput from "../_ui/password-input";
 import { ElliotLogo } from "@/app/_ui/elliot-logo";
+import { selfSignupEnabled } from "@/lib/self-signup";
 
 type Mode = "sign-in" | "create-business";
 
@@ -114,9 +115,13 @@ export default function LoginPage() {
     );
   }
 
+  // Agencies are set up by Elliot; the "Create a business" tab only shows
+  // when self sign-up is switched on (NEXT_PUBLIC_SELF_SIGNUP_ENABLED).
+  const canSignUp = selfSignupEnabled();
+
   return (
     <AuthShell>
-      <div role="tablist" aria-label="Sign in or create a business" className="mb-6 grid grid-cols-2 gap-1 rounded-md bg-gray-100 p-1">
+      <div role="tablist" aria-label="Sign in or create a business" className={canSignUp ? "mb-6 grid grid-cols-2 gap-1 rounded-md bg-gray-100 p-1" : "hidden"}>
         <TabButton active={mode === "sign-in"} onClick={() => { setMode("sign-in"); setError(null); }}>
           Sign in
         </TabButton>
@@ -125,7 +130,7 @@ export default function LoginPage() {
         </TabButton>
       </div>
 
-      {mode === "sign-in" ? (
+      {mode === "sign-in" || !canSignUp ? (
         <form onSubmit={handleSignIn}>
           <Field label="Email">
             <input

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { checkAlertChannels, formatWhatsapp } from "@/lib/alerts";
@@ -45,10 +45,18 @@ type AiConfig = {
 // tool routing, the follow-up sweep). Not every possible tool -- only the
 // ones something downstream really reads autonomy_rules for.
 const AUTONOMY_ACTIONS: { key: string; label: string; description: string }[] = [
-  { key: "send_email", label: "Send email replies", description: "Even when automatic, only confident answers to common questions are sent without review." },
-  { key: "book_appointment", label: "Book appointments", description: "Confirming a viewing time the client has already agreed to." },
+  { key: "book_appointment", label: "Book viewings and valuation visits", description: "Automatic: Elliot books a free time into the calendar. Needs approval: Elliot takes the request and hands it to your team to confirm." },
   { key: "send_follow_up", label: "Send follow-up sequences", description: "Each scheduled email or WhatsApp message in an active follow-up sequence." },
 ];
+
+// What Elliot does while an agency has never saved this card: it books
+// viewings itself, and holds follow-ups for approval.
+const UNSET_MODE: Record<string, string> = { book_appointment: "autonomous", send_follow_up: "approval_required" };
+
+// 0047: only an agency admin may change settings (the database refuses
+// everyone else). Others see the page read-only.
+const CanEdit = createContext(true);
+const ADMIN_ONLY = "Only an admin of your agency can change settings. Nothing was saved.";
 
 const PLAN_LABELS: Record<string, string> = {
   trial: "Trial",
@@ -58,6 +66,8 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolean; onClick: () => void }) {
+  const canEdit = useContext(CanEdit);
+  if (!canEdit) return null;
   return (
     <button
       onClick={onClick}
@@ -70,13 +80,14 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
 }
 
 function Card({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  const canEdit = useContext(CanEdit);
   return (
     <section className="mb-6 card">
       <header className="border-b border-gray-100 px-5 py-4">
         <h2 className="m-0 text-[15px] font-semibold text-ink">{title}</h2>
         <p className="m-0 mt-0.5 text-[13px] text-gray-500">{description}</p>
       </header>
-      <div className="p-5">{children}</div>
+      <fieldset disabled={!canEdit} className="m-0 min-w-0 border-0 p-5">{children}</fieldset>
     </section>
   );
 }
@@ -86,11 +97,13 @@ export default function SettingsForm({
   aiConfig,
   configError,
   ownFromAddress = null,
+  canEdit = true,
 }: {
   tenant: Tenant;
   aiConfig: AiConfig;
   configError: string | null;
   ownFromAddress?: string | null;
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -102,7 +115,7 @@ export default function SettingsForm({
     avg_deal_value: tenant.avg_deal_value != null ? String(tenant.avg_deal_value) : "",
   });
   const [autonomy, setAutonomy] = useState<Record<string, string>>(
-    Object.fromEntries(AUTONOMY_ACTIONS.map((a) => [a.key, aiConfig?.autonomy_rules?.[a.key]?.mode ?? "approval_required"]))
+    Object.fromEntries(AUTONOMY_ACTIONS.map((a) => [a.key, aiConfig?.autonomy_rules?.[a.key]?.mode ?? UNSET_MODE[a.key] ?? "approval_required"]))
   );
   const [email, setEmail] = useState({
     agency_email: aiConfig?.connected_gmail_address ?? "",
@@ -145,12 +158,14 @@ export default function SettingsForm({
       avgDealValue = parsed;
     }
 
-    const { error } = await supabase
+    const { data: changed, error } = await supabase
       .from("tenants")
       .update({ name: profile.name, industry: profile.industry || null, timezone: profile.timezone, avg_deal_value: avgDealValue })
-      .eq("id", tenant.id);
+      .eq("id", tenant.id)
+      .select("id");
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, profile: error.message }));
+    if (!changed?.length) return setErrors((e) => ({ ...e, profile: ADMIN_ONLY }));
     setSaved("profile");
     router.refresh();
   }
@@ -159,25 +174,27 @@ export default function SettingsForm({
     setSaving("autonomy");
     setErrors((e) => ({ ...e, autonomy: "" }));
     const newRules = Object.fromEntries(AUTONOMY_ACTIONS.map((a) => [a.key, { mode: autonomy[a.key] }]));
-    const { error } = await supabase.from("ai_config").update({ autonomy_rules: newRules }).eq("tenant_id", tenant.id);
+    const { data: changed, error } = await supabase.from("ai_config").update({ autonomy_rules: newRules }).eq("tenant_id", tenant.id).select("tenant_id");
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, autonomy: error.message }));
+    if (!changed?.length) return setErrors((e) => ({ ...e, autonomy: ADMIN_ONLY }));
     setSaved("autonomy");
   }
 
   async function saveIntegrations() {
     setSaving("integrations");
     setErrors((e) => ({ ...e, integrations: "" }));
-    const { error } = await supabase
+    const { data: changed, error } = await supabase
       .from("ai_config")
       .update({
         google_calendar_id: integrations.google_calendar_id || "primary",
         crm_webhook_url: integrations.crm_webhook_url || null,
         whatsapp_phone_number_id: integrations.whatsapp_phone_number_id || null,
       })
-      .eq("tenant_id", tenant.id);
+      .eq("tenant_id", tenant.id).select("tenant_id");
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, integrations: error.message }));
+    if (!changed?.length) return setErrors((e) => ({ ...e, integrations: ADMIN_ONLY }));
     setSaved("integrations");
   }
 
@@ -188,12 +205,13 @@ export default function SettingsForm({
       return setErrors((e) => ({ ...e, email: "That doesn't look like an email address." }));
     }
     setSaving("email");
-    const { error } = await supabase
+    const { data: changed, error } = await supabase
       .from("ai_config")
       .update({ connected_gmail_address: agencyEmail || null, email_from_name: email.from_name.trim() || null })
-      .eq("tenant_id", tenant.id);
+      .eq("tenant_id", tenant.id).select("tenant_id");
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, email: error.message }));
+    if (!changed?.length) return setErrors((e) => ({ ...e, email: ADMIN_ONLY }));
     setEmail({ agency_email: agencyEmail, from_name: email.from_name.trim() });
     setSaved("email");
   }
@@ -211,25 +229,27 @@ export default function SettingsForm({
   async function saveNotifications() {
     setSaving("notifications");
     setErrors((e) => ({ ...e, notifications: "" }));
-    const { error } = await supabase.from("ai_config").update({ escalation_notify_email: notifyEmail || null }).eq("tenant_id", tenant.id);
+    const { data: changed, error } = await supabase.from("ai_config").update({ escalation_notify_email: notifyEmail || null }).eq("tenant_id", tenant.id).select("tenant_id");
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, notifications: error.message }));
+    if (!changed?.length) return setErrors((e) => ({ ...e, notifications: ADMIN_ONLY }));
     setSaved("notifications");
   }
 
   async function saveViewings() {
     setSaving("viewings");
     setErrors((e) => ({ ...e, viewings: "" }));
-    const { error } = await supabase
+    const { data: changed, error } = await supabase
       .from("ai_config")
       .update({
         reminders_enabled: viewings.reminders_enabled,
         booking_notice_minutes: Number(viewings.booking_notice_minutes),
         booking_buffer_minutes: Number(viewings.booking_buffer_minutes),
       })
-      .eq("tenant_id", tenant.id);
+      .eq("tenant_id", tenant.id).select("tenant_id");
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, viewings: error.message }));
+    if (!changed?.length) return setErrors((e) => ({ ...e, viewings: ADMIN_ONLY }));
     setSaved("viewings");
   }
 
@@ -239,7 +259,7 @@ export default function SettingsForm({
     if (!checked.ok) return setErrors((e) => ({ ...e, alerts: checked.error }));
     setSaving("alerts");
     const v = checked.value;
-    const { error } = await supabase
+    const { data: changed, error } = await supabase
       .from("ai_config")
       .update({
         alert_email_enabled: v.email_enabled,
@@ -247,9 +267,10 @@ export default function SettingsForm({
         alert_whatsapp_enabled: v.whatsapp_enabled,
         alert_whatsapp_number: v.whatsapp,
       })
-      .eq("tenant_id", tenant.id);
+      .eq("tenant_id", tenant.id).select("tenant_id");
     setSaving(null);
     if (error) return setErrors((e) => ({ ...e, alerts: error.message }));
+    if (!changed?.length) return setErrors((e) => ({ ...e, alerts: ADMIN_ONLY }));
     setAlerts((a) => ({ ...a, whatsapp: formatWhatsapp(v.whatsapp) }));
     setSaved("alerts");
   }
@@ -258,7 +279,13 @@ export default function SettingsForm({
   const labelClass = "mb-1 block text-[12.5px] font-medium text-gray-700";
 
   return (
+    <CanEdit.Provider value={canEdit}>
     <div className="max-w-2xl">
+      {!canEdit && (
+        <p className="mb-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+          You can see these settings, but only an admin of your agency can change them.
+        </p>
+      )}
       <Card title="Business profile" description="Used in Elliot's replies and in your reports.">
         <div className="mb-3 grid grid-cols-2 gap-3">
           <div>
@@ -587,5 +614,6 @@ export default function SettingsForm({
         <SaveButton saving={saving === "alerts"} saved={saved === "alerts"} onClick={saveAlerts} />
       </Card>
     </div>
+    </CanEdit.Provider>
   );
 }

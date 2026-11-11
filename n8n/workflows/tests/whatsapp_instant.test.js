@@ -153,7 +153,7 @@ test('25: Elliot is asked at its own chat webhook, as a WhatsApp conversation', 
     nodes,
     execution: { resumeUrl: 'https://simon.app.n8n.cloud/webhook-waiting/123' },
   })[0].json;
-  assert.strictEqual(out.chat_url, 'https://simon.app.n8n.cloud/webhook/chat');
+  assert.strictEqual(out.chat_url, 'https://simon.app.n8n.cloud/webhook/chat-internal');
   assert.deepStrictEqual(out.request, {
     tenant_slug: 'simon',
     message: 'Hi',
@@ -165,7 +165,7 @@ test('25: Elliot is asked at its own chat webhook, as a WhatsApp conversation', 
   const pasted = run(nodeOf(wf25, 'Build Elliot Request').parameters.jsCode, {
     json: { id: 'conv' }, nodes, vars: { ELLIOT_CHAT_WEBHOOK_URL: 'https://x.example/webhook/chat' }, execution: { resumeUrl: 'https://simon.app.n8n.cloud/webhook-waiting/1' },
   })[0].json;
-  assert.strictEqual(pasted.chat_url, 'https://x.example/webhook/chat');
+  assert.strictEqual(pasted.chat_url, 'https://x.example/webhook/chat-internal');
   assert.throws(() => run(nodeOf(wf25, 'Build Elliot Request').parameters.jsCode, { json: { id: 'conv' }, nodes }), /ELLIOT_CHAT_WEBHOOK_URL/);
   // No name yet: none sent (Elliot asks for it in the chat), phone from WhatsApp.
   const noName = run(nodeOf(wf25, 'Build Elliot Request').parameters.jsCode, {
@@ -269,9 +269,9 @@ test('25: the Meta signature check and verify handshake are unchanged', () => {
 });
 
 test('01: a WhatsApp chat needs no form, and Elliot is told it is on WhatsApp', () => {
-  const v = run(nodeOf(wf01, 'Validate Input').parameters.jsCode, { json: { body: { tenant_slug: 's', message: 'Hi', channel: 'whatsapp' } } })[0].json;
+  const v = run(nodeOf(wf01, 'Validate Input').parameters.jsCode, { json: { internal: true, body: { tenant_slug: 's', message: 'Hi', channel: 'whatsapp' } } })[0].json;
   assert.strictEqual(v.channel, 'whatsapp');
-  const w = run(nodeOf(wf01, 'Validate Input').parameters.jsCode, { json: { body: { tenant_slug: 's', message: 'Hi', channel: 'sms' } } })[0].json;
+  const w = run(nodeOf(wf01, 'Validate Input').parameters.jsCode, { json: { internal: true, body: { tenant_slug: 's', message: 'Hi', channel: 'sms' } } })[0].json;
   assert.strictEqual(w.channel, 'chat_widget');
 
   const c = cond(wf01, 'Visitor Identified?');

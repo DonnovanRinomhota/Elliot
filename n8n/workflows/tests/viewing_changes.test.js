@@ -158,7 +158,7 @@ test('37: input is checked; a client without an identity can\'t change anything'
 });
 
 test('37: only the client\'s own, upcoming, confirmed booking; new time must respect notice', () => {
-  assert.match(nodeOf(wf37, 'Load Booking').parameters.query, /client_appointment\(\$1::uuid, \$2::uuid, \$3::uuid\)/);
+  assert.match(nodeOf(wf37, 'Load Booking').parameters.query, /client_appointment\(\$1::uuid, \$2::uuid, \$3::uuid, nullif\(\$4, ''\)::uuid\)/);
   const v = validate(good);
   assert.strictEqual(check(v, {}).error, 'no booking with that id for this client');
   assert.strictEqual(check(v, { ...info, status: 'cancelled' }).error, 'that booking is already cancelled');

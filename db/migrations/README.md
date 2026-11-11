@@ -62,6 +62,7 @@ set supabase_url = …`); the feature doc for each migration lists its set-up.
 | 0044 | ASARI CRM listing sync |
 | 0045 | Follow-ups by WhatsApp |
 | 0046 | Email attachments (private Storage bucket) |
+| 0047 | Security: agency isolation, roles, public key locked down ([security](../../docs/security.md)) |
 
 ## Tests
 
@@ -71,3 +72,19 @@ wraps itself in a transaction, rolls back, and ends with "00NN checks
 passed". Some need Supabase's `storage` and `auth` schemas (present in every
 Supabase project; the tests create small stand-ins if missing).
 `db/seed/dev_seed.sql` adds example agencies for local development.
+
+**After every new migration run `test_0047_tenant_isolation.sql`.** It fails
+if a table has no RLS, if the public key (`anon`) gains access to anything,
+or if a signed-in user can run a function that takes an agency ID.
+
+## Rules for new migrations
+
+- New table with agency data: `tenant_id`, `enable row level security`, a
+  policy on `current_tenant_id()`. Nothing for `anon`.
+- New function for n8n (takes `p_tenant_id`): `revoke all on function … from
+  public, anon, authenticated;` right after it.
+- New function for the dashboard: work the agency out with
+  `current_tenant_id()`, never take it as a parameter; `grant execute … to
+  authenticated`.
+- A table that points at another agency table: add it to the
+  `enforce_same_tenant` list in 0047 §4 (in a new migration).

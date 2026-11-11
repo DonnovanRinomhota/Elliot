@@ -4,11 +4,12 @@ The exported workflows live in `n8n/workflows/`; their Code-node logic is
 tested in `n8n/workflows/tests/`. A change only goes live once the workflow
 is re-imported into n8n (open it → ⋯ → Import from File, so its ID stays) and
 saved. Internal webhooks need the "Elliot Internal Webhook Secret" header
-(see [`internal-webhook-auth.md`](internal-webhook-auth.md)).
+(see [`internal-webhook-auth.md`](internal-webhook-auth.md) and
+[`../security.md`](../security.md)).
 
 | # | Workflow | What it does | Docs |
 |---|---|---|---|
-| 01 | Main AI Agent | Elliot itself: the chat webhook every channel calls; tools, approval rules, logging, prompt caching | [01](01-main-ai-agent.md), [system prompt](main-agent-system-prompt.md) |
+| 01 | Main AI Agent | Elliot itself: `/chat` for the website, `/chat-internal` (secret) for email and WhatsApp; tools, approval rules, logging, prompt caching | [01](01-main-ai-agent.md), [system prompt](main-agent-system-prompt.md) |
 | 08 | Knowledge Ingestion | Text, PDF and website pages into the knowledge base | [08](08-knowledge-ingestion.md) |
 | 09 | Knowledge Retrieval | `search_company_knowledge` tool | [09](09-knowledge-retrieval.md) |
 | 10 | Lead Capture | `capture_lead` tool: contact, lead, score, assignment | [10](10-lead-capture.md) |

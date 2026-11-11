@@ -97,8 +97,14 @@ export default function TeamManager({
 
   async function setDigest(enabled: boolean) {
     setError(null);
-    const { error: e } = await supabase.from("ai_config").update({ daily_digest_enabled: enabled }).eq("tenant_id", tenantId);
+    const { data: changed, error: e } = await supabase
+      .from("ai_config")
+      .update({ daily_digest_enabled: enabled })
+      .eq("tenant_id", tenantId)
+      .select("tenant_id");
     if (e) return setError(e.message);
+    // 0047: the database lets only an agency admin change settings.
+    if (!changed?.length) return setError("Only an admin of your agency can change this.");
     router.refresh();
   }
 
@@ -254,7 +260,7 @@ export default function TeamManager({
                 viewings, today&apos;s viewings, hot leads waiting for a call, and anything that needs them.
               </p>
               <label className="inline-flex items-center gap-2 text-ink">
-                <input type="checkbox" checked={digestEnabled} onChange={(e) => setDigest(e.target.checked)} />
+                <input type="checkbox" checked={digestEnabled} disabled={!canManage} onChange={(e) => setDigest(e.target.checked)} />
                 Send daily summaries for this agency
               </label>
             </div>

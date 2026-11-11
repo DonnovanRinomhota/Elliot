@@ -19,7 +19,9 @@ export async function getPlatformAdminStatus(): Promise<PlatformAdminStatus | nu
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user || !isAdminEmail(user.email)) return null;
+  // The address must be confirmed: otherwise someone could register an
+  // unclaimed ADMIN_EMAILS address and set up their own authenticator app.
+  if (!user || !isAdminEmail(user.email) || !user.email_confirmed_at) return null;
   let data: { currentLevel: string | null; nextLevel: string | null } | null = null;
   try {
     ({ data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel());

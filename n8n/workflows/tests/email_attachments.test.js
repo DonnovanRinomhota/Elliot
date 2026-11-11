@@ -163,7 +163,9 @@ test('16 / 40: attachments go to Elliot; an email with only files is answered', 
   assert.deepStrictEqual([rs.skip, rs.message], [false, '(No text: the client sent attachments only.)']);
 });
 
-const validate = (body) => run(nodeOf(w01, 'Validate Input').parameters.jsCode, [{ body }])[0].json;
+// Elliot's own workflows arrive through /chat-internal ("internal"); the public
+// /chat webhook does not, and may not claim a channel or attachments (0047).
+const validate = (body, internal = true) => run(nodeOf(w01, 'Validate Input').parameters.jsCode, [{ body, ...(internal ? { internal: true } : {}) }])[0].json;
 const SIGNED = `${BASE}/storage/v1/object/sign/email-attachments/t/c/1-a.pdf?token=x`;
 
 test('01: only links to the private bucket, only on email', () => {
@@ -180,6 +182,8 @@ test('01: only links to the private bucket, only on email', () => {
   const web = validate({ tenant_slug: 's', message: 'Hi', attachments: [{ filename: 'a.pdf', content_type: 'application/pdf', url: SIGNED }] });
   assert.deepStrictEqual([web.channel, web.attachments, web.message], ['chat_widget', [], 'Hi'], 'website chat ignores attachments');
   assert.deepStrictEqual(validate({ tenant_slug: 's', message: 'Hi', channel: 'whatsapp' }).channel, 'whatsapp');
+  const spoof = validate({ tenant_slug: 's', message: 'Hi', channel: 'email', attachments: [{ filename: 'a.pdf', content_type: 'application/pdf', url: SIGNED }] }, false);
+  assert.deepStrictEqual([spoof.channel, spoof.attachments, spoof.verified], ['chat_widget', [], false], 'a public caller cannot pose as email');
 });
 
 test('01: Claude gets the PDFs and photos, plus what to do with the rest', () => {

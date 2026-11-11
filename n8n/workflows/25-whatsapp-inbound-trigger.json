@@ -432,7 +432,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Hands the message to Elliot (workflow 01, the same agent as the website\n// chat), so WhatsApp gets the same answers: listings, viewings booked with\n// the property, lead capture, hand-over to the team.\n//\n// Elliot's address: by default worked out from this n8n's own address\n// (https://<you>.app.n8n.cloud/webhook/chat). To use another one, paste it\n// below instead of the placeholder, or set an ELLIOT_CHAT_WEBHOOK_URL variable.\nconst ELLIOT_CHAT_WEBHOOK_URL = 'PASTE_ELLIOT_CHAT_WEBHOOK_URL_HERE';\n\nfunction setting(name, pasted) {\n  try { if ($vars && $vars[name]) return String($vars[name]); } catch (e) {}\n  try { if ($env && $env[name]) return String($env[name]); } catch (e) {}\n  return String(pasted || '').startsWith('PASTE_') ? '' : String(pasted || '');\n}\n\nconst f = $('Extract WhatsApp Fields').first().json;\nconst tenant = $('Lookup Tenant by Phone Number Id').first().json;\nconst contact = $('Upsert Contact').first().json || {};\nconst conversationId = $input.first().json.id;\n\nlet url = setting('ELLIOT_CHAT_WEBHOOK_URL', ELLIOT_CHAT_WEBHOOK_URL);\nif (!url) {\n  let resume = '';\n  try { resume = String($execution.resumeUrl || ''); } catch (e) {}\n  const at = resume.indexOf('/webhook-waiting/');\n  if (at > 0) url = resume.slice(0, at) + '/webhook/chat';\n}\nif (!url) {\n  throw new Error(\"Can't work out Elliot's address: paste the chat webhook URL (workflow 01's Production URL) into ELLIOT_CHAT_WEBHOOK_URL in this node.\");\n}\n\nreturn [{ json: {\n  chat_url: url,\n  request: {\n    tenant_slug: tenant.tenant_slug,\n    message: f.body,\n    conversation_id: conversationId,\n    channel: 'whatsapp',\n    contact: { name: contact.name || null, phone: contact.phone || ('+' + f.from_wa_id) }\n  }\n} }];"
+        "jsCode": "// Hands the message to Elliot (workflow 01, the same agent as the website\n// chat), so WhatsApp gets the same answers: listings, viewings booked with\n// the property, lead capture, hand-over to the team.\n//\n// Elliot's address: by default worked out from this n8n's own address\n// (https://<you>.app.n8n.cloud/webhook/chat). To use another one, paste it\n// below instead of the placeholder, or set an ELLIOT_CHAT_WEBHOOK_URL variable.\nconst ELLIOT_CHAT_WEBHOOK_URL = 'PASTE_ELLIOT_CHAT_WEBHOOK_URL_HERE';\n\nfunction setting(name, pasted) {\n  try { if ($vars && $vars[name]) return String($vars[name]); } catch (e) {}\n  try { if ($env && $env[name]) return String($env[name]); } catch (e) {}\n  return String(pasted || '').startsWith('PASTE_') ? '' : String(pasted || '');\n}\n\nconst f = $('Extract WhatsApp Fields').first().json;\nconst tenant = $('Lookup Tenant by Phone Number Id').first().json;\nconst contact = $('Upsert Contact').first().json || {};\nconst conversationId = $input.first().json.id;\n\nlet url = setting('ELLIOT_CHAT_WEBHOOK_URL', ELLIOT_CHAT_WEBHOOK_URL);\nif (!url) {\n  let resume = '';\n  try { resume = String($execution.resumeUrl || ''); } catch (e) {}\n  const at = resume.indexOf('/webhook-waiting/');\n  if (at > 0) url = resume.slice(0, at) + '/webhook/chat';\n}\nif (!url) {\n  throw new Error(\"Can't work out Elliot's address: paste the chat webhook URL (workflow 01's Production URL) into ELLIOT_CHAT_WEBHOOK_URL in this node.\");\n}\n\n// 0047: Elliot's own workflows use the secret-protected address, which is the\n// only one allowed to say \"this is email / WhatsApp from this client\".\nurl = String(url || '').replace(/\\/chat\\/?(\\?.*)?$/, '/chat-internal');\n\nreturn [{ json: {\n  chat_url: url,\n  request: {\n    tenant_slug: tenant.tenant_slug,\n    message: f.body,\n    conversation_id: conversationId,\n    channel: 'whatsapp',\n    contact: { name: contact.name || null, phone: contact.phone || ('+' + f.from_wa_id) }\n  }\n} }];"
       },
       "id": "59ecb6d9-c70f-58f5-b15b-71cb187487aa",
       "name": "Build Elliot Request",
@@ -458,7 +458,9 @@
               "neverError": true
             }
           }
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "300a60c0-cb01-55ff-8e68-bc0ba22081b1",
       "name": "Ask Elliot",
@@ -468,7 +470,13 @@
         1388,
         220
       ],
-      "notes": "Calls workflow 01 (Elliot) at its chat webhook. Workflow 01 must be active."
+      "notes": "Calls workflow 01 at /webhook/chat-internal with the Elliot Internal Webhook Secret (0047).",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Elliot Internal Webhook Secret"
+        }
+      }
     },
     {
       "parameters": {

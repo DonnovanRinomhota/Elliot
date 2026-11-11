@@ -59,7 +59,7 @@ begin
   if jsonb_array_length(r->'alternatives') <> 0 then raise exception 'reference search should not suggest others'; end if;
 
   -- Upcoming viewings: only confirmed and not over, with the property.
-  r := identify_chat_visitor('bbbbbbbb-0000-0000-0000-000000000001', 'bbbbbbbb-1111-0000-0000-000000000001', null, null, null);
+  r := identify_chat_visitor('bbbbbbbb-0000-0000-0000-000000000001', 'bbbbbbbb-1111-0000-0000-000000000001', null, null, null, true); -- 0047: verified channel
   if jsonb_array_length(r->'upcoming_viewings') <> 1 then raise exception 'viewings: %', r->'upcoming_viewings'; end if;
   if r->'upcoming_viewings'->0->>'title' <> 'Studio flat'
      or r->'upcoming_viewings'->0->>'listing_id' <> 'bbbbbbbb-3333-0000-0000-000000000001'

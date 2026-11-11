@@ -75,7 +75,7 @@ end $$;
 -- Not callable through the public API.
 do $$
 begin
-  if has_function_privilege('authenticated', 'identify_chat_visitor(uuid, uuid, text, text, text)', 'execute')
+  if has_function_privilege('authenticated', 'identify_chat_visitor(uuid, uuid, text, text, text, boolean)', 'execute')
      or has_function_privilege('anon', 'upsert_conversation_contact(uuid, uuid, text, text, text, text, text)', 'execute')
      or has_function_privilege('authenticated', 'upsert_conversation_contact_row(uuid, uuid, text, text, text, text, text)', 'execute')
      or has_function_privilege('authenticated', 'remove_duplicate_visitor_messages()', 'execute') then

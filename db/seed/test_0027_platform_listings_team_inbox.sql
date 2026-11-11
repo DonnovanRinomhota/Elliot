@@ -141,7 +141,9 @@ begin
   if (r->>'count')::int <> 1 then raise exception 'feature keyword search: %', r; end if;
   r := search_listings('aaaaaaaa-0000-0000-0000-000000000001', '{"location":"Gdańsk"}');
   if (r->>'found')::boolean then raise exception 'expected no results: %', r; end if;
-  if (select times_suggested from listings where reference = 'A-1') <> 3 then
+  -- 3 searches found A-1; since 0034 a search with no match also suggests
+  -- nearby alternatives, so the count can be higher.
+  if (select times_suggested from listings where reference = 'A-1') < 3 then
     raise exception 'times_suggested not counted';
   end if;
 end $$;
@@ -287,6 +289,8 @@ reset role;
 -- ── Platform admin "view as" (row written by the dashboard server) ──
 insert into platform_admin_views (auth_user_id, tenant_id)
 values ('22222222-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001');
+-- Since 0040 a platform admin's view only counts with two-step sign-in (aal2).
+select set_config('request.jwt.claims', '{"aal":"aal2"}', true);
 -- n8n-style functions set app.current_tenant for the rest of the
 -- transaction; a real dashboard request starts clean, so clear it here.
 select set_config('app.current_tenant', '', true);
