@@ -1,194 +1,137 @@
 # Elliot
 
-**Elliot** is a configurable, multi-tenant AI Business Assistant platform — an "AI employee" businesses can deploy for customer support, lead qualification, appointment scheduling, email handling, and CRM automation, built on Claude + n8n + Supabase.
+**Elliot is an AI front office for estate agencies.** It answers buyers,
+renters, sellers and landlords on the agency's website chat, WhatsApp and
+email, day and night. It qualifies them, shows matching listings, books
+viewings and valuation visits into the agents' own Google Calendars, follows
+up with people who go quiet, and hands conversations to the team when a person
+is needed. Built on Claude, n8n, Supabase and Next.js.
 
-> Status: **active build.** Every phase in the original roadmap (1-10) is now built, except item 10 itself (a second real tenant) -- that one is inherently gated on having a real business to onboard, not a build task. Everything else, including the full email agent, follow-up engine, CRM sync, and human escalation handling, is built and verified end-to-end. Beyond the original 10-phase roadmap, the dashboard now also covers tenant onboarding, knowledge base uploads, human takeover on email conversations, and structured lead-scoring reasoning -- see "What's built beyond the original roadmap" below. **For what's not built yet and what to pick up next, see [`ROADMAP.md`](./ROADMAP.md) -- keep it up to date as items land.** See `docs/architecture.md` for the full technical blueprint and `KNOWN_ISSUES.md` for resolved bugs and open items.
+Made and run by Donnovan Rinomhota (Poland). Public site: [getelliot.eu](https://getelliot.eu)
+(separate repo, [Elliot-web](https://github.com/DonnovanRinomhota/Elliot-web)).
 
 ## Live links
 
-- **Dashboard (production):** https://app.getelliot.eu
-- **Vercel project:** https://vercel.com/elliot-1b82/elliot-real-estate — deployments, env vars, build logs
-- **GitHub repo:** https://github.com/DonnovanRinomhota/Elliot
-- **n8n instance:** https://makodevops.app.n8n.cloud — workflow editor, executions, credentials
-- **Supabase project:** Project ref `drnthityffeuwlddjorx` — https://supabase.com/dashboard/project/drnthityffeuwlddjorx — table editor, SQL editor, auth users
-
-Deploys are automatic: pushing to `main` on GitHub triggers a new Vercel
-build. n8n workflow changes do **not** deploy automatically -- exported
-JSON in `n8n/workflows/` is the source-controlled copy, but you have to
-manually re-import/activate a workflow in the n8n editor for a change to
-actually take effect. Database migrations are the same: files in
-`db/migrations/` are source-controlled, but you have to run each one
-against Supabase yourself (SQL Editor) -- nothing applies them
-automatically. See "Making a change" below.
-
-## Making a change
-
-Different parts of this repo deploy differently -- there's no single "push
-and everything updates" step:
-
-| Change type | Where it lives | How it goes live |
-|---|---|---|
-| Dashboard code (`apps/elliot-dashboard`) | Next.js / Vercel | Push to `main` → Vercel auto-builds & deploys |
-| n8n workflow (`n8n/workflows/*.json`) | n8n | Manually re-import the JSON into the n8n editor and activate/publish -- git push does **not** touch the live workflow |
-| Database schema (`db/migrations/*.sql`) | Supabase | Manually run the new migration file's SQL in Supabase's SQL Editor -- git push does **not** run it |
-| Env vars (Supabase keys, n8n webhook URLs) | Vercel project settings | Add/edit directly in Vercel → Settings → Environment Variables, enabled for Production **and** Preview **and** Development |
-
-Normal flow for a dashboard-only change: edit on a feature branch, push,
-open a PR into `main`, merge, Vercel builds automatically.
-
-Normal flow for anything touching n8n or the database: make the change
-locally, run the SQL migration in Supabase and/or re-import the workflow
-in n8n **first**, confirm it actually works, *then* push/merge the code
-that depends on it -- merging the dashboard code first (with an RPC or
-webhook it depends on not existing yet) will deploy successfully but the
-feature will fail at runtime.
+| What | Where |
+|---|---|
+| Dashboard (agencies and the control panel) | https://app.getelliot.eu |
+| Public website | https://getelliot.eu |
+| Vercel project (dashboard) | https://vercel.com/elliot-1b82/elliot-real-estate |
+| n8n (workflows, executions, credentials) | https://makodevops.app.n8n.cloud |
+| Supabase (database, storage, auth) | https://supabase.com/dashboard/project/drnthityffeuwlddjorx |
+| This repo | https://github.com/DonnovanRinomhota/Elliot |
 
 ## What Elliot does
 
-- Customer support & FAQ answering, grounded in a business's own documents (RAG — no invented answers)
-- Lead capture, qualification, and scoring (HOT/WARM/COLD), configurable per business
-- Appointment booking, rescheduling, cancellation with double-booking protection
-- Email classification, drafting, and gated auto-response
-- CRM sync — generic webhook adapter, not tied to one provider (see workflow 22/23)
-- Human escalation with full conversation context handoff
-- Full audit logging of every AI decision and tool call
+| Area | What happens | Docs |
+|---|---|---|
+| Website chat | One-line widget; asks for name and email/phone first; shows the AI disclosure | `apps/web-chat-widget`, `docs/control-panel-listings-inbox.md` |
+| WhatsApp | Instant replies on the agency's number; team can take over; reminders, alerts and follow-ups by approved templates | `docs/whatsapp-setup.md`, `docs/whatsapp-follow-ups.md` |
+| Email | Each agency has its own Elliot address; it forwards its inbox (Gmail, Outlook, anything) or connects Gmail; replies stay in the client's thread, in the agency's name; reads PDFs and photos clients attach | `docs/agency-email.md`, `docs/email-attachments.md` |
+| Listings | Typed, imported from a spreadsheet, or copied from ASARI CRM every hour; Elliot searches them and sends links with photos | `docs/control-panel-listings-inbox.md`, `docs/asari-sync.md` |
+| Viewings | Free times across the agents' own Google Calendars, booking, confirmation email, reminder the day before; clients confirm, move or cancel by message | `docs/agent-calendars.md`, `docs/workflow-specs/37-38-viewing-changes-reminders.md` |
+| Sellers and landlords | Valuation requests, seller leads, valuation visits at the property | `docs/valuations.md` |
+| Leads | Qualification and hot/warm/cold scoring, round-robin assignment to agents, CRM sync by webhook | `docs/workflow-specs/10-lead-capture.md`, `docs/workflow-specs/22-crm-sync.md` |
+| Follow-ups | Sequences of emails and WhatsApp messages for quiet leads, with approval rules and auto-enrol | `docs/workflow-specs/20-follow-up-sweep.md`, `docs/whatsapp-follow-ups.md` |
+| Team | Inbox, take over any chat, escalations, approvals, alerts, daily summary email | `docs/control-panel-listings-inbox.md` |
+| Control panel (`/platform`) | Every agency's account, usage, AI cost and health; two-step sign-in; support access only with the agency's permission | `docs/support-access.md` |
+| Health | Checks every 15 minutes, alerts by email and WhatsApp | `docs/workflow-specs/33-health-check.md` |
+| getelliot.eu | Elliot's own sales assistant, call booking, public demo agency | `docs/website-sales-and-demo.md` |
 
-## Core design principle
+**Core design rule:** Claude never acts directly. It proposes a tool call; n8n
+checks it against the agency's rules (what Elliot may do alone, what needs
+approval) before anything happens, and every call is logged.
 
-The AI (Claude) never performs privileged actions directly. It proposes a tool call; the orchestration layer (n8n) validates that call against the tenant's permission and approval rules before anything actually happens. Every tool call is logged. This is the boundary that makes the system auditable and safe to sell to businesses that don't want to hand an LLM the keys to their CRM.
+## How changes go live
+
+Each part deploys differently. Nothing applies migrations or workflows for you.
+
+| Change | Lives in | Goes live when |
+|---|---|---|
+| Dashboard (`apps/elliot-dashboard`) | Vercel | Merged to `main` (Vercel builds automatically) |
+| Workflow (`n8n/workflows/*.json`) | n8n | Re-imported in n8n (open the workflow → ⋯ → Import from File, so its ID stays), credentials checked, saved |
+| Database (`db/migrations/*.sql`) | Supabase | Run in Supabase → SQL Editor, in number order |
+| Environment variables | Vercel → Settings → Environment Variables | Set for Production, Preview and Development, then redeploy |
+
+Order for anything touching n8n or the database: run the migration and import
+the workflows first, then merge the dashboard code that depends on them.
+Every feature doc in `docs/` ends with its own set-up steps.
+
+### Dashboard environment variables (Vercel)
+
+| Variable | Used for |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase (browser and server) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only admin actions (team invites, ASARI credentials, attachment downloads) |
+| `ADMIN_EMAILS` | Who may use the control panel and onboarding (comma-separated) |
+| `ELLIOT_WEBHOOK_SECRET` | Shared secret for n8n's internal webhooks (n8n credential "Elliot Internal Webhook Secret") |
+| `N8N_INGEST_WEBHOOK_URL` | 08: knowledge uploads |
+| `N8N_SEND_WEBHOOK_URL` | 17: send an approved email draft |
+| `N8N_ONBOARD_WEBHOOK_URL` | 19: new agency |
+| `N8N_SEND_WHATSAPP_WEBHOOK_URL` | 28: send an approved WhatsApp draft |
+| `N8N_CANCEL_APPOINTMENT_WEBHOOK_URL` | 30: cancel a viewing and its calendar event |
+| `N8N_SEND_WHATSAPP_MESSAGE_WEBHOOK_URL` | 32: team reply on WhatsApp |
+| `N8N_HEALTH_TEST_WEBHOOK_URL` | 33: "send a test alert" |
+| `N8N_CALENDAR_CHECK_WEBHOOK_URL` | 41: check agents' calendars |
+| `N8N_ASARI_SYNC_WEBHOOK_URL` | 42: ASARI "Sync now" |
+| `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`) | Listing import: reading listings out of spreadsheets, PDFs and Word files |
+| `GOOGLE_DRIVE_API_KEY` | Listing photos from Google Drive folders |
+| `AI_PRICE_INPUT_PER_MTOK`, `AI_PRICE_OUTPUT_PER_MTOK` (optional) | AI cost shown in the control panel |
+
+Older `NEXT_PUBLIC_N8N_*` names are still read as a fallback; use the
+server-only names above.
 
 ## Repo layout
 
 ```
-/apps
-  /elliot-dashboard    — tenant admin UI (Next.js) -- the real, built one
-  /web-chat-widget     — embeddable customer-facing chat widget (vanilla JS, not Next.js -- see its own README for why) -- built, unit-tested, CORS with real third-party origins not yet verified live (see ROADMAP.md)
-  /dashboard           — stray leftover placeholder from before the dashboard was renamed to elliot-dashboard; dead, safe to delete
-/n8n
-  /workflows           — exported n8n workflow JSON (version-controlled)
-/db
-  /migrations          — Supabase/Postgres schema + RLS policies
-  /seed                — seed data for local dev
-/docs
-  architecture.md       — full technical blueprint
-  /workflow-specs        — one spec per n8n workflow (trigger, nodes, credentials, error paths)
-/scripts               — dev/deploy helper scripts
+apps/
+  elliot-dashboard/   Next.js dashboard: agencies (/dashboard), control panel (/platform), public listing pages (/p)
+  web-chat-widget/    widget.js, the website chat (copied into the dashboard's public/ at build)
+n8n/workflows/        Exported n8n workflows (source of truth; re-import after changes)
+  tests/              Code-node logic tested straight from the JSON (node <file>.test.js)
+db/migrations/        Postgres schema, RLS and functions, 0001 → latest, run in order
+db/seed/              Scenario tests per migration (scratch database only) and dev seed data
+docs/                 Feature docs with set-up steps; workflow-specs/ per workflow
+brand/                Logo files
 ```
 
-## Tech stack
+Workflows, with what each is for: [`docs/workflow-specs/README.md`](docs/workflow-specs/README.md).
+Migrations: [`db/migrations/README.md`](db/migrations/README.md).
 
-Claude API · n8n · Supabase (Postgres + pgvector) · Next.js · Google/Microsoft Calendar APIs · HubSpot (or similar CRM)
+## Tests
 
-## Development approach
+```bash
+# Dashboard: unit tests and type check
+cd apps/elliot-dashboard && npm test && npx tsc --noEmit -p .
 
-Built incrementally, one component at a time, in this order:
+# Workflows: every test file (one needs luxon on NODE_PATH for slot maths)
+for f in n8n/workflows/tests/*.test.js; do node "$f" || echo "FAILED: $f"; done
 
-1. ✅ Multi-tenant schema + Row-Level Security
-2. ✅ Main AI Agent loop — restructured since initial build into a proper
-   agentic loop (single `Call Claude` node, loops on tool calls up to a
-   safety cap, `disable_parallel_tool_use` to keep the tool-result contract
-   simple)
-3. ✅ RAG knowledge ingestion + retrieval
-4. ✅ Human escalation & approval gates — `escalate_to_human` is a real
-   5th tool on the main agent (01), available in any conversation for any
-   of 9 defined reasons (angry customer, legal/refund issue, sensitive
-   info, exceeds permissions, etc.), not just the old lead-capture-only
-   hot-lead path. Creates a real `escalations` row, sends a notification
-   email if `ai_config.escalation_notify_email` is set, and is visible on
-   a dedicated dashboard screen with acknowledge/resolve actions. Verified
-   live end-to-end. See `docs/workflow-specs/24-escalate-to-human.md`.
-   Minor pre-existing redundancy not cleaned up: Lead Capture (5) still
-   has its own separate hardcoded escalation path (`reason: 'other'`)
-   for hot leads, which could now be unified with the agent's own tool
-   call instead, but isn't yet.
-5. ✅ Lead capture & qualification
-6. ✅ Appointment management — check-availability + book-appointment, with
-   DB-level double-booking protection, a graceful response when a
-   collision happens (`slot_unavailable`, not a raw DB error), and a
-   compensating delete for the Google Calendar event on collision so
-   nothing is left orphaned -- see `KNOWN_ISSUES.md`, verified live.
-7. ✅ Email agent (classify, draft, gated auto-send) — built ahead of (4)
-   despite the original plan; see Phase 7 in commit history
-8. ✅ Follow-up engine — cron sweep (20) + entry point (21). Content is
-   literal tenant-authored subject/body per step, not Claude-drafted
-   (deliberate — unattended/scheduled with no per-send human review in
-   autonomous mode). Every send reuses the existing email_drafts
-   approval-gate flow. See `docs/workflow-specs/20-follow-up-sweep.md`
-   for the real limitations (sequences still hand-authored via SQL; a
-   run advances on schedule regardless of whether a pending draft was
-   actually approved/sent yet).
-9. ✅ CRM sync — generic webhook adapter (22/23), not tied to one CRM
-   provider. Each tenant points `ai_config.crm_webhook_url` at whatever
-   receives their sync data (a CRM's native webhook, or Zapier/Make in
-   front of one that doesn't take webhooks directly). Verified live
-   end-to-end. See `docs/workflow-specs/22-crm-sync.md`.
-10. 🟡 Multi-tenant hardening (second real tenant) — tenant onboarding
-    (workflow 19) removes the manual-SQL friction for this, and it now has
-    a dashboard form (`/dashboard/onboarding`) instead of being API-only.
-    Calendar/Gmail OAuth connection per tenant is still a manual, one-off
-    setup, and the onboarding page itself has no access control yet (see
-    `KNOWN_ISSUES.md`); see `docs/workflow-specs/19-tenant-onboarding.md`
-    for the OAuth gap specifically.
+# Database: each db/seed/test_00NN_*.sql against a scratch Postgres with the
+# migrations applied; each rolls back and ends with "00NN checks passed".
+```
 
-## What's built beyond the original roadmap
+## Docs
 
-The dashboard grew past "approve/reject email drafts" into a real
-operating surface:
-
-- **Real analytics** (`/`) — conversations, new leads, appointments booked,
-  auto-resolved rate, escalation rate, avg response time, activity/leads
-  charts. Backed by a real Postgres RPC (`get_dashboard_overview_stats`),
-  not placeholder numbers.
-- **Structured lead-scoring reasoning** (`/dashboard/leads`) — each lead
-  shows *why* it scored what it did (budget provided, urgent timeline,
-  etc.), mirroring `10-lead-capture.json`'s actual scoring logic exactly,
-  not an approximation. Raw qualification answers are still viewable via a
-  toggle.
-- **Human takeover** (`/dashboard/conversations/[id]`) — reply as a human
-  directly from the dashboard. Email conversations reuse the draft
-  pipeline; website chats can be taken over live (Elliot pauses, the
-  widget shows the team's replies). Email replies reuse the existing draft-approval send pipeline
-  (`create_manual_email_draft` → workflow 17 → 15) rather than a separate
-  send path, and correctly tags the message as `human_agent` (not
-  `assistant`) in the conversation log.
-- **Tenant onboarding UI** (`/dashboard/onboarding`) — a form wrapping
-  workflow 19, instead of calling the webhook by hand.
-- **Control panel** (`/platform`, platform admins) — every agency's
-  account state (trial, active, past due…), usage, AI cost and health;
-  billing dates; "open their dashboard"; activity log.
-- **Listings** (`/dashboard/listings`) — the agency's properties, with CSV
-  import. Elliot searches them (`search_listings` tool) and never invents one.
-- **Team** (`/dashboard/team`) — invites, roles, round-robin lead
-  assignment, who gets alerts and the daily summary.
-- **Inbox** (`/dashboard/inbox`) — chats that need a person and live
-  website chats, refreshing itself; works on a phone.
-- **Knowledge base upload UI** (`/dashboard/knowledge`) — a form wrapping
-  workflow 08's ingestion webhook. Plain text only; no PDF/website parsing
-  yet, matching what the backend actually does.
-
-More workflows exist outside this original phase list — internal
-tooling rather than agent capabilities:
-- `18` demo request intake — wires the marketing site's form to a real lead
-- `19` tenant onboarding — replaces hand-written SQL per tenant
-- `20`/`21` follow-up engine — sweep + entry point
-- `22`/`23` CRM sync — sweep + entry point (syncs now queue themselves via
-  database triggers, migration `0026`)
-- `29` auto-enrol follow-ups — puts quiet leads into the tenant's auto-enrol sequence
-- `30` cancel appointment — cancels and removes the Google Calendar event
-- `31` daily summary email — 08:00 summary for each agency's admins
-
-Setting up the Nov 2026 fix pack (env vars, imports, smoke test):
-`docs/client-ready-setup.md`. Then the control panel, listings, team,
-inbox and daily summary: `docs/control-panel-listings-inbox.md`.
-
-See their specs in `docs/workflow-specs/`.
-
-See `docs/architecture.md` for reasoning, database schema, security model, and what's deliberately **not** being built yet.
-
-## MVP niche
-
-Real estate agencies — high-value leads worth qualifying, heavy scheduling need, FAQ-heavy. Originally planned around a specific design-partner relationship (Zebra Real Estate) to validate against before generalizing; that partnership didn't materialize, so the vertical is built generic and company-agnostic instead (see the seed data's `zebra-dev` tenant, which is now just example/demo data, not a live client). Whatever real business becomes the first tenant can be configured without rework.
+| Doc | About |
+|---|---|
+| [`ROADMAP.md`](ROADMAP.md) | What's built, what's verified live, what's next |
+| [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) | Bugs fixed and limits still open |
+| [`docs/agency-email.md`](docs/agency-email.md) | Agency email addresses, forwarding, sending via Resend |
+| [`docs/email-attachments.md`](docs/email-attachments.md) | Files clients attach to emails |
+| [`docs/whatsapp-setup.md`](docs/whatsapp-setup.md) | Connecting a WhatsApp number |
+| [`docs/whatsapp-follow-ups.md`](docs/whatsapp-follow-ups.md) | Follow-up steps by WhatsApp, the `elliot_follow_up` template |
+| [`docs/agent-calendars.md`](docs/agent-calendars.md) | Each agent's own Google Calendar |
+| [`docs/valuations.md`](docs/valuations.md) | Sellers, landlords and valuation visits |
+| [`docs/asari-sync.md`](docs/asari-sync.md) | Listings from ASARI CRM |
+| [`docs/support-access.md`](docs/support-access.md) | Control panel two-step sign-in and support access |
+| [`docs/control-panel-listings-inbox.md`](docs/control-panel-listings-inbox.md) | Control panel, listings, team, inbox, daily summary |
+| [`docs/website-sales-and-demo.md`](docs/website-sales-and-demo.md) | getelliot.eu's sales assistant, call booking and demo |
+| [`docs/client-ready-setup.md`](docs/client-ready-setup.md) | Webhook secret, CRM sync, auto-enrol (Nov 2026 fix pack) |
+| [`docs/sales-knowledge/elliot-for-agencies.md`](docs/sales-knowledge/elliot-for-agencies.md) | What the getelliot.eu assistant knows (upload on the sales account's Knowledge page) |
+| [`docs/dashboard-design.md`](docs/dashboard-design.md) | Dashboard look and components |
+| [`docs/architecture.md`](docs/architecture.md), [`docs/setup-guide.md`](docs/setup-guide.md) | The original blueprint and first set-up guide (historical) |
 
 ## License
 
-TBD — private/proprietary while pre-revenue. Add a license before any public distribution.
+Private and proprietary. Not for distribution.

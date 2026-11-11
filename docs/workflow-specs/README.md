@@ -1,15 +1,45 @@
-# n8n Workflow Specs
+# n8n workflows
 
-One markdown file per workflow, written alongside (not always strictly before, in practice) the workflow it documents. Each spec covers:
+The exported workflows live in `n8n/workflows/`; their Code-node logic is
+tested in `n8n/workflows/tests/`. A change only goes live once the workflow
+is re-imported into n8n (open it → ⋯ → Import from File, so its ID stays) and
+saved. Internal webhooks need the "Elliot Internal Webhook Secret" header
+(see [`internal-webhook-auth.md`](internal-webhook-auth.md)).
 
-- Trigger
-- Inputs
-- Nodes (in order, with config)
-- Data passed between nodes
-- Credentials required
-- Error paths
-- Expected output
+| # | Workflow | What it does | Docs |
+|---|---|---|---|
+| 01 | Main AI Agent | Elliot itself: the chat webhook every channel calls; tools, approval rules, logging, prompt caching | [01](01-main-ai-agent.md), [system prompt](main-agent-system-prompt.md) |
+| 08 | Knowledge Ingestion | Text, PDF and website pages into the knowledge base | [08](08-knowledge-ingestion.md) |
+| 09 | Knowledge Retrieval | `search_company_knowledge` tool | [09](09-knowledge-retrieval.md) |
+| 10 | Lead Capture | `capture_lead` tool: contact, lead, score, assignment | [10](10-lead-capture.md) |
+| 11 | Check Availability | Free times across the agents' calendars | [11](11-check-availability.md), [agent calendars](../agent-calendars.md) |
+| 12 | Book Appointment | Books into a free agent's calendar, confirmation email | [12](12-book-appointment.md) |
+| 13 | Classify Email | *Retired:* email is answered instantly by 01 (0035) | [13](13-classify-email.md) |
+| 14 | Draft Email Reply | *Retired:* as 13 | [14](14-draft-email-reply.md) |
+| 15 | Send Approved Email | Sends an approved email draft (through 39) | [15](15-send-approved-email.md) |
+| 16 | Email Inbound Trigger | The agency's Gmail → Elliot → reply in the thread; attachments | [16](16-email-inbound-trigger.md), [attachments](../email-attachments.md) |
+| 17 | Manual Send Draft | Dashboard webhook for 15 | [17](17-manual-send-draft.md) |
+| 18 | Demo Request Intake | getelliot.eu contact form | [18](18-demo-request-intake.md) |
+| 19 | Tenant Onboarding | New agency | [19](19-tenant-onboarding.md) |
+| 20 | Follow-Up Sweep | Sends due follow-up steps by email or WhatsApp | [20](20-follow-up-sweep.md), [WhatsApp](../whatsapp-follow-ups.md) |
+| 21 | Start Follow-Up Run | Puts a lead on a sequence | [20](20-follow-up-sweep.md) |
+| 22 / 23 | Queue CRM Sync / CRM Sync Sweep | Contacts, leads and viewings to the agency's CRM webhook | [22](22-crm-sync.md) |
+| 24 | Escalate To Human | Escalation, alert email to the lead's owner | [24](24-escalate-to-human.md) |
+| 25 | WhatsApp Inbound Trigger | Meta webhook → Elliot → instant reply | [25](25-whatsapp-inbound-trigger.md), [set-up](../whatsapp-setup.md) |
+| 26 | Draft WhatsApp Reply | *Retired:* WhatsApp is answered instantly (0032) | [26](26-draft-whatsapp-reply.md) |
+| 27 | Send Approved WhatsApp | Sends WhatsApp drafts; follow-ups after 24 hours as the `elliot_follow_up` template | [27](27-send-approved-whatsapp.md) |
+| 28 | Manual Send WhatsApp Draft | Dashboard webhook for 27 | [28](28-manual-send-whatsapp-draft.md) |
+| 29 | Auto-Enrol Follow-Ups | Quiet leads into the auto-enrol sequence | [29](29-auto-enrol-follow-ups.md) |
+| 30 | Cancel Appointment | Cancels a viewing and its calendar event | [30](30-cancel-appointment.md) |
+| 31 | Daily Summary Email | 08:00 summary for each agency | [control panel doc](../control-panel-listings-inbox.md) |
+| 32 | Send WhatsApp Message | A team member's reply on WhatsApp | [32](32-send-whatsapp-message.md) |
+| 33 / 34 | Health Check & Alerts / Workflow Error Recorder | Checks every 15 minutes; failures from other workflows | [33](33-health-check.md) |
+| 35 / 36 | Website Booking & Demo Access / Demo Clean-up | getelliot.eu calls and the demo agency | [website doc](../website-sales-and-demo.md) |
+| 37 / 38 | Client Viewing Changes / Viewing Reminders | Confirm, move, cancel by message; reminders the day before | [37-38](37-38-viewing-changes-reminders.md) |
+| 39 | Send Email | Every email Elliot sends, via Resend, in the agency's name | [agency email](../agency-email.md) |
+| 40 | Email Inbound (Forwarded) | Email forwarded to `<slug>@in.getelliot.eu` → Elliot → reply; attachments | [agency email](../agency-email.md), [attachments](../email-attachments.md) |
+| 41 | Calendar Access Check | What Elliot may do with each agent's calendar | [agent calendars](../agent-calendars.md) |
+| 42 | ASARI Sync | Listings from ASARI CRM, hourly or on "Sync now" | [ASARI](../asari-sync.md) |
 
-Specs exist for every workflow in the codebase: `01` (main AI agent), `08`/`09` (knowledge ingestion/retrieval), `10` (lead capture), `11`/`12` (availability/booking), `13`–`17` (the full email agent: classify, draft, send, inbound trigger, manual send), `18` (demo request intake), `19` (tenant onboarding), `20` (follow-up sweep — also covers `21`, its entry point), `22` (CRM sync — also covers `23`, its sweep counterpart), `24` (escalate to human), `25`–`28` (the WhatsApp agent: inbound trigger, draft, send, manual send — mirrors 13–17's shape against a separate `whatsapp_drafts` table, reusing `13` for classification since it's channel-agnostic), `29` (auto-enrol follow-ups), `30` (cancel appointment + calendar cleanup). `internal-webhook-auth.md` covers the shared-secret gate on 19/21/22/30.
-
-No gaps remain as of 21 Sep 2026. `13`–`17` were the last ones missing before that — built fast in Phase 7, written up later once flagged. `25`–`28` (WhatsApp) are new and untested against a real Meta number — see ROADMAP.md.
+Retired workflows stay in the repo for their history; they can be switched
+off in n8n.

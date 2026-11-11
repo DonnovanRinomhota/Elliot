@@ -140,11 +140,9 @@ included in the returned object for internal debugging/logging only.
 **Verified live:** tested a real double-booking collision against live Google
 Calendar + Supabase. Confirmed working as designed.
 
-## OPEN — Repo has a duplicated nested `elliot/` folder
-An early "Add files via upload" commit committed a full copy of the repo
-*inside itself*. Dropped entirely from this update package rather than
-carried forward — if anything only existed in that nested copy, it's now
-gone. Worth double-checking nothing important was lost.
+## RESOLVED — Repo had a duplicated nested `elliot/` folder
+An early "Add files via upload" commit put a full copy of the repo inside
+itself. It was dropped and no longer exists.
 
 ## RESOLVED (this update) — Schema drift between Supabase (live) and `db/migrations` (git)
 Two changes were made directly against the live database during Phase 4/5
@@ -183,22 +181,15 @@ is a deliberately simple stopgap for a single operator, not a real
 permission system; revisit if more than one person ever needs this level
 of access.
 
-## PARTLY RESOLVED (Nov 2026) — Human takeover: email and website chat work, WhatsApp doesn't
-Email conversations: reply as a human (`0023_manual_email_draft_rpc.sql`,
-`reply-form.tsx`). Website chat (`chat_widget`): **Take over this chat**
-on the conversation page (0027 `take_over_conversation` /
-`send_human_chat_message` / `hand_back_conversation`). Workflow 01 stays
-quiet while `assigned_human` is set, and the widget polls
-`/api/widget/messages` for team replies while it's open. See
-`docs/control-panel-listings-inbox.md`. Not covered: the Elliot-web
-marketing site's own chat component (it doesn't poll), and the visitor only
-sees team replies while the chat window is open.
-
-Still open: human takeover doesn't work for `whatsapp`-channel
-conversations either, for a related but different reason: nothing in
-workflow 28 or the dashboard sends an outbound WhatsApp message except
-through an approved `whatsapp_drafts` row -- there's no "reply as a
-human" path analogous to email's `reply-form.tsx` yet.
+## RESOLVED (Nov 2026) — Human takeover on every channel
+Email: reply as a human (`0023_manual_email_draft_rpc.sql`,
+`reply-form.tsx`). Website chat: **Take over this chat** on the
+conversation page (0027); workflow 01 stays quiet while `assigned_human` is
+set, and the widget polls `/api/widget/messages` for team replies while
+it's open. WhatsApp: the same takeover, with team replies sent through
+workflow 32 (0032) within WhatsApp's 24-hour window. See
+`docs/control-panel-listings-inbox.md`. A website visitor sees team replies
+only while their chat window is open.
 
 ## RESOLVED (Nov 2026, pending live check) — WhatsApp webhook (25) doesn't verify Meta's request signature
 Meta signs every webhook POST body with `X-Hub-Signature-256`
@@ -215,24 +206,22 @@ takes priority where available). The repo keeps the placeholder.
 Unit-tested with real HMACs (valid, tampered, wrong secret, malformed,
 missing). See `docs/workflow-specs/25-whatsapp-inbound-trigger.md`.
 
-## OPEN — WhatsApp: no template-message support (24-hour window)
-WhatsApp only allows a free-form reply within 24 hours of the customer's
-last message; anything later legally requires a pre-approved template
-message. `27-send-approved-whatsapp.json` detects a late draft and marks
-it `blocked_needs_template` rather than attempting (and failing) the send,
-but nothing builds, submits, or sends an actual template message.
-Practical impact: any WhatsApp reply drafted more than 24 hours after the
-customer's last message -- including, eventually, any WhatsApp follow-up
-sequence step beyond day 0 -- will sit blocked rather than send. See
-`docs/workflow-specs/27-send-approved-whatsapp.md`.
+## RESOLVED (Nov 2026) — WhatsApp: template messages after 24 hours
+WhatsApp only allows free text within 24 hours of the client's last message.
+Elliot now uses approved templates where it writes first: `viewing_reminder`
+(workflow 38), `elliot_alert` (33) and `elliot_follow_up` (follow-up steps,
+27, 0045). Replies to clients are instant, so they're always inside the
+window. A WhatsApp draft that isn't a follow-up and is approved after 24 hours
+is still marked `blocked_needs_template`; the team replies by email or once
+the client writes again. See `docs/whatsapp-follow-ups.md`.
 
-## OPEN — WhatsApp: only text messages are handled
-`25-whatsapp-inbound-trigger.json` skips anything that isn't
-`type: "text"` (images, audio, location, documents, etc.) -- the customer
-gets no reply at all for these today, not even a generic acknowledgement.
-Real support needs downloading the media from Meta's authenticated media
-URL and giving Claude something to work with (vision for images, at
-minimum). Not started.
+## PARTLY RESOLVED — WhatsApp: photos, voice notes and documents aren't opened
+Workflow 25 answers every message type: photos, videos, documents, voice
+notes, stickers and locations reach Elliot as a short note ("[Sent a
+photo: caption]"), so the client gets a sensible reply and the team sees
+what arrived. Elliot doesn't open the media itself yet. Next step: download
+it from Meta's media URL and give PDFs and photos to Claude, as email
+already does (0046).
 
 ## RESOLVED (Nov 2026) — Three webhooks were called straight from the browser
 `08` (knowledge ingestion), `17` (manual email send) and `28` (manual
@@ -247,3 +236,11 @@ nodes use the same Header Auth credential as 19/21/22/30. The ingest route
 takes the tenant from the session; the send route only sends drafts that
 belong to the user's tenant and are `approved`. See
 `docs/workflow-specs/internal-webhook-auth.md`.
+
+## OPEN — Gmail (workflow 16) answers only the first of several new emails
+The Gmail trigger checks the inbox every minute and can hand over several
+new emails at once, but the nodes after it read the first one only
+(`.first()`). If two clients email in the same minute, the second isn't
+answered. Rare at today's volume; agencies that forward to their Elliot
+address (workflow 40) aren't affected, since each forwarded email starts its
+own run. Fix: process the trigger's items one at a time (Loop Over Items).

@@ -1,67 +1,73 @@
-# Database Migrations
+# Database migrations
 
-Run in order — each file is numbered and depends on the ones before it.
+Postgres schema, row-level security and functions for Supabase. Run every file
+in number order in **Supabase → SQL Editor** (paste the whole file, Run). Each
+file is one transaction and safe to run again. Nothing runs them for you: a
+merged migration isn't live until you run it.
 
-```
-0001_extensions_and_tenants.sql
-0002_contacts_leads_conversations.sql
-0003_knowledge_rag.sql
-0004_appointments.sql
-0005_follow_up_engine.sql
-0006_escalations_crm_sync.sql
-0007_audit_and_tool_log.sql
-0008_row_level_security.sql
-...
-0026_auto_crm_sync_and_follow_up_enrolment.sql
-```
+Some files end with a one-off step (for example 0046's `update platform_settings
+set supabase_url = …`); the feature doc for each migration lists its set-up.
 
-Every file in this folder runs in number order (0001 through the highest);
-the list above only shows the first eight and the latest.
-`db/seed/test_0026_auto_sync_and_enrolment.sql` is a scenario test for
-0026, and `db/seed/test_0027_platform_listings_team_inbox.sql` for 0027
-(control panel, listings, team, takeover, daily summary) -- run them on a
-scratch database only. The 0027 test wraps itself in a transaction and
-rolls back; it ends with "0027 checks passed". Same for
-`test_0028_listings_available_from.sql` ("0028 checks passed") and
-`test_0029_listing_photos.sql` ("0029 checks passed"; needs Supabase's
-storage schema, which every Supabase project has) and
-`test_0030_appointment_listing_and_agent.sql` ("0030 checks passed") and
-`test_0031_chat_contacts.sql` ("0031 checks passed").
+## How access works
 
-## How to apply
+- **Agencies (dashboard):** signed in with Supabase Auth. Policies use
+  `current_tenant_id()`, the user's agency, or the agency a platform admin is
+  viewing (0027, 0040: only with two-step sign-in and, when the switch is on,
+  the agency's permission).
+- **n8n:** connects as the service role (`Elliot Postgres (service role)`) and
+  passes the agency explicitly to each query or function.
+- Tables an agency must never read directly (credentials, tokens) are
+  revoked from `anon` and `authenticated`; only n8n and the dashboard server
+  use them, through functions that leave secrets out.
 
-Via the Supabase SQL editor (simplest for now — a proper migration tool like `sqlx` or Supabase CLI migrations comes later once there's a team, not a solo dev):
+## Files
 
-1. Open your Supabase project → SQL Editor.
-2. Paste and run each file in order, 0001 through 0008.
-3. Then, for local dev only, run `db/seed/dev_seed.sql`.
-4. Verify isolation by running `db/seed/test_rls_isolation.sql` against a **non-service-role** connection — every `expected_0` query must return 0. If one doesn't, stop and fix it before building anything on top.
+| # | What it adds |
+|---|---|
+| 0001–0008 | Core schema: tenants, contacts, leads, conversations, messages, knowledge (pgvector), appointments, follow-ups, escalations, CRM sync, audit log, row-level security |
+| 0009 | Tenant-scoped functions for n8n |
+| 0010 | Embedding size fix (Voyage, 1024) |
+| 0011 | Calendar ID on `ai_config`, one lead per contact |
+| 0012 | Escalation function |
+| 0013 | Email drafts and approval |
+| 0014 | Agency Gmail address |
+| 0015 | `current_tenant_id()` for the dashboard |
+| 0016 | Proposed appointment on email drafts |
+| 0017 | Demo requests from the website |
+| 0018 | Follow-ups through email drafts |
+| 0019 | CRM webhook URL |
+| 0020 | Escalation alert email |
+| 0021–0022 | Overview stats |
+| 0023 | Team reply on email |
+| 0024 | Revenue estimate |
+| 0025 | WhatsApp drafts |
+| 0026 | Automatic CRM sync and follow-up auto-enrol |
+| 0027 | Control panel, listings, team, inbox, live takeover |
+| 0028 | Listing available-from date |
+| 0029 | Listing photos (Storage) |
+| 0030 | Viewings linked to a property and an agent |
+| 0031 | Chat contacts; duplicate messages removed |
+| 0032 | WhatsApp instant replies |
+| 0033 | Listing links, booking details |
+| 0034 | Better search and viewings |
+| 0035 | Email instant replies |
+| 0036 | Health checks and alerts |
+| 0037 | getelliot.eu: sales assistant, calls, demo agency |
+| 0038 | Clients confirm, move or cancel viewings; reminders |
+| 0039 | Agency email addresses (Resend) |
+| 0040 | Support access and two-step sign-in for the control panel |
+| 0041 | Switch: support access needs the agency's permission |
+| 0042 | Each agent's own Google Calendar; overlapping viewings for different agents |
+| 0043 | Sellers, landlords and valuation visits |
+| 0044 | ASARI CRM listing sync |
+| 0045 | Follow-ups by WhatsApp |
+| 0046 | Email attachments (private Storage bucket) |
 
-## Important architectural note on RLS enforcement
+## Tests
 
-These policies check `current_setting('app.current_tenant')`, which must be set explicitly per session via `set_config('app.current_tenant', '<uuid>', false)` **before** any tenant-scoped query runs.
-
-This works cleanly when **n8n connects directly via the Postgres node** (a real session, so `set_config` persists for the query). It does **not** automatically work if you instead call the data through Supabase's PostgREST/client-library API using end-user JWTs — that path expects RLS policies written against `auth.uid()` / JWT claims instead.
-
-**Decision for this project:** n8n uses direct Postgres connections and sets `app.current_tenant` itself after resolving the tenant from the inbound request (API key / widget token). The dashboard app (`apps/dashboard`), when it exists, will likely need the JWT-claim style of policy instead, since it's calling through Supabase Auth. That means dashboard-facing tables may eventually need a **second set of policies** (or a rewrite of these) once that app is built. Flagging this now so it isn't a surprise later — not fixing it yet, since the dashboard isn't in scope for this phase.
-
-## Verifying the double-booking constraint
-
-After running 0004, this should fail with a constraint violation:
-
-```sql
-select set_config('app.current_tenant', '11111111-1111-1111-1111-111111111111', false);
-
-insert into appointments (tenant_id, contact_id, starts_at, ends_at, timezone)
-values ('11111111-1111-1111-1111-111111111111', 'a1a1a1a1-0000-0000-0000-000000000001',
-        '2026-09-01 10:00:00+00', '2026-09-01 10:30:00+00', 'Europe/Warsaw');
-
--- this second insert, overlapping the first, must be rejected:
-insert into appointments (tenant_id, contact_id, starts_at, ends_at, timezone)
-values ('11111111-1111-1111-1111-111111111111', 'a1a1a1a1-0000-0000-0000-000000000001',
-        '2026-09-01 10:15:00+00', '2026-09-01 10:45:00+00', 'Europe/Warsaw');
-```
-
-## Known gap to close before this is production-ready
-
-The exclusion constraint on `appointments` prevents overlap **tenant-wide**. If a tenant has multiple agents/resources that should be independently bookable in parallel (e.g. Zebra Real Estate has several agents), this constraint needs a `resource_id` column added to the exclusion clause, or it will incorrectly block legitimate concurrent bookings. Not fixed in this migration because the MVP assumes single-resource scheduling per tenant — revisit before onboarding a multi-agent tenant.
+`db/seed/test_00NN_*.sql` is a scenario test for migration 00NN (0026 onward).
+Run them only on a **scratch** database with every migration applied: each
+wraps itself in a transaction, rolls back, and ends with "00NN checks
+passed". Some need Supabase's `storage` and `auth` schemas (present in every
+Supabase project; the tests create small stand-ins if missing).
+`db/seed/dev_seed.sql` adds example agencies for local development.

@@ -1,5 +1,7 @@
 # Setup Guide — Connecting Everything (Phase 1 + 2)
 
+> **Historical.** This is the guide from the first build (Phases 1–3, Aug–Sep 2026): migrations 0001–0008, workflow 01's first version and two Postgres credentials. Much has changed since (the dashboard, 36 workflows, migrations up to 0046). For how things go live today see the root `README.md`; each feature doc in `docs/` has its own set-up steps.
+
 Do these in order. Each step tells you how to know it worked before moving to the next — don't skip the checks, since a silent failure early on (especially around RLS) is much harder to debug three steps later.
 
 ---
