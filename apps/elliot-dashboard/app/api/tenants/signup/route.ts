@@ -12,6 +12,7 @@
 // path for "insert a tenant for myself" -- see lib/supabase/admin.ts.
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isNewAccount, selfSignupEnabled } from "@/lib/self-signup";
 
 function slugify(name: string) {
   return name
@@ -22,6 +23,14 @@ function slugify(name: string) {
 }
 
 export async function POST(request: Request) {
+  // Off by default: agencies are created from the control panel.
+  if (!selfSignupEnabled()) {
+    return NextResponse.json(
+      { success: false, error: "Creating an account here is switched off. Ask Elliot to set your agency up." },
+      { status: 403 }
+    );
+  }
+
   let body: { tenantName?: string; authUserId?: string; email?: string };
   try {
     body = await request.json();
@@ -43,6 +52,11 @@ export async function POST(request: Request) {
   // client -- the service-role client can look this up directly.
   const { data: authUser, error: authLookupError } = await supabase.auth.admin.getUserById(authUserId);
   if (authLookupError || !authUser?.user || authUser.user.email?.toLowerCase() !== email.toLowerCase()) {
+    return NextResponse.json({ success: false, error: "Could not verify the new account." }, { status: 400 });
+  }
+  // Only an account made a moment ago by the sign-up form: this route can't
+  // be used to attach an agency to somebody's existing account.
+  if (!isNewAccount(authUser.user.created_at) || tenantName.trim().length > 120) {
     return NextResponse.json({ success: false, error: "Could not verify the new account." }, { status: 400 });
   }
 

@@ -69,6 +69,7 @@ export default async function SettingsPage() {
         aiConfig={aiConfig}
         configError={configError?.message ?? null}
         ownFromAddress={sendingIdentity?.from_address ?? null}
+        canEdit={me?.role === "admin" || !!adminView}
       />
       <div className="max-w-2xl">
         <AsariCard
