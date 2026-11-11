@@ -1,7 +1,17 @@
 # Workflow Spec: 01 - Main AI Agent
 
 ## Trigger
-`POST /webhook/chat` (n8n Webhook node, path `chat`). Public-facing — this is what the eventual web chat widget calls.
+Two webhooks into the same flow (0047, [`../security.md`](../security.md)):
+
+- `POST /webhook/chat` — public; the website chat widget. Always treated as
+  `chat_widget`: a `channel`, `attachments` or identity in the body are ignored.
+- `POST /webhook/chat-internal` — Header Auth with "Elliot Internal Webhook
+  Secret"; called by 16, 40 (email) and 25 (WhatsApp). Only here may the body
+  set `channel` and `attachments`, and the client counts as verified.
+
+Bookings: when the agency's Settings say bookings need approval, "Extract
+Tool Call" turns `book_appointment` into a high-priority hand-over to the
+team and tells Claude nothing was booked.
 
 ## Inputs (JSON body)
 ```json

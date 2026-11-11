@@ -261,6 +261,11 @@ Each is unit- and database-tested (`db/seed/test_00NN_*.sql`,
   private bucket and shown on the conversation; Elliot reads PDFs and photos.
   Pending the first real email with files. `docs/email-attachments.md`.
 
+- 🟡 **Security review** (0047, workflows 01/16/25/37/40, dashboard). Public
+  key locked down, roles enforced in the database, public chat can't pose
+  as email or WhatsApp, booking approval enforced. Tested on a scratch
+  database and from the workflow files; pending roll-out. `docs/security.md`.
+
 ## Next
 
 - Workflow 16 (Gmail) answers only the first of several emails that arrive

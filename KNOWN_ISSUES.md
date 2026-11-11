@@ -1,5 +1,26 @@
 # Known Issues / Resolved-but-worth-remembering
 
+## RESOLVED (Nov 2026) — Security review: agency isolation and roles
+The public Supabase key could call n8n's helper functions with any agency's
+ID; any team member could make themselves admin or change their agency's
+plan and settings; the public chat webhook let a caller pose as an email or
+WhatsApp client; a website visitor who typed a client's email could see and
+cancel that client's viewings; "Book appointments: Needs approval" did
+nothing.
+
+**Root cause:** Supabase grants new tables and functions to the public key by
+default, and RLS policies were "same agency" only, with no roles. Workflow
+01 trusted fields from the request body.
+
+**Fix:** migration `0047`, workflows 01 / 16 / 25 / 37 / 40, dashboard. Full
+list, roll-out order and what is still open: [`docs/security.md`](docs/security.md).
+
+**Verified:** every finding reproduced on a scratch Postgres with Supabase's
+default grants, then `db/seed/test_0047_tenant_isolation.sql` (fails before
+0047, passes after) and `n8n/workflows/tests/security_hardening.test.js`.
+Not run against production; the n8n side is tested from the workflow files,
+not in a live n8n.
+
 ## RESOLVED (Nov 2026) — Leads scoring 40–69 were never saved
 `10 - Lead Capture`'s `Score Lead` node set `status = 'QUALIFIED'` for
 scores 40–69, but `leads_status_check` (`0002`) only allows NEW /

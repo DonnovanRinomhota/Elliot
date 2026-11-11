@@ -64,6 +64,7 @@ Every feature doc in `docs/` ends with its own set-up steps.
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase (browser and server) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only admin actions (team invites, ASARI credentials, attachment downloads) |
 | `ADMIN_EMAILS` | Who may use the control panel and onboarding (comma-separated) |
+| `NEXT_PUBLIC_SELF_SIGNUP_ENABLED` | Leave unset. `true` shows "Create a business" on the sign-in page (anyone could open an agency) |
 | `ELLIOT_WEBHOOK_SECRET` | Shared secret for n8n's internal webhooks (n8n credential "Elliot Internal Webhook Secret") |
 | `N8N_INGEST_WEBHOOK_URL` | 08: knowledge uploads |
 | `N8N_SEND_WEBHOOK_URL` | 17: send an approved email draft |
@@ -117,6 +118,7 @@ for f in n8n/workflows/tests/*.test.js; do node "$f" || echo "FAILED: $f"; done
 |---|---|
 | [`ROADMAP.md`](ROADMAP.md) | What's built, what's verified live, what's next |
 | [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) | Bugs fixed and limits still open |
+| [`docs/security.md`](docs/security.md) | Agency isolation, roles, the security review and its roll-out steps |
 | [`docs/agency-email.md`](docs/agency-email.md) | Agency email addresses, forwarding, sending via Resend |
 | [`docs/email-attachments.md`](docs/email-attachments.md) | Files clients attach to emails |
 | [`docs/whatsapp-setup.md`](docs/whatsapp-setup.md) | Connecting a WhatsApp number |

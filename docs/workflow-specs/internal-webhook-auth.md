@@ -4,6 +4,12 @@ Applies to: `08` knowledge ingestion, `17` manual email send, `19` tenant
 onboarding, `21` start follow-up run, `22` queue CRM sync, `28` manual
 WhatsApp send, `30` cancel appointment.
 
+Since 0047 also: `01`'s second webhook **`/chat-internal`**, which workflows
+16, 40 (email) and 25 (WhatsApp) call from their "Ask Elliot" node with the
+same credential. Only requests that arrive there may say which channel they
+are, attach files, or count as a verified client; the public `/chat` webhook
+is always the website chat. See [`../security.md`](../security.md).
+
 ## Why
 These webhooks create tenants, start email sequences, queue CRM writes and
 cancel bookings. Before this, anyone who found a URL could call them.
