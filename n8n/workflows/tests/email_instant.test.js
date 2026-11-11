@@ -63,7 +63,8 @@ test('16: email goes to Elliot and the answer back by email (no more drafts)', (
   const names = wf16.nodes.map((n) => n.name);
   for (const gone of ['Execute: Classify Email', 'Execute: Draft Email Reply', 'Insert Inbound Message']) assert.ok(!names.includes(gone), gone);
   const chain = ['Gmail Trigger', 'Extract Email Fields', 'Should Process?', 'Lookup Tenant by Mailbox', 'If Tenant Found', 'If Not Self-Sent',
-    'Claim Message', 'Is New Message?', 'Upsert Contact', 'Get or Create Conversation (Email)', 'Build Elliot Request', 'Ask Elliot', 'Read Elliot Answer'];
+    'Claim Message', 'Is New Message?', 'Upsert Contact', 'Get or Create Conversation (Email)', 'Storage Address', 'Attachment Files', 'Has Attachments?', 'Upload Attachment',
+    'Record Attachment', 'Sign Attachment', 'Collect Attachments', 'Build Elliot Request', 'Ask Elliot', 'Read Elliot Answer']; // 0046: attachments
   for (let i = 0; i < chain.length - 1; i += 1) assert.ok(next(wf16, chain[i]).includes(chain[i + 1]), `${chain[i]} -> ${chain[i + 1]}`);
   assert.deepStrictEqual(next(wf16, 'If Tenant Found', 1), ['Log Unmatched Mailbox']);
   assert.deepStrictEqual(next(wf16, 'Read Elliot Answer'), ['Has Reply?', 'Elliot Failed?']);
@@ -128,6 +129,7 @@ test('16: Elliot is asked as an email conversation with the sender\'s email', ()
     'Extract Email Fields': extract(),
     'Lookup Tenant by Mailbox': { tenant_id: 't', tenant_slug: 'simon' },
     'Upsert Contact': { id: 'c', name: null },
+    'Get or Create Conversation (Email)': { id: 'conv' },
   };
   const out = run(nodeOf(wf16, 'Build Elliot Request').parameters.jsCode, { json: { id: 'conv' }, nodes, execution: { resumeUrl: 'https://makodevops.app.n8n.cloud/webhook-waiting/1' } })[0].json;
   assert.strictEqual(out.chat_url, 'https://makodevops.app.n8n.cloud/webhook/chat');
@@ -137,6 +139,7 @@ test('16: Elliot is asked as an email conversation with the sender\'s email', ()
     conversation_id: 'conv',
     channel: 'email',
     contact: { name: 'Don Rino', email: 'don@example.com' },
+    attachments: [], // 0046: none on this email (Collect Attachments didn't run)
   });
 });
 

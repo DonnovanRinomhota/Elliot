@@ -94,7 +94,7 @@ Settings shows the new From address straight away. To go back:
 ## Limits
 
 - Text emails only (no HTML or attachments in replies). Attachments clients
-  send are not read yet.
+  send are kept and read: see docs/email-attachments.md (0046).
 - Resend's free plan has a monthly and a daily email cap (about 3,000 a month
   and 100 a day when this was written; check resend.com/pricing). Move to a
   paid plan before several agencies are live.

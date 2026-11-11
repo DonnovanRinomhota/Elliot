@@ -239,7 +239,8 @@ test('40: Resend webhook → fetch the email with our key → agency → Elliot 
   assert.deepStrictEqual(next(wf40, 'Agency Found?', 1), ['Log Unknown Address']);
   assert.deepStrictEqual(next(wf40, 'Gmail Forwarding Code?', 0), ['Save Forwarding Code']);
   assert.deepStrictEqual(next(wf40, 'Gmail Forwarding Code?', 1), ['Should Answer?']);
-  const rest = ['Should Answer?', 'Claim Message', 'Is New Message?', 'Upsert Contact', 'Get or Create Conversation (Email)', 'Build Elliot Request', 'Ask Elliot', 'Read Elliot Answer'];
+  const rest = ['Should Answer?', 'Claim Message', 'Is New Message?', 'Upsert Contact', 'Get or Create Conversation (Email)', 'Storage Address', 'List Attachments', 'Attachment Files', 'Has Attachments?',
+    'Download Attachment', 'Upload Attachment', 'Record Attachment', 'Sign Attachment', 'Collect Attachments', 'Build Elliot Request', 'Ask Elliot', 'Read Elliot Answer']; // 0046: attachments
   for (let i = 0; i < rest.length - 1; i++) assert.deepStrictEqual(next(wf40, rest[i]), [rest[i + 1]], rest[i]);
   assert.deepStrictEqual(next(wf40, 'Read Elliot Answer'), ['Has Reply?', 'Elliot Failed?']);
   assert.deepStrictEqual(next(wf40, 'Has Reply?'), ['Build Reply Email']);

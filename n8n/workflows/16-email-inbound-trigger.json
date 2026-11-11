@@ -16,7 +16,9 @@
             "INBOX"
           ]
         },
-        "options": {}
+        "options": {
+          "downloadAttachments": true
+        }
       },
       "id": "dbf75273-56d0-4b49-9aa6-0a08e9594d2d",
       "name": "Gmail Trigger",
@@ -36,7 +38,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// n8n's Gmail Trigger (simple: false) gives a parsed email: text, html,\n// subject, from / to / cc .value[], id (Gmail's id), threadId, messageId\n// (the email's own Message-ID, used to thread our reply) and headers.\n// 0035: every recipient is checked against the agency's mailbox (not just\n// the first \"To\"), automatic emails are skipped (no-reply senders,\n// newsletters, out-of-office), and only the new part of a reply goes to\n// Elliot -- not the whole quoted conversation underneath.\nconst msg = $json;\nconst addrs = (f) => ((f && f.value) || []).map((v) => String(v.address || '').trim().toLowerCase()).filter(Boolean);\nconst fromEmail = addrs(msg.from)[0] || '';\nconst fromName = String((msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].name) || '').trim();\nconst recipients = [...new Set([...addrs(msg.to), ...addrs(msg.cc), ...addrs(msg.bcc)])];\n\nfunction header(name) {\n  const h = msg.headers;\n  let v = '';\n  try {\n    if (h && typeof h.get === 'function') v = h.get(name);\n    else if (h) v = h[name] ?? h[name.toLowerCase()];\n  } catch (e) { v = ''; }\n  if (!v && Array.isArray(msg.headerLines)) {\n    const line = msg.headerLines.find((l) => String(l.key || '').toLowerCase() === name.toLowerCase());\n    if (line) v = String(line.line || '').replace(/^[^:]*:\\s*/, '');\n  }\n  if (v == null) return '';\n  return typeof v === 'object' ? (v.value || v.text || JSON.stringify(v)) : String(v);\n}\n\nlet text = String(msg.text || '');\nif (!text.trim() && msg.html) {\n  text = String(msg.html)\n    .replace(/<(br|\\/p|\\/div|\\/li|\\/tr)\\b[^>]*>/gi, '\\n')\n    .replace(/<[^>]*>/g, ' ')\n    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\")\n    .replace(/[ \\t]+/g, ' ');\n}\ntext = text.replace(/\\r\\n/g, '\\n');\n// Only the new part of a reply: cut at \"On ... wrote:\" / \"W dniu ... pisze:\" /\n// \"-----Original Message-----\", and drop quoted lines.\nconst cut = text.search(/\\n[ \\t]*(On\\s[^\\n]{0,200}(\\n[^\\n]{0,200})?\\swrote:|W dniu\\s[^\\n]{0,200}(\\n[^\\n]{0,200})?\\s(pisze|napisał\\(a\\)|napisała|napisał):|-{2,}\\s*(Original Message|Wiadomość oryginalna|Forwarded message))/i);\nif (cut > 0) text = text.slice(0, cut);\nconst body = text.split('\\n').filter((l) => !/^\\s*>/.test(l)).join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim().slice(0, 4000);\nconst subject = String(msg.subject || '').trim();\n\nconst autoSubmitted = header('auto-submitted').toLowerCase();\nconst precedence = header('precedence').toLowerCase();\nlet skip = null;\nif (!fromEmail) skip = 'no_sender';\nelse if (/^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|bounce)/i.test(fromEmail.split('@')[0])) skip = 'automatic_sender';\nelse if (autoSubmitted && autoSubmitted !== 'no') skip = 'auto_submitted';\nelse if (/bulk|list|junk/.test(precedence) || header('list-unsubscribe') || header('list-id')) skip = 'mailing_list';\nelse if (!body && !subject) skip = 'empty';\n\nconst rfcId = String(msg.messageId || '').trim();\nreturn [{\n  json: {\n    skip: !!skip,\n    reason: skip,\n    gmail_message_id: msg.id || '',\n    gmail_thread_id: msg.threadId || msg.id || '',\n    rfc_message_id: /^<.+>$/.test(rfcId) ? rfcId : (rfcId ? `<${rfcId}>` : ''),\n    from_email: fromEmail,\n    from_name: fromName,\n    to_email: recipients[0] || '',\n    recipients,\n    subject,\n    body,\n    // What Elliot reads: the subject is often the whole question.\n    message: subject && !/^(re|odp|fw|fwd|pd)\\s*:/i.test(subject) ? `Subject: ${subject}\\n\\n${body || subject}` : (body || subject)\n  }\n}];"
+        "jsCode": "// n8n's Gmail Trigger (simple: false) gives a parsed email: text, html,\n// subject, from / to / cc .value[], id (Gmail's id), threadId, messageId\n// (the email's own Message-ID, used to thread our reply) and headers.\n// 0035: every recipient is checked against the agency's mailbox (not just\n// the first \"To\"), automatic emails are skipped (no-reply senders,\n// newsletters, out-of-office), and only the new part of a reply goes to\n// Elliot -- not the whole quoted conversation underneath.\nconst msg = $json;\n// 0046: an email with only attachments is still answered.\nlet attachmentCount = 0;\ntry { attachmentCount = Object.keys($input.first().binary || {}).filter((k) => /^attachment_\\d+$/.test(k)).length; } catch (e) { attachmentCount = 0; }\nconst addrs = (f) => ((f && f.value) || []).map((v) => String(v.address || '').trim().toLowerCase()).filter(Boolean);\nconst fromEmail = addrs(msg.from)[0] || '';\nconst fromName = String((msg.from && msg.from.value && msg.from.value[0] && msg.from.value[0].name) || '').trim();\nconst recipients = [...new Set([...addrs(msg.to), ...addrs(msg.cc), ...addrs(msg.bcc)])];\n\nfunction header(name) {\n  const h = msg.headers;\n  let v = '';\n  try {\n    if (h && typeof h.get === 'function') v = h.get(name);\n    else if (h) v = h[name] ?? h[name.toLowerCase()];\n  } catch (e) { v = ''; }\n  if (!v && Array.isArray(msg.headerLines)) {\n    const line = msg.headerLines.find((l) => String(l.key || '').toLowerCase() === name.toLowerCase());\n    if (line) v = String(line.line || '').replace(/^[^:]*:\\s*/, '');\n  }\n  if (v == null) return '';\n  return typeof v === 'object' ? (v.value || v.text || JSON.stringify(v)) : String(v);\n}\n\nlet text = String(msg.text || '');\nif (!text.trim() && msg.html) {\n  text = String(msg.html)\n    .replace(/<(br|\\/p|\\/div|\\/li|\\/tr)\\b[^>]*>/gi, '\\n')\n    .replace(/<[^>]*>/g, ' ')\n    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\")\n    .replace(/[ \\t]+/g, ' ');\n}\ntext = text.replace(/\\r\\n/g, '\\n');\n// Only the new part of a reply: cut at \"On ... wrote:\" / \"W dniu ... pisze:\" /\n// \"-----Original Message-----\", and drop quoted lines.\nconst cut = text.search(/\\n[ \\t]*(On\\s[^\\n]{0,200}(\\n[^\\n]{0,200})?\\swrote:|W dniu\\s[^\\n]{0,200}(\\n[^\\n]{0,200})?\\s(pisze|napisał\\(a\\)|napisała|napisał):|-{2,}\\s*(Original Message|Wiadomość oryginalna|Forwarded message))/i);\nif (cut > 0) text = text.slice(0, cut);\nconst body = text.split('\\n').filter((l) => !/^\\s*>/.test(l)).join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim().slice(0, 4000);\nconst subject = String(msg.subject || '').trim();\n\nconst autoSubmitted = header('auto-submitted').toLowerCase();\nconst precedence = header('precedence').toLowerCase();\nlet skip = null;\nif (!fromEmail) skip = 'no_sender';\nelse if (/^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|bounce)/i.test(fromEmail.split('@')[0])) skip = 'automatic_sender';\nelse if (autoSubmitted && autoSubmitted !== 'no') skip = 'auto_submitted';\nelse if (/bulk|list|junk/.test(precedence) || header('list-unsubscribe') || header('list-id')) skip = 'mailing_list';\nelse if (!body && !subject && !attachmentCount) skip = 'empty';\n\nconst rfcId = String(msg.messageId || '').trim();\nreturn [{\n  json: {\n    skip: !!skip,\n    reason: skip,\n    gmail_message_id: msg.id || '',\n    gmail_thread_id: msg.threadId || msg.id || '',\n    rfc_message_id: /^<.+>$/.test(rfcId) ? rfcId : (rfcId ? `<${rfcId}>` : ''),\n    from_email: fromEmail,\n    from_name: fromName,\n    to_email: recipients[0] || '',\n    recipients,\n    subject,\n    body,\n    // What Elliot reads: the subject is often the whole question.\n    message: subject && !/^(re|odp|fw|fwd|pd)\\s*:/i.test(subject) ? `Subject: ${subject}\\n\\n${body || subject}` : (body || subject || '(No text: the client sent attachments only.)')\n  }\n}];"
       },
       "id": "120df9b8-0e94-4ecf-9da5-6ffc002ba5ad",
       "name": "Extract Email Fields",
@@ -302,14 +304,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// Hands the email to Elliot (workflow 01, the same agent as WhatsApp and the\n// website chat): answers from the knowledge base, listings with links,\n// viewings booked with a confirmation email, hand-over to the team.\n// Elliot's address: worked out from this n8n's own address, or pasted below.\nconst ELLIOT_CHAT_WEBHOOK_URL = 'PASTE_ELLIOT_CHAT_WEBHOOK_URL_HERE';\n\nfunction setting(name, pasted) {\n  try { if ($vars && $vars[name]) return String($vars[name]); } catch (e) {}\n  try { if ($env && $env[name]) return String($env[name]); } catch (e) {}\n  return String(pasted || '').startsWith('PASTE_') ? '' : String(pasted || '');\n}\n\nconst f = $('Extract Email Fields').first().json;\nconst tenant = $('Lookup Tenant by Mailbox').first().json;\nconst contact = $('Upsert Contact').first().json || {};\nconst conversationId = $input.first().json.id;\n\nlet url = setting('ELLIOT_CHAT_WEBHOOK_URL', ELLIOT_CHAT_WEBHOOK_URL);\nif (!url) {\n  let resume = '';\n  try { resume = String($execution.resumeUrl || ''); } catch (e) {}\n  const at = resume.indexOf('/webhook-waiting/');\n  if (at > 0) url = resume.slice(0, at) + '/webhook/chat';\n}\nif (!url) {\n  throw new Error(\"Can't work out Elliot's address: paste the chat webhook URL (workflow 01's Production URL) into ELLIOT_CHAT_WEBHOOK_URL in this node.\");\n}\n\nreturn [{ json: {\n  chat_url: url,\n  request: {\n    tenant_slug: tenant.tenant_slug,\n    message: f.message,\n    conversation_id: conversationId,\n    channel: 'email',\n    contact: { name: contact.name || f.from_name || null, email: f.from_email }\n  }\n} }];"
+        "jsCode": "// Hands the email to Elliot (workflow 01, the same agent as WhatsApp and the\n// website chat): answers from the knowledge base, listings with links,\n// viewings booked with a confirmation email, hand-over to the team.\n// Elliot's address: worked out from this n8n's own address, or pasted below.\nconst ELLIOT_CHAT_WEBHOOK_URL = 'PASTE_ELLIOT_CHAT_WEBHOOK_URL_HERE';\n\nfunction setting(name, pasted) {\n  try { if ($vars && $vars[name]) return String($vars[name]); } catch (e) {}\n  try { if ($env && $env[name]) return String($env[name]); } catch (e) {}\n  return String(pasted || '').startsWith('PASTE_') ? '' : String(pasted || '');\n}\n\nconst f = $('Extract Email Fields').first().json;\nconst tenant = $('Lookup Tenant by Mailbox').first().json;\nconst contact = $('Upsert Contact').first().json || {};\nconst conversationId = $('Get or Create Conversation (Email)').first().json.id;\n// 0046: the files the client attached (links only for the ones Elliot reads).\nlet files = [];\ntry { files = $('Collect Attachments').first().json.files || []; } catch (e) { files = []; }\n\nlet url = setting('ELLIOT_CHAT_WEBHOOK_URL', ELLIOT_CHAT_WEBHOOK_URL);\nif (!url) {\n  let resume = '';\n  try { resume = String($execution.resumeUrl || ''); } catch (e) {}\n  const at = resume.indexOf('/webhook-waiting/');\n  if (at > 0) url = resume.slice(0, at) + '/webhook/chat';\n}\nif (!url) {\n  throw new Error(\"Can't work out Elliot's address: paste the chat webhook URL (workflow 01's Production URL) into ELLIOT_CHAT_WEBHOOK_URL in this node.\");\n}\n\nreturn [{ json: {\n  chat_url: url,\n  request: {\n    tenant_slug: tenant.tenant_slug,\n    message: f.message,\n    conversation_id: conversationId,\n    channel: 'email',\n    contact: { name: contact.name || f.from_name || null, email: f.from_email },\n    attachments: files\n  }\n} }];"
       },
       "id": "bb9b09fb-656e-5128-8d95-1d92d4005f91",
       "name": "Build Elliot Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        380,
+        1920,
         64
       ]
     },
@@ -335,7 +337,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        600,
+        2140,
         64
       ],
       "notes": "Calls workflow 01 (Elliot) at its chat webhook. Workflow 01 must be published."
@@ -349,7 +351,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        820,
+        2360,
         64
       ]
     },
@@ -382,7 +384,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1040,
+        2580,
         -40
       ]
     },
@@ -395,7 +397,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1260,
+        2800,
         -40
       ]
     },
@@ -423,7 +425,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1480,
+        3020,
         -40
       ],
       "credentials": {
@@ -443,7 +445,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1700,
+        3240,
         -40
       ]
     },
@@ -476,7 +478,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1920,
+        3460,
         -40
       ]
     },
@@ -493,7 +495,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        2140,
+        3680,
         -40
       ],
       "credentials": {
@@ -532,7 +534,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1040,
+        2580,
         200
       ]
     },
@@ -549,7 +551,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        1260,
+        2800,
         200
       ],
       "credentials": {
@@ -558,6 +560,194 @@
           "name": "Elliot Postgres (service role)"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0046: where Storage is (Supabase project URL), for the attachments.\nselect supabase_url from platform_settings limit 1;",
+        "options": {}
+      },
+      "id": "4f242a85-d8b9-5770-b2fa-43fe370fc6c5",
+      "name": "Storage Address",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "alwaysOutputData": true,
+      "position": [
+        380,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Which files are kept, and which Elliot reads (Claude opens PDFs and\n// JPEG/PNG/GIF/WebP photos; the rest are kept for the team).\nconst MAX_FILES = 10;            // per email\nconst MAX_BYTES = 25 * 1024 * 1024;\nconst READ_MAX = 5;              // files Elliot reads per email\nconst isImage = (t) => /^image\\//i.test(t);\nconst readableType = (t) => /^image\\/(jpeg|png|gif|webp)$/i.test(t) || /^application\\/pdf$/i.test(t);\nconst readLimit = (t) => (/pdf/i.test(t) ? 10 : 5) * 1024 * 1024;\n// Logos and icons in email signatures arrive as small images: not kept.\nconst isSignatureImage = (t, size, inline) => isImage(t) && size > 0 && (size < 15000 || (inline && size < 100000));\nconst safeName = (n) => String(n || 'file').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(-120) || 'file';\nfunction plan(list, ctx) {\n  const base = String(ctx.base || '').replace(/\\/+$/, '');\n  let reading = 0;\n  const kept = list.filter((f) => f.size <= MAX_BYTES && !isSignatureImage(f.content_type, f.size, f.inline)).slice(0, MAX_FILES);\n  return kept.map((f, i) => {\n    const readable = readableType(f.content_type) && f.size > 0 && f.size <= readLimit(f.content_type) && reading < READ_MAX;\n    if (readable) reading += 1;\n    const path = `${ctx.tenant_id}/${ctx.conversation_id}/${ctx.stamp}-${i + 1}-${safeName(f.filename)}`;\n    return { ...f, tenant_id: ctx.tenant_id, conversation_id: ctx.conversation_id, email_message_id: ctx.email_message_id || null,\n      path, readable, upload_url: `${base}/storage/v1/object/email-attachments/${path}`, sign_url: `${base}/storage/v1/object/sign/email-attachments/${path}` };\n  });\n}\n\n// Gmail Trigger (Download Attachments on) puts each file in binary attachment_0, _1...\nconst base = $('Storage Address').first().json.supabase_url;\nconst f = $('Extract Email Fields').first().json;\nconst ctx = { base, tenant_id: $('Lookup Tenant by Mailbox').first().json.tenant_id, conversation_id: $('Get or Create Conversation (Email)').first().json.id,\n  email_message_id: f.rfc_message_id, stamp: Date.now() };\nlet bin = {};\ntry { bin = $('Gmail Trigger').first().binary || {}; } catch (e) { bin = {}; }\nconst toBytes = (s) => {\n  const m = String(s || '').trim().match(/^([\\d.,]+)\\s*(B|kB|KB|MB|GB)?$/i);\n  if (!m) return Number(s) || 0;\n  const n = Number(m[1].replace(',', '.'));\n  return Math.round(n * ({ b: 1, kb: 1024, mb: 1048576, gb: 1073741824 }[(m[2] || 'b').toLowerCase()]));\n};\nconst keys = Object.keys(bin).filter((k) => /^attachment_\\d+$/.test(k)).sort((a, b) => Number(a.split('_')[1]) - Number(b.split('_')[1]));\nconst list = keys.map((k) => ({ key: k, filename: bin[k].fileName || k, content_type: String(bin[k].mimeType || 'application/octet-stream').toLowerCase(),\n  size: toBytes(bin[k].fileSize), inline: false }));\nif (!list.length) return [{ json: { none: true } }];\nif (!base) return [{ json: { none: true, not_saved: list.map((x) => x.filename), reason: 'platform_settings.supabase_url is not set' } }];\nconst files = plan(list, ctx);\nif (!files.length) return [{ json: { none: true } }];\nreturn files.map((x) => ({ json: x, binary: { file: bin[x.key] } }));"
+      },
+      "id": "ee2d9f2e-a7a2-5db4-8e78-dece8a8d4482",
+      "name": "Attachment Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "df25cef9-ed1f-525d-a51d-fdebd8ae178b",
+              "leftValue": "={{ $json.none !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "78913316-fc7e-57d7-909c-9e3c1472f5c9",
+      "name": "Has Attachments?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        820,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Attachment Files').item.json.upload_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "={{ $('Attachment Files').item.json.content_type }}"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "file",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "cdf7dc70-eba9-5356-9e43-9cd578ac6460",
+      "name": "Upload Attachment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Supabase Storage (service role)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Supabase Storage, private bucket email-attachments (0046).",
+      "position": [
+        1040,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0046: the file, for the conversation page (uploaded = Storage accepted it).\ninsert into message_attachments (tenant_id, conversation_id, email_message_id, filename, content_type, size_bytes, storage_path, uploaded, read_by_elliot)\nvalues ($1::uuid, $2::uuid, nullif($3, ''), $4, $5, $6::bigint, $7, $8::boolean, $9::boolean)\non conflict (storage_path) do update set uploaded = excluded.uploaded\nreturning id;",
+        "options": {
+          "queryReplacement": "={{ (() => { const m = $('Attachment Files').item.json; const ok = Number($json.statusCode) >= 200 && Number($json.statusCode) < 300; return [ m.tenant_id, m.conversation_id, m.email_message_id || '', m.filename, m.content_type, m.size || 0, m.path, ok, ok && m.readable ]; })() }}"
+        }
+      },
+      "id": "5981f8f2-6224-5101-8957-69488b097404",
+      "name": "Record Attachment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "position": [
+        1260,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Attachment Files').item.json.sign_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ expiresIn: 3600 }) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "c4e03693-7548-5718-be71-34d7b8f01d36",
+      "name": "Sign Attachment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Supabase Storage (service role)"
+        }
+      },
+      "notes": "A link valid for an hour, which Claude opens to read the file.",
+      "position": [
+        1480,
+        324
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One summary for Elliot: every file kept, with a short-lived link for the\n// ones Elliot reads (PDFs and photos). Runs on both branches.\nconst metas = $('Attachment Files').all().map((i) => i.json);\nconst first = metas[0] || {};\nif (first.none) {\n  return [{ json: { files: (first.not_saved || []).map((name) => ({ filename: name, saved: false, url: null })) } }];\n}\nconst safeAll = (n) => { try { return $(n).all().map((i) => i.json); } catch (e) { return []; } };\nconst uploads = safeAll('Upload Attachment');\nconst signs = $input.all().map((i) => i.json);\nconst base = String($('Storage Address').first().json.supabase_url || '').replace(/\\/+$/, '');\nconst ok = (r) => r && Number(r.statusCode) >= 200 && Number(r.statusCode) < 300;\nconst files = metas.map((m, i) => {\n  const saved = ok(uploads[i]);\n  let s = signs[i] && signs[i].body;\n  if (typeof s === 'string') { try { s = JSON.parse(s); } catch (e) { s = null; } }\n  const signed = saved && ok(signs[i]) && s && (s.signedURL || s.signedUrl);\n  return { filename: m.filename, content_type: m.content_type, size: m.size, saved,\n    url: m.readable && signed ? `${base}/storage/v1${signed}` : null };\n});\nreturn [{ json: { files } }];"
+      },
+      "id": "3ecc496f-728e-58ea-94bd-c6d340ea22d8",
+      "name": "Collect Attachments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        324
+      ]
     }
   ],
   "pinData": {},
@@ -672,7 +862,7 @@
       "main": [
         [
           {
-            "node": "Build Elliot Request",
+            "node": "Storage Address",
             "type": "main",
             "index": 0
           }
@@ -777,6 +967,90 @@
         [
           {
             "node": "Log Elliot Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Storage Address": {
+      "main": [
+        [
+          {
+            "node": "Attachment Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attachment Files": {
+      "main": [
+        [
+          {
+            "node": "Has Attachments?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Attachments?": {
+      "main": [
+        [
+          {
+            "node": "Upload Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Collect Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Attachment": {
+      "main": [
+        [
+          {
+            "node": "Record Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Attachment": {
+      "main": [
+        [
+          {
+            "node": "Sign Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Attachment": {
+      "main": [
+        [
+          {
+            "node": "Collect Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Attachments": {
+      "main": [
+        [
+          {
+            "node": "Build Elliot Request",
             "type": "main",
             "index": 0
           }
