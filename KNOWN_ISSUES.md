@@ -1,5 +1,36 @@
 # Known Issues / Resolved-but-worth-remembering
 
+## RESOLVED (Nov 2026) — Reliability review: silent failures and duplicates
+- **Claude unavailable crashed workflow 01.** No retry, no timeout. Email and
+  WhatsApp clients got "someone will get back to you" from the channel
+  workflow, but nothing told the team; website visitors got an error.
+- **A tool that crashed took Elliot down with it** (a refused Google
+  Calendar call, a sub-workflow whose ID was reset by an import).
+- **Follow-up steps could be sent twice.** The sweep moved a run on only at
+  the very end; a crash in between meant the same step went out again 15
+  minutes later.
+- **Emails could be sent twice.** "Send via Resend" retried on a dropped
+  connection without an idempotency key.
+- **Clients had no way to stop follow-ups**, and follow-ups kept going to
+  leads marked CONVERTED or LOST.
+- **WhatsApp messages Meta accepted but never delivered were invisible**
+  (status updates were dropped).
+- **CRM sync gave up after 25 minutes** (5 tries, 5 minutes apart).
+
+**Fix:** migration `0048`, workflows 01 / 20 / 23 / 25 / 39, retries and
+timeouts in eight more. See [`docs/reliability.md`](docs/reliability.md).
+
+**Verified:** `db/seed/test_0048_reliability.sql` on a scratch Postgres
+(including the crash case: a second sweep straight after the first hands out
+nothing) and `n8n/workflows/tests/reliability.test.js`. Not run in a live n8n.
+
+## OPEN — Importing a workflow resets sub-workflow links and the error workflow
+`01` and `10` refer to workflows 24 and 37 by placeholder, and no file names
+workflow 34 as its error workflow, because the real IDs were never recorded
+in the repo. After every import they must be picked again by hand
+([`docs/reliability.md`](docs/reliability.md#after-importing-a-workflow-into-n8n)).
+Fix: put the three real IDs in the files.
+
 ## RESOLVED (Nov 2026) — Security review: agency isolation and roles
 The public Supabase key could call n8n's helper functions with any agency's
 ID; any team member could make themselves admin or change their agency's

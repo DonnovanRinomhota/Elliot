@@ -266,6 +266,13 @@ Each is unit- and database-tested (`db/seed/test_00NN_*.sql`,
   as email or WhatsApp, booking approval enforced. Tested on a scratch
   database and from the workflow files; pending roll-out. `docs/security.md`.
 
+- 🟡 **Reliability review** (0048, workflows 01/20/23/25/39 and retries in
+  eight more). Claude retried with a holding reply and escalation when it
+  can't answer; crashed tools never reported as done; follow-up steps and
+  emails can't be sent twice; STOP for follow-ups; failed WhatsApp deliveries
+  recorded. Tested on a scratch database and from the workflow files;
+  pending roll-out. `docs/reliability.md`.
+
 ## Next
 
 - Workflow 16 (Gmail) answers only the first of several emails that arrive

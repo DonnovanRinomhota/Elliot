@@ -33,15 +33,18 @@
 
 ## Workflow 20 — Follow-Up Sweep
 **Trigger:** cron, every 15 minutes (matches `docs/architecture.md` section 4 — adjust directly in the n8n trigger node, no code change needed).
-**Per due run, one of three outcomes:**
+**Per due run, one of three outcomes** (decided in the database by `claim_due_follow_up_runs`, 0048; see [`../reliability.md`](../reliability.md)):
 | Outcome | Condition | Result |
 |---|---|---|
-| Stop | contact replied since run started | `status='stopped'`, `stop_reason='contact_replied'` |
+| Stop | the client replied since the run started, asked for no more messages (STOP), or the lead is CONVERTED / LOST | `status='stopped'`, `stop_reason` = `contact_replied` / `opted_out` / `lead_closed` |
 | Complete | no more steps in the sequence | `status='completed'` |
-| Send | otherwise | insert `email_drafts` row, send now if autonomous, advance to next step (or complete if this was the last one) |
+| Send | otherwise | the run is moved to its next step first (or completed, if this was the last one), then the step comes back to the workflow: a draft is inserted and sent now if automatic |
+
+Because the run moves on before anything is sent, a sweep that crashes or
+overlaps the next one can never send a step twice.
 
 **Credentials required:** the shared Postgres credential (same as everywhere else), and the same Gmail OAuth2 credential already used by workflow `15`/`18` for the autonomous-send path (`Send via Gmail` node — only fires when `ai_config.autonomy_rules.send_follow_up.mode === 'autonomous'`; defaults to `approval_required` when that key is absent, which it is for every tenant onboarded via `19` so far).
 
 ## Error paths
-- Gmail send failure (`continueOnFail: true`) never loses the draft — it's already inserted before the send attempt — and the run still advances regardless (see the advance-without-waiting-for-send limitation above).
+- A send failure never loses the draft — it's already inserted before the send attempt — and the run has already moved on (see the advance-without-waiting-for-send limitation above). A step whose send failed is not sent again.
 - A sweep capped at 25 due runs per execution, so a large backlog spreads across multiple 15-minute sweeps rather than overloading one execution.

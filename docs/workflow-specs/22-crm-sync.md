@@ -20,7 +20,7 @@
 |---|---|
 | Tenant has no `crm_webhook_url` configured | Immediately marked `failed` with a clear `last_error` — not left pending forever with no explanation |
 | Send succeeds | Marked `synced` |
-| Send fails | `retry_count` incremented; stays `pending` (next sweep retries automatically) until 5 total attempts, then `failed` permanently |
+| Send fails | `retry_count` incremented; stays `pending` and is tried again after 15 min, 45 min, 2 h 15 and 6 h 45 (`due_crm_syncs`, 0048); after 5 attempts `failed` |
 
 **Payload sent to the tenant's webhook:**
 ```json
@@ -36,7 +36,7 @@
 
 ## Design decisions worth knowing
 - **Both the queue query and the sweep query are single round trips**, same lesson as workflows 20/21: `Verify Entity Belongs To Tenant` uses scalar subqueries (always exactly one row, `NULL` rather than a vanished item on no match); `Query Pending Syncs` uses three `LEFT JOIN`s gated by `entity_type`, so exactly one contributes to the `CASE`-built payload per row — no chained Postgres node to strip fields via a narrow `RETURNING` or lose the item on zero rows.
-- **The 5-attempt retry cap reuses the existing `retry_count` column** rather than adding new scheduling logic — the sweep's own 5-minute cadence *is* the retry backoff.
+- **The 5-attempt retry cap reuses the existing `retry_count` column.** Since 0048 the wait between tries grows (5 min × 3^retries, counted from the last try), so a CRM that is down for a few hours doesn't lose the sync.
 
 ## Credentials required
 The shared Postgres credential (same as everywhere else). `Send To CRM Webhook` has no credential of its own — it POSTs to whatever URL the tenant configured, which is data, not a fixed endpoint needing a stored credential.
