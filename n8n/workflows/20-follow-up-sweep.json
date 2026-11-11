@@ -471,6 +471,7 @@
     },
     {
       "parameters": {
+        "mode": "each",
         "workflowId": {
           "__rl": true,
           "value": "171fa894c0614981",
