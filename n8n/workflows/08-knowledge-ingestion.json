@@ -224,7 +224,8 @@
               "batchSize": 1,
               "batchInterval": 200
             }
-          }
+          },
+          "timeout": 30000
         }
       },
       "id": "bb402b5e-a1de-43ed-8a22-b1073bc86bc1",
@@ -241,7 +242,10 @@
           "name": "Voyage AI API Key (Authorization header)"
         }
       },
-      "notes": "Runs once per chunk item (n8n's default per-item execution for HTTP Request nodes). batchInterval adds a small delay between calls to stay well under Voyage's rate limits on free tier -- tune this down if ingestion feels slow and you're not hitting rate limit errors."
+      "notes": "Runs once per chunk item (n8n's default per-item execution for HTTP Request nodes). batchInterval adds a small delay between calls to stay well under Voyage's rate limits on free tier -- tune this down if ingestion feels slow and you're not hitting rate limit errors.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
     },
     {
       "parameters": {

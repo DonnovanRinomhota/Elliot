@@ -50,7 +50,9 @@ test('20 wiring: WhatsApp, nothing to send, or email', () => {
   assert.deepStrictEqual(next(w20, 'Autonomous WhatsApp?', 0), ['Send WhatsApp']);
   assert.deepStrictEqual(next(w20, 'Autonomous WhatsApp?', 1), ['Merge Before Advance']);
   assert.deepStrictEqual(next(w20, 'Send WhatsApp'), ['Merge Before Advance']);
-  assert.deepStrictEqual(next(w20, 'Merge Before Advance'), ['Advance Run']);
+  // 0048: the run is moved on when the step is claimed, not at the end.
+  assert.deepStrictEqual(next(w20, 'Merge Before Advance'), []);
+  assert.ok(!w20.nodes.some((n) => n.name === 'Advance Run'));
   const send = nodeOf(w20, 'Send WhatsApp');
   assert.strictEqual(send.parameters.workflowId.value, nodeOf(load('28-manual-send-whatsapp-draft.json'), 'Execute: Send Approved WhatsApp').parameters.workflowId.value,
     'same workflow 27 as 28 uses');
@@ -113,7 +115,9 @@ test('20: WhatsApp draft waits for approval unless follow-ups are automatic', ()
   const cond = nodeOf(w20, 'Autonomous WhatsApp?').parameters.conditions.conditions[0].leftValue;
   assert.strictEqual(expr(cond, {}, { 'Determine Action': auto }), true);
   assert.strictEqual(expr(cond, {}, { 'Determine Action': a }), false);
-  assert.match(nodeOf(w20, 'Query Due Runs').parameters.query, /channel = 'whatsapp'/);
+  // 0048: the WhatsApp conversation lookup moved into claim_due_follow_up_runs (0048 migration).
+  assert.match(nodeOf(w20, 'Query Due Runs').parameters.query, /select \* from claim_due_follow_up_runs\(25\);/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'db', 'migrations', '0048_reliability.sql'), 'utf8'), /conv\.channel = 'whatsapp'/);
 });
 
 test('27 wiring: outside 24 hours a follow-up goes as the template', () => {

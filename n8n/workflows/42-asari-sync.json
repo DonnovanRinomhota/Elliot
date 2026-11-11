@@ -100,7 +100,10 @@
       "position": [
         440,
         300
-      ]
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
     },
     {
       "parameters": {
@@ -208,7 +211,10 @@
         1320,
         200
       ],
-      "notes": "ASARI allows 25 calls a minute: one call every 2.6 seconds."
+      "notes": "ASARI allows 25 calls a minute: one call every 2.6 seconds.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
     },
     {
       "parameters": {

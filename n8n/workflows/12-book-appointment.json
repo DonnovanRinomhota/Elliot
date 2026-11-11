@@ -68,7 +68,9 @@
         "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Pick Calendar').first().json.google_calendar_id) }}/events/{{ $('HTTP Request').first().json.id }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleCalendarOAuth2Api",
-        "options": {}
+        "options": {
+          "timeout": 20000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -133,7 +135,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ (() => {\n  const req = $('When Executed by Another Workflow').first().json;\n  const info = $json;\n  const DASHBOARD_URL = 'https://app.getelliot.eu';\n  const CHANNEL = { whatsapp: 'WhatsApp', chat_widget: 'website chat', email: 'email' };\n  const place = [info.listing_title, info.listing_reference ? `ref ${info.listing_reference}` : null].filter(Boolean).join(', ');\n  const attendees = [info.contact_email, info.agent_invite].filter(Boolean).map((email) => ({ email }));\n  // 0037: a call with the Elliot team (getelliot.eu) gets a Google Meet link.\n  if (String(req.kind || '') === 'consultation') {\n    let d = {};\n    try { d = JSON.parse(req.details || '{}') || {}; } catch (e) { d = {}; }\n    const label = d.call_type === 'demo' ? '30-min live demo' : '15-min intro call';\n    return JSON.stringify({\n      summary: `Elliot ${label} \\u2014 ${info.contact_name || info.contact_email || 'visitor'}${d.agency ? ` (${d.agency})` : ''}`,\n      description: [\n        `Elliot ${label}, booked on getelliot.eu.`,\n        d.agency ? `Agency: ${d.agency}` : null,\n        d.agents ? `Agents: ${d.agents}` : null,\n        d.listings ? `Listings: ${d.listings}` : null,\n        d.crm ? `CRM: ${d.crm}` : null,\n        info.contact_phone ? `Phone: ${info.contact_phone}` : null,\n        req.notes ? `Notes: ${req.notes}` : null,\n        info.conversation_id ? `Chat: ${DASHBOARD_URL}/dashboard/conversations/${info.conversation_id}` : null,\n      ].filter(Boolean).join('\\n'),\n      start: { dateTime: req.starts_at, timeZone: info.timezone },\n      end: { dateTime: req.ends_at, timeZone: info.timezone },\n      attendees: info.contact_email ? [{ email: info.contact_email }] : [],\n      conferenceData: { createRequest: { requestId: `elliot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, conferenceSolutionKey: { type: 'hangoutsMeet' } } },\n    });\n  }\n  // 0043: an agent values the client's own property, at their address.\n  if (String(req.kind || '') === 'valuation') {\n    return JSON.stringify({\n      summary: `Valuation visit \\u2014 ${info.contact_name || 'client'}${req.location ? ` \\u2014 ${req.location}` : ''}`,\n      location: req.location || undefined,\n      description: [\n        \"Free valuation of the client's property, booked by Elliot.\",\n        req.location ? `Address: ${req.location}` : null,\n        info.agent_name ? `Agent: ${info.agent_name}` : null,\n        info.contact_phone ? `Client phone: ${info.contact_phone}` : null,\n        req.notes || null,\n        info.conversation_id ? `Conversation: ${DASHBOARD_URL}/dashboard/conversations/${info.conversation_id}` : null,\n      ].filter(Boolean).join('\\n'),\n      start: { dateTime: req.starts_at, timeZone: info.timezone },\n      end: { dateTime: req.ends_at, timeZone: info.timezone },\n      attendees,\n    });\n  }\n  return JSON.stringify({\n    summary: `Property viewing — ${info.contact_name || 'client'}${info.listing_title ? ` — ${info.listing_title}` : ''}`,\n    location: info.listing_address || undefined,\n    description: [\n      place ? `Property: ${place}` : null,\n      info.listing_address ? `Address: ${info.listing_address}` : null,\n      info.agent_name ? `Agent: ${info.agent_name}` : null,\n      info.contact_phone ? `Client phone: ${info.contact_phone}` : null,\n      req.notes || null,\n      info.conversation_id ? `Booked by Elliot on ${CHANNEL[info.conversation_channel] || 'chat'}: ${DASHBOARD_URL}/dashboard/conversations/${info.conversation_id}` : null,\n    ].filter(Boolean).join('\\n'),\n    start: { dateTime: req.starts_at, timeZone: info.timezone },\n    end: { dateTime: req.ends_at, timeZone: info.timezone },\n    attendees,\n  });\n})() }}",
-        "options": {}
+        "options": {
+          "timeout": 20000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -347,7 +351,10 @@
           "name": "Elliot Google Calendar"
         }
       },
-      "notes": "0042: is the agent (or the agency calendar) still free at that time?"
+      "notes": "0042: is the agent (or the agency calendar) still free at that time?",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
     },
     {
       "parameters": {

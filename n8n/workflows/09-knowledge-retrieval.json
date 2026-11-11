@@ -41,7 +41,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ input: [$json.query], model: 'voyage-4-lite', input_type: 'query' }) }}",
-        "options": {}
+        "options": {
+          "timeout": 30000
+        }
       },
       "id": "35490791-d8c2-4902-ba39-716ef75701bb",
       "name": "Embed Query (Voyage AI)",
@@ -57,7 +59,10 @@
           "name": "Voyage AI API Key (Authorization header)"
         }
       },
-      "notes": "Header Auth credential must send 'Authorization: Bearer <key>'. input_type: 'query' vs 'document' matters for Voyage's models -- queries and documents are embedded slightly differently for better retrieval, verify against current Voyage docs."
+      "notes": "Header Auth credential must send 'Authorization: Bearer <key>'. input_type: 'query' vs 'document' matters for Voyage's models -- queries and documents are embedded slightly differently for better retrieval, verify against current Voyage docs.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
     },
     {
       "parameters": {

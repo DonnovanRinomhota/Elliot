@@ -152,7 +152,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $json.to_wa_id, type: 'text', text: { body: $json.body } }) }}",
-        "options": {}
+        "options": {
+          "timeout": 30000
+        }
       },
       "id": "a63c769b-d198-4dc7-8ba6-bfa6524f3fe3",
       "name": "Send via WhatsApp API",

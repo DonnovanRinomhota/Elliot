@@ -179,7 +179,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Meta's Cloud API webhook shape:\n// { entry: [{ changes: [{ value: { metadata: { phone_number_id }, contacts: [{ profile: { name }, wa_id }], messages: [{ from, id, timestamp, type, text: { body } }] } }] }] }\n// The SAME path also receives delivery/read \"statuses\" updates with no \"messages\" key at all --\n// those aren't a customer message and are skipped, as are reactions.\n// Text and button replies go to Elliot as they are. Elliot can't open media yet, so a photo,\n// voice note, document or location becomes a short note (\"[Sent a photo: caption]\") and Elliot\n// answers that sensibly (e.g. asks the client to type the question) instead of staying silent.\nconst body = $json.body || $json;\nconst value = body?.entry?.[0]?.changes?.[0]?.value;\nconst message = value?.messages?.[0];\n\nif (!value || !message) {\n  return [{ json: { skip: true, reason: !value ? 'no_value' : 'no_message_key_(status_update)' } }];\n}\n\nconst caption = (m) => (m && m.caption && String(m.caption).trim() ? `: ${String(m.caption).trim()}` : '');\nlet text = '';\nswitch (message.type) {\n  case 'text': text = message.text?.body || ''; break;\n  case 'button': text = message.button?.text || message.button?.payload || ''; break;\n  case 'interactive': {\n    const i = message.interactive || {};\n    text = i.button_reply?.title || i.list_reply?.title || '';\n    break;\n  }\n  case 'image': text = `[Sent a photo${caption(message.image)}]`; break;\n  case 'video': text = `[Sent a video${caption(message.video)}]`; break;\n  case 'document': {\n    const d = message.document || {};\n    text = `[Sent a document${d.filename ? ` (${d.filename})` : ''}${caption(d)}]`;\n    break;\n  }\n  case 'audio': text = message.audio?.voice ? '[Sent a voice message]' : '[Sent an audio file]'; break;\n  case 'sticker': text = '[Sent a sticker]'; break;\n  case 'location': {\n    const l = message.location || {};\n    const place = [l.name, l.address].filter(Boolean).join(', ');\n    text = `[Shared a location${place ? `: ${place}` : ''}${l.latitude != null ? ` (${l.latitude}, ${l.longitude})` : ''}]`;\n    break;\n  }\n  case 'contacts': text = '[Shared a contact card]'; break;\n  case 'reaction': return [{ json: { skip: true, reason: 'reaction' } }];\n  default: text = `[Sent a ${message.type || 'message'} that can't be opened here]`;\n}\ntext = String(text).trim();\nif (!text) {\n  return [{ json: { skip: true, reason: 'empty_message', message_type: message.type } }];\n}\n\nreturn [{ json: {\n  skip: false,\n  phone_number_id: value.metadata?.phone_number_id || '',\n  from_wa_id: message.from || '',\n  contact_name: value.contacts?.[0]?.profile?.name || null,\n  wa_message_id: message.id || '',\n  message_type: message.type,\n  message_timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),\n  body: text.slice(0, 4000)\n} }];"
+        "jsCode": "// Meta's Cloud API webhook shape:\n// { entry: [{ changes: [{ value: { metadata: { phone_number_id }, contacts: [{ profile: { name }, wa_id }], messages: [{ from, id, timestamp, type, text: { body } }] } }] }] }\n// The SAME path also receives delivery/read \"statuses\" updates with no \"messages\" key at all --\n// those aren't a customer message and are skipped, as are reactions.\n// Text and button replies go to Elliot as they are. Elliot can't open media yet, so a photo,\n// voice note, document or location becomes a short note (\"[Sent a photo: caption]\") and Elliot\n// answers that sensibly (e.g. asks the client to type the question) instead of staying silent.\nconst body = $json.body || $json;\nconst value = body?.entry?.[0]?.changes?.[0]?.value;\nconst message = value?.messages?.[0];\n\n// 0048: what else was in this delivery.\n//  - Meta later reports a message it accepted as FAILED (number not on\n//    WhatsApp, 24-hour window closed, blocked...). That used to be dropped;\n//    now it is recorded so the team sees the client never got it.\n//  - Meta may put several messages in one delivery. This workflow answers the\n//    first; any others are counted so they show up in the alerts instead of\n//    vanishing.\nconst allValues = (body?.entry || []).flatMap((en) => (en?.changes || []).map((ch) => ch?.value).filter(Boolean));\nconst failed = allValues.flatMap((v) => (v.statuses || []).filter((s) => s && s.status === 'failed').map((s) => ({\n  phone_number_id: v.metadata?.phone_number_id || '',\n  recipient: s.recipient_id || '',\n  wa_message_id: s.id || '',\n  error: (() => { const er = (s.errors || [])[0] || {}; const t = er.title || er.message || (er.error_data && er.error_data.details) || 'not delivered'; return `${t}${er.code ? ` (code ${er.code})` : ''}`; })(),\n})));\nconst extraMessages = Math.max(0, allValues.reduce((sum, v) => sum + ((v.messages || []).filter((m) => m && m.type !== 'reaction').length), 0) - 1);\nconst extras = { delivery_failures: failed, has_delivery_failures: failed.length > 0, extra_messages: extraMessages,\n  extra_phone_number_id: allValues[0]?.metadata?.phone_number_id || '' };\n\nif (!value || !message) {\n  return [{ json: { skip: true, reason: !value ? 'no_value' : 'no_message_key_(status_update)', ...extras } }];\n}\n\nconst caption = (m) => (m && m.caption && String(m.caption).trim() ? `: ${String(m.caption).trim()}` : '');\nlet text = '';\nswitch (message.type) {\n  case 'text': text = message.text?.body || ''; break;\n  case 'button': text = message.button?.text || message.button?.payload || ''; break;\n  case 'interactive': {\n    const i = message.interactive || {};\n    text = i.button_reply?.title || i.list_reply?.title || '';\n    break;\n  }\n  case 'image': text = `[Sent a photo${caption(message.image)}]`; break;\n  case 'video': text = `[Sent a video${caption(message.video)}]`; break;\n  case 'document': {\n    const d = message.document || {};\n    text = `[Sent a document${d.filename ? ` (${d.filename})` : ''}${caption(d)}]`;\n    break;\n  }\n  case 'audio': text = message.audio?.voice ? '[Sent a voice message]' : '[Sent an audio file]'; break;\n  case 'sticker': text = '[Sent a sticker]'; break;\n  case 'location': {\n    const l = message.location || {};\n    const place = [l.name, l.address].filter(Boolean).join(', ');\n    text = `[Shared a location${place ? `: ${place}` : ''}${l.latitude != null ? ` (${l.latitude}, ${l.longitude})` : ''}]`;\n    break;\n  }\n  case 'contacts': text = '[Shared a contact card]'; break;\n  case 'reaction': return [{ json: { skip: true, reason: 'reaction', ...extras } }];\n  default: text = `[Sent a ${message.type || 'message'} that can't be opened here]`;\n}\ntext = String(text).trim();\nif (!text) {\n  return [{ json: { skip: true, reason: 'empty_message', message_type: message.type, ...extras } }];\n}\n\nreturn [{ json: {\n  ...extras,\n  skip: false,\n  phone_number_id: value.metadata?.phone_number_id || '',\n  from_wa_id: message.from || '',\n  contact_name: value.contacts?.[0]?.profile?.name || null,\n  wa_message_id: message.id || '',\n  message_type: message.type,\n  message_timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : new Date().toISOString(),\n  body: text.slice(0, 4000)\n} }];"
       },
       "id": "29b1e9ff-d74e-4c09-9813-aea51cd49520",
       "name": "Extract WhatsApp Fields",
@@ -696,6 +696,133 @@
           "name": "Elliot Postgres (service role)"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c42f7359-42a8-59af-8072-265e2c3346a7",
+              "leftValue": "={{ $json.has_delivery_failures === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a68c49bd-a23e-52a6-8fcb-8792798fdee8",
+      "name": "Delivery Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per failed message (0048).\nreturn ($input.first().json.delivery_failures || []).map((f) => ({ json: f }));"
+      },
+      "id": "680a3d34-950f-53c2-94b1-96cfa1462959",
+      "name": "Each Failed Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0048: audit log (alerts) and a note in the client's conversation. Meta\n-- repeats status updates; each failed message is recorded once.\nselect record_whatsapp_delivery_failure($1, $2, $3, $4) as recorded;",
+        "options": {
+          "queryReplacement": "={{ [ $json.phone_number_id, $json.recipient, $json.wa_message_id, $json.error ] }}"
+        }
+      },
+      "id": "9de3ce26-beb8-52dc-bddb-fb1d7af0cd01",
+      "name": "Record Delivery Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        16,
+        740
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8dfa121d-2fd3-5e18-af1b-10fc27678504",
+              "leftValue": "={{ Number($json.extra_messages) > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "93ffa95c-25aa-541c-8135-720aae7f1d92",
+      "name": "More Than One Message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0048: Meta sent several messages in one delivery and only the first is\n-- answered. Logged so it appears in the alerts and someone reads the chat.\ninsert into audit_log (tenant_id, actor_type, actor_id, event_type, details)\nselect ac.tenant_id, 'system', 'workflow_25', 'whatsapp_unanswered_failed',\n       jsonb_build_object('messages_not_answered', $2::int, 'from_wa_id', $3)\nfrom ai_config ac where ac.whatsapp_phone_number_id = nullif($1, '') limit 1;",
+        "options": {
+          "queryReplacement": "={{ [ $json.extra_phone_number_id, Number($json.extra_messages) || 0, $json.from_wa_id || '' ] }}"
+        }
+      },
+      "id": "dbab4097-af9c-5b56-b94e-8c05b95fc75a",
+      "name": "Log Unanswered Messages",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -208,
+        960
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -784,6 +911,16 @@
         [
           {
             "node": "Should Process?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delivery Failed?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "More Than One Message?",
             "type": "main",
             "index": 0
           }
@@ -976,6 +1113,41 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "Delivery Failed?": {
+      "main": [
+        [
+          {
+            "node": "Each Failed Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Each Failed Message": {
+      "main": [
+        [
+          {
+            "node": "Record Delivery Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "More Than One Message?": {
+      "main": [
+        [
+          {
+            "node": "Log Unanswered Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
