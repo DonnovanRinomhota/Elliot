@@ -28,8 +28,9 @@ directly: he sets Elliot up, watches how it performs and adjusts it with them.
   how they differ.
 - **Qualifies buyers and renters**: budget, area, size, timing and financing,
   and marks each lead hot, warm or cold so the team knows who to call first.
-- **Books viewings** in free slots of the agency's Google Calendar, picks the
-  agent, and emails the client a confirmation in English and Polish. The
+- **Books viewings** in free slots of the agents' own Google Calendars (the
+  client's own agent first), and emails the client a confirmation in English
+  and Polish. The
   agency sets the earliest booking time and a gap between viewings for travel.
 - **Reminds clients the day before** (WhatsApp or email). Clients can reply
   to confirm, move or cancel; Elliot does it, updates the calendar and tells
@@ -43,9 +44,19 @@ directly: he sets Elliot up, watches how it performs and adjusts it with them.
   full conversation.
 - **Captures every lead** in the dashboard and, if the agency uses one, sends
   it on to their CRM (directly or through Zapier or Make).
-- **Follows up** with people who go quiet, by email, with the agency's approval
-  rules.
+- **Follows up** with people who go quiet, by email or WhatsApp, with the
+  agency's approval rules.
+- **Reads what clients send by email**: PDFs and photos (a mortgage
+  pre-approval, a floor plan, a photo of a flat they liked) are read and used
+  in the reply; other files are kept for the team. All files are shown in the
+  dashboard.
 - **Daily summary** email for the team each morning.
+
+## Listings
+
+The agency's listings come from **ASARI CRM** automatically (copied every
+hour), or are typed in or imported from a spreadsheet, PDF or Word file.
+Each listing gets a page with its photos that Elliot can link to.
 
 ## Channels
 
@@ -81,12 +92,11 @@ from; changes apply straight away.
 
 ## Works with
 
-Google Calendar, any email inbox (Gmail, Outlook / Microsoft 365, or the
-agency's own mail server, by forwarding), WhatsApp Business, the agency's
-website, and CRMs through a webhook, Zapier or Make. Not yet: Outlook
-calendars. For a
-specific CRM such as ASARI, Galactica Virgo or IMO, book a call to discuss
-the connection.
+Google Calendar (each agent's own), any email inbox (Gmail, Outlook /
+Microsoft 365, or the agency's own mail server, by forwarding), WhatsApp
+Business, the agency's website, ASARI CRM (listings), and CRMs through a
+webhook, Zapier or Make. Not yet: Outlook calendars. For another CRM such as
+Galactica Virgo or IMO, book a call to discuss the connection.
 
 ## Pricing
 
@@ -95,10 +105,11 @@ from €500**. Net prices; VAT is added where it applies. The exact price
 depends on the number of enquiries and which tools Elliot connects to, and is
 confirmed in writing before anything starts.
 
-Included: website chat trained on the agency's listings and FAQs, lead
-qualification and scoring, viewing booking with Google Calendar, follow-up
-emails with approval rules, the dashboard, CRM connection, and a monthly
-review and adjustments.
+Included: website chat, WhatsApp and email replies trained on the agency's
+listings and FAQs, lead qualification and scoring, viewing and valuation
+booking with Google Calendar, follow-ups by email and WhatsApp with approval
+rules, the dashboard, listings from ASARI or a spreadsheet, CRM connection,
+and a monthly review and adjustments.
 
 ## Data and privacy
 

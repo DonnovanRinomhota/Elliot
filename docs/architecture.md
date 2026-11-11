@@ -1,5 +1,7 @@
 # AI Business Assistant Platform — Technical Blueprint v1
 
+> **Historical.** The original blueprint (v1, Aug 2026), kept for its reasoning. What's actually built is described in the root `README.md`, `ROADMAP.md` and the feature docs in `docs/`.
+
 ## 0. Ground Rules Before We Start
 
 - This is a **blueprint**, not code. Nothing here is built yet.

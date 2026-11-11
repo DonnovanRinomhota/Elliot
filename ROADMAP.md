@@ -1,9 +1,8 @@
 # Roadmap / Feature Backlog
 
-Tracks everything from the original 10-phase build (see root `README.md`'s
-"Development approach" for that) plus a second wave of ideas that came out
-of an external product review, re-audited against the real codebase before
-being logged here -- nothing on this list is taken on faith. Keep this file
+What's built, what's verified on the real stack, and what's next. The
+newest work is under "November 2026" near the end; "Next" lists what to
+pick up. Keep this file
 in sync going forward: when an item is started, flip it to 🟡; when it's
 actually built *and verified* (not just merged), flip it to ✅ and add a
 one-line pointer to where it's proven (a `KNOWN_ISSUES.md` entry, a
@@ -54,48 +53,18 @@ Production showed no runtime errors over the deploys and tests.
   wired to the real n8n webhooks (Elliot-web PRs #1–#3, Sep 2026). This
   entry used to say "README only, nothing built" -- that was stale.
 - ⬜ **Voice** (e.g. Retell or similar usage-based voice agent
-  infrastructure). Not started. Depends on having a real always-on
-  channel first, same underlying gap as the widget.
-- 🟡 **WhatsApp** (workflows `25`–`28`, migration `0025`) -- inbound
-  messages, classify/draft/approve/send, and dashboard Approvals support,
-  built against Meta's WhatsApp Cloud API. High-value for the real-estate/
-  Europe niche specifically. Mirrors the email agent's shape (13-17)
-  rather than the widget's, since WhatsApp's webhook -- like email's --
-  doesn't wait around for a reply in the same request: `25` (inbound
-  trigger, routes tenants by `phone_number_id` -- genuinely multi-tenant
-  from one shared credential, unlike Gmail's single-mailbox limitation,
-  see that workflow's spec) → `13` (classify, reused as-is) → `26` (draft,
-  a mirror of `14`) → approve in the dashboard, or auto-send for
-  high-confidence FAQ answers → `27` (send) / `28` (manual send trigger).
-  Drafts live in a new `whatsapp_drafts` table, a sibling of
-  `email_drafts` rather than a merge of it -- kept separate on purpose so
-  WhatsApp being new and unproven can't put email's working path at risk.
-  The database side is real-verified: all 25 migrations run clean end to
-  end (tested locally with Postgres 16 + pgvector, not just read for
-  syntax), and RLS tenant isolation plus both approve/reject RPCs were
-  tested as an actual non-superuser role, not the table-owning role that
-  bypasses RLS by default. The dashboard side (Approvals merging both
-  draft tables with the right RPC/webhook per row, the Settings field for
-  `whatsapp_phone_number_id`) passed `tsc`, a production build, and a
-  browser-driven check of the approve/reject/blocked states with the
-  Supabase calls intercepted. **None of this has been tested against a
-  real Meta WhatsApp number or run inside n8n itself** -- the four
-  workflow JSON files are valid and structurally checked (every
-  connection resolves, every node reachable from a trigger, no orphaned
-  nodes) but have never actually executed. Needs, before this can go to
-  🟢: a Meta Business Account + WhatsApp Cloud API sandbox number, the
-  verify token and Meta App Secret pasted into workflow 25's two Code
-  nodes (n8n Cloud Starter has no env vars -- see
-  `docs/client-ready-setup.md`), an HTTP Header Auth credential set
-  in n8n (currently a placeholder on workflow 27's send node), and
-  `NEXT_PUBLIC_N8N_SEND_WHATSAPP_WEBHOOK_URL` set in the dashboard's env.
-  Known gaps, all documented in the relevant workflow specs and
-  `KNOWN_ISSUES.md` (Meta's request signature is now verified -- fix pack
-  above -- but needs the Meta App Secret pasted in): no template-message support, so any reply more than 24 hours
-  after the contact's last message gets blocked rather than sent
-  (`blocked_needs_template`); non-text messages (images, audio, location)
-  aren't handled at all; and human takeover doesn't work on WhatsApp
-  conversations, same as it doesn't yet on the chat widget.
+  infrastructure). Not started.
+- 🟡 **WhatsApp** (workflows `25`, `27`, `28`, `32`; migrations `0025`,
+  `0032`, `0045`). Elliot answers each message instantly through workflow 01,
+  like the website chat (0032; the old draft-and-approve path, 26, is
+  retired). The team can take over a WhatsApp chat and reply from the
+  dashboard (32). Reminders (`viewing_reminder`), alerts (`elliot_alert`) and
+  follow-ups after 24 hours (`elliot_follow_up`, 0045) go as approved
+  templates. Photos, voice notes, documents and locations are noted in the
+  conversation but not opened yet. Meta's request signature is checked.
+  Working on Meta's test number; waiting on Meta business verification and
+  the agency's real number (needs the business registered). Set-up:
+  `docs/whatsapp-setup.md`, `docs/whatsapp-follow-ups.md`.
 
 ## Dashboard / operator experience
 
@@ -107,7 +76,8 @@ Production showed no runtime errors over the deploys and tests.
   `10-lead-capture.json`'s actual scoring logic exactly.
 - ✅ **Human takeover** (`/dashboard/conversations/[id]`) -- email
   replies, and live takeover of website chats (Elliot pauses, the widget
-  polls for team replies). WhatsApp takeover still to do. See
+  polls for team replies), and WhatsApp chats (team replies go out
+  through workflow 32). See
   `docs/control-panel-listings-inbox.md`.
 - ✅ **Control panel** (`/platform`) -- every agency's account state,
   usage, AI cost, health; manual billing dates; "open their dashboard";
@@ -157,8 +127,8 @@ Production showed no runtime errors over the deploys and tests.
   means anything with multiple tenants in different countries.
 - ✅ **Follow-up sequence configuration UI** (`/dashboard/follow-ups`) --
   create, edit, activate/deactivate, and delete sequences without SQL. Each
-  step is a day, subject, and message, saved in the same `steps` shape
-  workflow 20 reads. Only `{{contact_name}}` is substituted by the sweep, so
+  step is a day, Email or WhatsApp (0045), subject (email only) and message,
+  saved in the same `steps` shape workflow 20 reads. Only `{{contact_name}}` is substituted by the sweep, so
   any other placeholder is rejected before saving (it would otherwise be sent
   to the contact literally), and steps are saved sorted by day because the
   sweep indexes them by position. Validation is unit-tested (`npm test` in
@@ -177,7 +147,8 @@ Production showed no runtime errors over the deploys and tests.
   `/dashboard/follow-ups`, `/dashboard/leads`). One sequence per tenant can
   be set to auto-enrol: leads created after it's switched on that go quiet
   for N hours (12h–7 days) are enrolled, unless they've booked a viewing,
-  are Converted/Lost, have no email, or were in that sequence before. Staff
+  are Converted/Lost, can't be reached (no email and no WhatsApp chat,
+  0045), or were in that sequence before. Staff
   can also Start / Stop a follow-up on any lead from the Leads page. All
   enrolment rules tested in SQL (see the fix-pack note above), including
   "switching it on never back-fills old leads" and RLS on the dashboard's
@@ -247,8 +218,8 @@ Production showed no runtime errors over the deploys and tests.
   reminder sent. Unit- and DB-tested (`viewing_changes.test.js`,
   `test_0038_viewing_changes.sql`); pending live import and the
   `viewing_reminder` template. Spec: `docs/workflow-specs/37-38-viewing-changes-reminders.md`.
-  Known limit: the no-overlap rule (0004) is per agency, so two agents can't
-  have viewings at the same time yet -- fix with per-agent calendars.
+  The old limit (two agents couldn't have viewings at the same time) is gone
+  since 0042: the no-overlap rule is per calendar.
 
 - 🟡 **Lower running costs** (workflow 01). Prompt caching on tools,
   instructions and the conversation (re-reads at 0.1x the price), cached
@@ -257,13 +228,56 @@ Production showed no runtime errors over the deploys and tests.
   Dashboard AI cost now uses Sonnet 5 prices ($2 / $10 per million). Tested in
   `token_savings.test.js`; pending live import.
 
+## November 2026: agencies, sellers, ASARI, files
+
+Each is unit- and database-tested (`db/seed/test_00NN_*.sql`,
+`n8n/workflows/tests/`); "live" means used on the real stack.
+
+- ✅ **Agency email addresses** (0039, workflows 39/40). Each agency gets
+  `<slug>@in.getelliot.eu`, forwards its inbox there (any provider), and
+  Elliot replies in the client's thread in the agency's name via Resend.
+  Working live. `docs/agency-email.md`.
+- ✅ **Control panel two-step sign-in and support access** (0040/0041). The
+  Elliot team opens an agency's dashboard only with two-step sign-in and,
+  when the switch is on, the agency's permission; every visit is listed for
+  the agency. Switch currently **off** for testing: turn on before the first
+  paying agency. `docs/support-access.md`.
+- ✅ **Agents' own Google Calendars** (0042, workflows 11/12/30/41). Viewings
+  go into a free agent's calendar (the client's own agent first); the Team
+  page checks each calendar is shared correctly. `docs/agent-calendars.md`.
+- 🟡 **Sellers and landlords** (0043). Valuation requests, seller leads
+  (hot within 3 months), valuation visits at the property. Pending the first
+  live seller. `docs/valuations.md`.
+- ✅ **AI disclosure** (EU AI Act art. 50). The chat header and Elliot's
+  first WhatsApp/email reply say clients are talking to an AI assistant.
+- 🟡 **ASARI CRM listings** (0044, workflow 42). Hourly copy of the
+  agency's exported ASARI listings, Sync now in Settings. Pending the first
+  real agency's credentials: check the field mapping then.
+  `docs/asari-sync.md`.
+- 🟡 **Follow-ups by WhatsApp** (0045, workflows 20/27). Pending Meta's
+  approval of `elliot_follow_up` for steps after 24 hours.
+  `docs/whatsapp-follow-ups.md`.
+- 🟡 **Email attachments** (0046, workflows 01/16/40). Files kept in a
+  private bucket and shown on the conversation; Elliot reads PDFs and photos.
+  Pending the first real email with files. `docs/email-attachments.md`.
+
+## Next
+
+- Workflow 16 (Gmail) answers only the first of several emails that arrive
+  in the same minute; make it handle each one.
+- WhatsApp: open photos and documents clients send (like email attachments).
+- Elliot could prefer fresh ASARI listings when suggesting properties.
+- Outlook / Microsoft 365 calendars; phone calls (voice).
+
 ## Business / non-code
 
 Not something to build -- these are decisions, listed here so they don't
 get lost either:
 
-- Pricing tiers (Starter / Growth / Pro structure was proposed; not
-  decided).
+- Pricing: one plan for estate agencies, from €199 a month plus setup from
+  €500 (net), confirmed in writing per agency (shown on getelliot.eu).
+- Register the business (NIP), then Meta business verification and the real
+  WhatsApp number.
 - Competitive positioning: lean into "bring your own website/CRM/calendar,
   Elliot operates the front office" rather than competing feature-for-
   feature with vertical-specific players like Ylopo or Structurely.
