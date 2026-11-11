@@ -6,6 +6,7 @@ import ReplyForm from "./reply-form";
 import ChatControls from "./chat-controls";
 import AutoRefresh from "../../auto-refresh";
 import ContactPanel from "./contact-panel";
+import { attachmentNote, fileKind, placeAttachments, withoutAttachedNote, type Attachment } from "@/lib/attachments";
 import { PageHeader, Panel, StatusBadge, formatDate, humanize } from "../../../../_ui/ui";
 import BackButton from "@/app/_ui/back-button";
 
@@ -26,6 +27,13 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   const { data: messages, error: msgError } = await supabase
     .from("messages")
     .select("id, role, content, created_at")
+    .eq("conversation_id", params.id)
+    .order("created_at", { ascending: true });
+
+  // 0046: files the client attached to emails.
+  const { data: attachmentRows } = await supabase
+    .from("message_attachments")
+    .select("id, filename, content_type, size_bytes, uploaded, read_by_elliot, created_at")
     .eq("conversation_id", params.id)
     .order("created_at", { ascending: true });
 
@@ -66,6 +74,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   // workflow 01; migration 0031 removes the copies). Never show them twice.
   const shown = withoutRepeats((messages ?? []) as { id: string; role: string; content: string; created_at: string }[]);
   // WhatsApp's 24-hour reply window starts at the client's last message.
+  const { byMessage: filesByMessage, unplaced: unplacedFiles } = placeAttachments(shown, (attachmentRows ?? []) as Attachment[]);
   const lastInboundAt = [...shown].reverse().find((m) => m.role === "user")?.created_at ?? null;
   const ROLE_LABEL: Record<string, string> = {
     user: contactName,
@@ -119,12 +128,21 @@ export default async function ConversationDetailPage({ params }: { params: { id:
                             : "border border-gray-200 bg-white text-gray-800"
                       }`}
                     >
-                      {m.content}
+                      {m.role === "user" ? withoutAttachedNote(m.content) : m.content}
                     </div>
+                    {filesByMessage.get(m.id) && <AttachmentList files={filesByMessage.get(m.id)!} />}
                   </li>
                 );
               })}
             </ol>
+            {unplacedFiles.length > 0 && (
+              <div className="mt-4">
+                <div className="mb-1 text-[12px] text-gray-500">
+                  <span className="font-medium text-gray-700">{contactName}</span> also sent
+                </div>
+                <AttachmentList files={unplacedFiles} />
+              </div>
+            )}
             {shown.length === 0 && !msgError && (
               <p className="m-0 text-[13px] text-gray-500">No messages in this conversation.</p>
             )}
@@ -183,5 +201,38 @@ export default async function ConversationDetailPage({ params }: { params: { id:
         </aside>
       </div>
     </div>
+  );
+}
+
+const KIND_LABEL = { pdf: "PDF", image: "IMG", document: "DOC", other: "FILE" } as const;
+
+// 0046: the files under a client's email. Opening and downloading go through
+// /api/attachments/:id, which checks the agency may see the file.
+function AttachmentList({ files }: { files: Attachment[] }) {
+  return (
+    <ul className="m-0 mt-2 grid w-full max-w-[78%] list-none gap-1.5 p-0">
+      {files.map((f) => (
+        <li key={f.id} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <span className="inline-flex h-8 w-9 shrink-0 items-center justify-center rounded-md bg-gray-100 text-[10.5px] font-semibold tracking-wide text-gray-600">
+            {KIND_LABEL[fileKind(f.content_type, f.filename)]}
+          </span>
+          <span className="min-w-0 flex-1">
+            {f.uploaded ? (
+              <a href={`/api/attachments/${f.id}`} target="_blank" rel="noopener" className="block truncate text-[13.5px] font-medium text-ink hover:underline">
+                {f.filename}
+              </a>
+            ) : (
+              <span className="block truncate text-[13.5px] font-medium text-gray-500">{f.filename}</span>
+            )}
+            <span className={`block text-[12px] ${f.uploaded ? "text-gray-500" : "text-alert"}`}>{attachmentNote(f)}</span>
+          </span>
+          {f.uploaded && (
+            <a href={`/api/attachments/${f.id}?download=1`} className="shrink-0 text-[12.5px] text-gray-500 hover:text-ink hover:underline">
+              Download
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
