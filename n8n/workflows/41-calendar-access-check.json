@@ -315,7 +315,8 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "pinData": {},
   "active": false,

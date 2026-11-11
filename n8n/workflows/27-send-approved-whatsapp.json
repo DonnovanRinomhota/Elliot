@@ -141,7 +141,13 @@
         -40,
         360
       ],
-      "notes": "Template-message sending (the only legal way to message someone outside the 24h window) isn't built. This just marks the draft so it shows up distinctly in Approvals instead of silently failing or retrying forever -- see docs/workflow-specs/27-send-approved-whatsapp.md."
+      "notes": "Template-message sending (the only legal way to message someone outside the 24h window) isn't built. This just marks the draft so it shows up distinctly in Approvals instead of silently failing or retrying forever -- see docs/workflow-specs/27-send-approved-whatsapp.md.",
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -187,7 +193,13 @@
       "position": [
         -40,
         -140
-      ]
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -261,7 +273,13 @@
       "position": [
         480,
         -140
-      ]
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -673,7 +691,8 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "49bce046-ee97-4868-be34-b9d935c7be25",
   "meta": {

@@ -200,7 +200,13 @@
       "position": [
         -1080,
         0
-      ]
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -397,7 +403,13 @@
       "position": [
         -1340,
         -560
-      ]
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
     },
     {
       "parameters": {
@@ -637,7 +649,8 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "d8ae447f-449c-41f3-be8e-82555841b4e6",
   "meta": {

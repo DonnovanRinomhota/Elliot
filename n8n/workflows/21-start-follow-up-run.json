@@ -13,7 +13,10 @@
       "name": "Start Follow-Up Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "PLACEHOLDER_SET_ON_IMPORT",
@@ -31,7 +34,10 @@
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [224, 0]
+      "position": [
+        224,
+        0
+      ]
     },
     {
       "parameters": {
@@ -45,7 +51,10 @@
       "name": "Resolve And Check",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [448, 0],
+      "position": [
+        448,
+        0
+      ],
       "notesInFlow": true,
       "credentials": {
         "postgres": {
@@ -63,7 +72,10 @@
       "name": "Check Valid",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [672, 0]
+      "position": [
+        672,
+        0
+      ]
     },
     {
       "parameters": {
@@ -79,7 +91,10 @@
               "id": "cond-valid",
               "leftValue": "={{ $json.valid }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -90,7 +105,10 @@
       "name": "Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [896, 0]
+      "position": [
+        896,
+        0
+      ]
     },
     {
       "parameters": {
@@ -104,7 +122,10 @@
       "name": "Insert Run",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1120, -96],
+      "position": [
+        1120,
+        -96
+      ],
       "notesInFlow": true,
       "credentials": {
         "postgres": {
@@ -123,7 +144,10 @@
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1344, -96]
+      "position": [
+        1344,
+        -96
+      ]
     },
     {
       "parameters": {
@@ -137,38 +161,94 @@
       "name": "Respond Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1120, 96]
+      "position": [
+        1120,
+        96
+      ]
     }
   ],
   "pinData": {},
   "connections": {
     "Start Follow-Up Webhook": {
-      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validate Input": {
-      "main": [[{ "node": "Resolve And Check", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Resolve And Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Resolve And Check": {
-      "main": [[{ "node": "Check Valid", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Check Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Check Valid": {
-      "main": [[{ "node": "Valid?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Valid?": {
       "main": [
-        [{ "node": "Insert Run", "type": "main", "index": 0 }],
-        [{ "node": "Respond Error", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Insert Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Insert Run": {
-      "main": [[{ "node": "Respond Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "3b6e1427-4e3a-4b71-a4e6-73a55e9472b8",
   "meta": {

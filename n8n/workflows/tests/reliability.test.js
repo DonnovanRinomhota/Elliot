@@ -362,4 +362,38 @@ test('calls that send or create something are never retried blindly', () => {
   }
 });
 
+// ───────────── imports don't reset anything ─────────────
+test('every sub-workflow link is a real workflow ID, and every workflow reports its crashes to 34', () => {
+  const ERROR_RECORDER = 'seDI8X3d4J3gLEgw'; // 34 - Workflow Error Recorder
+  const KNOWN = { '24 - Escalate To Human': 'jfcGGkCo29OLxONR', '37 - Client Viewing Changes': 'ySMoLU4Vf6EM6FAE' };
+  const files = fs.readdirSync(WF_DIR).filter((f) => /^\d\d-.*\.json$/.test(f));
+  assert.ok(files.length >= 36);
+  for (const file of files) {
+    const wf = load(file);
+    for (const n of wf.nodes.filter((x) => x.type === 'n8n-nodes-base.executeWorkflow')) {
+      const id = typeof n.parameters.workflowId === 'string' ? n.parameters.workflowId : n.parameters.workflowId.value;
+      assert.match(String(id), /^[A-Za-z0-9]{16}$/, `${file} "${n.name}" points at "${id}"`);
+      const name = n.parameters.workflowId.cachedResultName;
+      if (KNOWN[name]) assert.strictEqual(id, KNOWN[name], `${file} "${n.name}"`);
+    }
+    if (file.startsWith('34-')) assert.ok(!wf.settings.errorWorkflow, 'the recorder does not report to itself');
+    else assert.strictEqual(wf.settings.errorWorkflow, ERROR_RECORDER, `${file} names 34 as its error workflow`);
+  }
+  assert.strictEqual(nodeOf(wf01, 'Execute: Escalate To Human Sub-Workflow').parameters.workflowId.value, KNOWN['24 - Escalate To Human']);
+  assert.strictEqual(nodeOf(wf01, 'Execute: Change Viewing Sub-Workflow').parameters.workflowId.value, KNOWN['37 - Client Viewing Changes']);
+  assert.strictEqual(nodeOf(load('10-lead-capture.json'), 'Escalate Hot Lead (24)').parameters.workflowId.value, KNOWN['24 - Escalate To Human']);
+});
+
+test('every database node carries its credential, so an import does not empty it', () => {
+  // A Postgres node saved without a credential comes out of an import with its
+  // table and columns cleared (27 "Insert Outbound Message" did).
+  const ALLOWED = new Set(['Elliot Postgres (service role)', 'Elliot Postgres (RLS-scoped)']);
+  for (const file of fs.readdirSync(WF_DIR).filter((f) => /^\d\d-.*\.json$/.test(f))) {
+    for (const n of load(file).nodes.filter((x) => x.type === 'n8n-nodes-base.postgres')) {
+      const cred = n.credentials && n.credentials.postgres;
+      assert.ok(cred && ALLOWED.has(cred.name), `${file} "${n.name}" has no database credential`);
+    }
+  }
+});
+
 console.log(`\n${passed} passed`);

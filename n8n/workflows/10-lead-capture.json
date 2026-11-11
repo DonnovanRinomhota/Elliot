@@ -128,8 +128,9 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "SET_ME_TO_24_ESCALATE_TO_HUMAN",
+          "value": "jfcGGkCo29OLxONR",
           "mode": "list",
+          "cachedResultUrl": "/workflow/jfcGGkCo29OLxONR",
           "cachedResultName": "24 - Escalate To Human"
         },
         "workflowInputs": {
@@ -285,7 +286,8 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "50af2ee4-4a39-468b-9e16-a03598b9350c",
   "meta": {

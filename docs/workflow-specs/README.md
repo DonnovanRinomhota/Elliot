@@ -44,3 +44,26 @@ saved. Internal webhooks need the "Elliot Internal Webhook Secret" header
 
 Retired workflows stay in the repo for their history; they can be switched
 off in n8n.
+
+## Workflow IDs in n8n
+
+The ID is the part of a workflow's address after `/workflow/` on
+`makodevops.app.n8n.cloud`. Workflows that are called by others, with the ID
+the calling files use:
+
+| Workflow | ID | Called by |
+|---|---|---|
+| 09 - Knowledge Retrieval | `q3Q23QZ4329lF5Uk` | 01, 14, 26 |
+| 10 - Lead Capture | `XVFzq7X38hyUZDqZ` | 01 |
+| 11 - Check Availability | `D94fGN3AjCPhGzCb` | 01, 14, 26, 35 |
+| 12 - Book Appointment | `VNROj5sGjnwdFidx` | 01, 15, 27, 35 |
+| 15 - Send Approved Email | `5WtBLdM7JIbr0v3O` | 14, 17 |
+| 24 - Escalate To Human | `jfcGGkCo29OLxONR` | 01, 10 |
+| 27 - Send Approved WhatsApp | `171fa894c0614981` | 20, 26, 28 |
+| 34 - Workflow Error Recorder | `seDI8X3d4J3gLEgw` | every workflow's Settings → Error workflow |
+| 37 - Client Viewing Changes | `ySMoLU4Vf6EM6FAE` | 01 |
+| 39 - Send Email | `gwZAVRJ6G4iph76o` | 12, 15, 18, 20, 24, 31, 35, 37, 38, 40 |
+
+Always import with ⋯ → Import from File **inside the existing workflow**, so
+its ID stays. A workflow that is deleted and re-created gets a new ID; then
+update this table and the files that call it.

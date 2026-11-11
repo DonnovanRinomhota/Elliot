@@ -16,7 +16,10 @@
       "name": "Every 15 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "notes": "Same cadence as the follow-up sweep (20). Enrolment only decides WHO joins a sequence; 20 still does all the sending."
     },
     {
@@ -27,7 +30,10 @@
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [224, 0],
+      "position": [
+        224,
+        0
+      ],
       "id": "5a3111e2-9340-4e6a-b39b-b9d2046686dc",
       "name": "Enrol Quiet Leads",
       "credentials": {
@@ -57,7 +63,8 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "731c6f2a-fe6d-488a-876c-5586f6d5a546",
   "meta": {

@@ -1073,7 +1073,8 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "e6b7a586-d840-45ae-90bb-4893a17e6166",
   "meta": {

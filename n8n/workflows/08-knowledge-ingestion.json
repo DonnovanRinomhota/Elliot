@@ -504,7 +504,8 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "5c0cda4c-1652-464a-9d7b-bd2dde3c53a3",
   "meta": {
