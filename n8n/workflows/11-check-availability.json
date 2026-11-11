@@ -61,7 +61,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({\n  timeMin: `${$json.date_range_start}T00:00:00.000Z`,\n  timeMax: `${$json.date_range_end}T23:59:59.000Z`,\n  timeZone: $json.timezone,\n  // 0042: all the agents' calendars at once\n  items: ($json.calendar_ids || [$json.google_calendar_id]).map((id) => ({ id })),\n}) }}",
-        "options": {}
+        "options": {
+          "timeout": 20000
+        }
       },
       "id": "12e379d2-f7a5-4618-b306-57f4e2d05011",
       "name": "Get Busy Times (Google FreeBusy API)",
@@ -76,7 +78,10 @@
           "id": "GbHEZpAP7jofidkz",
           "name": "Elliot Google Calendar"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
     },
     {
       "parameters": {

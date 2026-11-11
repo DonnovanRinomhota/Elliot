@@ -211,7 +211,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-5',\n  max_tokens: 1024,\n  // Prompt caching: tools, instructions and the conversation so far are\n  // re-read at a tenth of the price on the next call (the tool loop, or the\n  // client's next message within 5 minutes). Up to 3 cache points.\n  system: [ { type: 'text', text: $json.system_prompt, cache_control: { type: 'ephemeral' } } ],\n  messages: ((msgs) => msgs.map((m, i) => {\n    if (i !== msgs.length - 1) return m;\n    const blocks = typeof m.content === 'string' ? [ { type: 'text', text: m.content } ] : (m.content || []).map((x) => ({ ...x }));\n    if (blocks.length) blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral' } };\n    return { ...m, content: blocks };\n  }))($json.claude_messages || []),\n  tool_choice: { type: 'auto', disable_parallel_tool_use: true },\n  tools: ((list) => list.map((t, i) => i === list.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t))(((mode, all) => mode !== 'sales' ? all : all\n    .filter((t) => t.name !== 'search_listings' && t.name !== 'record_valuation_request')\n    .map((t) => t.name === 'check_availability' ? {\n      name: 'check_availability',\n      description: 'Find free times for a call with the Elliot team: a 15-minute intro call or a 30-minute live demo, on Google Meet. Always call this before book_appointment so you only offer real times.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          call_type: { type: 'string', enum: ['intro', 'demo'], description: 'intro = 15-minute intro call, demo = 30-minute live demo' },\n          date_range_start: { type: 'string', description: 'Start date in YYYY-MM-DD format' },\n          date_range_end: { type: 'string', description: 'End date in YYYY-MM-DD format' }\n        },\n        required: ['call_type', 'date_range_start', 'date_range_end']\n      }\n    } : t.name === 'book_appointment' ? {\n      name: 'book_appointment',\n      description: 'Book the call the visitor chose, at a time check_availability returned. Creates the Google Meet call, puts it in the calendar and emails the visitor a confirmation. Needs a contact_id (from capture_lead) and their email.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          contact_id: { type: 'string', description: 'The contact_id from capture_lead' },\n          call_type: { type: 'string', enum: ['intro', 'demo'] },\n          starts_at: { type: 'string', description: 'ISO 8601 start, exactly as returned by check_availability' },\n          ends_at: { type: 'string', description: 'ISO 8601 end, exactly as returned by check_availability' },\n          email: { type: 'string', description: 'Where the Google Meet invitation and confirmation go' },\n          agency_name: { type: 'string', description: 'Name of their agency' },\n          agents: { type: 'string', description: 'How many agents, if they said' },\n          crm: { type: 'string', description: 'Which CRM they use, if they said' },\n          notes: { type: 'string', description: 'Anything else worth knowing before the call' }\n        },\n        required: ['contact_id', 'call_type', 'starts_at', 'ends_at', 'email']\n      }\n    } : t))($('Merge Tenant Context').first().json.assistant_mode, [\n    {\n      name: 'search_company_knowledge',\n      description: 'Search this business knowledge base for information relevant to the customer question. Always use before answering business-specific questions.',\n      input_schema: {\n        type: 'object',\n        properties: { query: { type: 'string', description: 'Focused search query' } },\n        required: ['query']\n      }\n    },\n    {\n      name: 'capture_lead',\n      description: 'Record or update information about a potential lead based on what they\\'ve shared in conversation. Call this whenever the visitor shares their contact info (name, email, phone, company) or answers that help qualify them (budget, timeline, what they\\'re looking for, urgency). You can call this multiple times in a conversation as you learn more -- it will update the existing lead rather than create a duplicate. Only include fields you actually know; omit anything not yet shared.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          contact: {\n            type: 'object',\n            properties: {\n              name: { type: 'string', description: 'The visitor\\'s full name, if known' },\n              email: { type: 'string', description: 'The visitor\\'s email address, if known' },\n              phone: { type: 'string', description: 'The visitor\\'s phone number, if known' },\n              company: { type: 'string', description: 'The visitor\\'s company or organization, if known and relevant' }\n            }\n          },\n          qualification_answers: {\n            type: 'object',\n            properties: {\n              budget: { type: 'string', description: 'Any budget or price range the visitor has mentioned' },\n              timeline: { type: 'string', description: 'How soon they are looking to act, e.g. this month, just browsing, ASAP' },\n              property_type: { type: 'string', description: 'What type of property or service they are interested in' },\n              intent_signal: { type: 'string', description: 'Any explicit signal of buying/booking intent, e.g. wants to schedule a viewing, ready to talk to an agent' }\n            }\n          }\n        }\n      }\n    },\n    {\n      name: 'check_availability',\n      description: 'Check available appointment slots for the business within a date range. Call this when a visitor asks to schedule, book, or view something and you need to know what times are open. Always call this before book_appointment so you can offer real available times.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          date_range_start: { type: 'string', description: 'Start date in YYYY-MM-DD format' },\n          date_range_end: { type: 'string', description: 'End date in YYYY-MM-DD format' }\n        },\n        required: ['date_range_start', 'date_range_end']\n      }\n    },\n    {\n      name: 'book_appointment',\n      description: 'Book a confirmed appointment for the visitor at a specific available time. Only call this after the visitor has explicitly agreed to a specific slot returned by check_availability. Requires a contact_id, so capture_lead should typically be called first to ensure the contact exists.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          contact_id: { type: 'string', description: 'The UUID of the contact this appointment is for' },\n          starts_at: { type: 'string', description: 'ISO 8601 UTC datetime the appointment starts, e.g. 2026-08-17T10:00:00.000Z' },\n          ends_at: { type: 'string', description: 'ISO 8601 UTC datetime the appointment ends' },\n          notes: { type: 'string', description: 'Brief note on what the appointment is for, based on the conversation' },\n          listing_id: { type: 'string', description: 'If the viewing is for a property from search_listings, its listing_id exactly as search_listings returned it. Leave out if it is not about one specific listing.' },\n          email: { type: 'string', description: 'The email address the visitor wants the confirmation sent to, if they gave one in this conversation. Leave out if they did not.' },\n          kind: { type: 'string', enum: ['viewing', 'valuation'], description: 'viewing (default): seeing one of the agency\\'s listings. valuation: an agent visits the client\\'s own property to value it (after record_valuation_request).' },\n          property_address: { type: 'string', description: 'For kind valuation: the full address of the client\\'s property (street, number, city), where the agent goes.' }\n        },\n        required: ['contact_id', 'starts_at', 'ends_at']\n      }\n    },\n    {\n      name: 'search_listings',\n      description: 'Search this agency\\'s current property listings. Call this whenever a visitor asks what is available or describes what they are looking for. Only include filters the visitor actually mentioned. Returns only listings that are currently available.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          transaction_type: { type: 'string', enum: ['sale', 'rent'], description: 'Buying (sale) or renting (rent)' },\n          property_type: { type: 'string', enum: ['apartment', 'house', 'plot', 'commercial', 'room', 'other'], description: 'Kind of property' },\n          location: { type: 'string', description: 'City, district or street the visitor mentioned, e.g. Mokotów' },\n          max_price: { type: 'number', description: 'Highest price, in the listing currency' },\n          min_price: { type: 'number', description: 'Lowest price, in the listing currency' },\n          min_rooms: { type: 'integer', description: 'Minimum number of rooms' },\n          min_bedrooms: { type: 'integer', description: 'Minimum number of bedrooms' },\n          min_area_m2: { type: 'number', description: 'Minimum floor area in square metres' },\n          keywords: { type: 'string', description: 'One feature or word to look for, e.g. balcony, garden, parking' },\n          reference: { type: 'string', description: 'The agency reference number, if the visitor quoted one' },\n          move_in_by: { type: 'string', description: 'Latest date the visitor wants to move in / take over, YYYY-MM-DD. Leave out if they did not say; then only properties free within about 60 days are returned.' }\n        }\n      }\n    },\n    {\n      name: 'record_valuation_request',\n      description: 'Record a client who wants to sell or let their own property, or asks what it is worth. Saves the property details on their lead and marks them as a seller or landlord. Call it as soon as you know the address and the type of property, and again when you learn more; details merge. Never give a price or estimate yourself.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          contact_id: { type: 'string', description: 'The client\\'s contact_id, if you have it' },\n          intent: { type: 'string', enum: ['sell', 'let'], description: 'sell, or let (rent it out)' },\n          address: { type: 'string', description: 'Street and number of the property' },\n          city: { type: 'string' },\n          district: { type: 'string' },\n          property_type: { type: 'string', enum: ['apartment', 'house', 'plot', 'commercial', 'other'] },\n          area_m2: { type: 'number', description: 'Floor area in square metres' },\n          rooms: { type: 'integer' },\n          floor: { type: 'string', description: 'Floor and floors in the building, e.g. 3/5' },\n          year_built: { type: 'string', description: 'Year or period the building was built' },\n          condition: { type: 'string', description: 'Condition in their words, e.g. after renovation, to renovate' },\n          extras: { type: 'string', description: 'Balcony, parking, garden, storage, lift...' },\n          timeline: { type: 'string', description: 'When they want to sell or let, in their words' },\n          within_3_months: { type: 'boolean', description: 'True if they want to sell or let within about 3 months' },\n          expected_price: { type: 'string', description: 'A price they hope for, only if they said one' },\n          notes: { type: 'string', description: 'Anything else useful for the agent' }\n        },\n        required: ['intent']\n      }\n    },\n    {\n      name: 'escalate_to_human',\n      description: 'Hand this conversation off to a human team member, who is alerted immediately with your summary and the whole conversation. Call this when the visitor explicitly asks for a human, seems angry or frustrated, raises a legal or refund-related issue, shares something sensitive you should not handle alone, asks something you genuinely cannot answer even after searching the knowledge base, asks you to do something outside what you are permitted to do, or whenever you tell the visitor a team member will contact them, send them something or follow up. Continue the conversation naturally after calling this -- let the visitor know a team member will follow up, without mentioning this tool or any internal process.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          reason: { type: 'string', enum: ['low_confidence', 'customer_requested_human', 'angry_customer', 'legal_issue', 'refund_requested', 'sensitive_info', 'no_trusted_source', 'action_exceeds_permissions', 'other'], description: 'Which of these best matches why a human is needed' },\n          priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'], description: 'How urgently a human should look at this -- urgent for anything time-sensitive or an upset customer, high for legal/refund issues, normal otherwise' },\n          context_summary: { type: 'string', description: 'A concise summary of the conversation and why a human is needed, written for a team member with zero prior context' }\n        },\n        required: ['reason', 'context_summary']\n      }\n    },\n    {\n      name: 'change_viewing',\n      description: 'Confirm, move or cancel one of the client\\'s own upcoming bookings (listed under UPCOMING VIEWINGS with their appointment_id). confirm = they say they are coming. reschedule = they agreed a new time that check_availability returned. cancel = they clearly asked to cancel. Only for their own bookings; the team and the calendar are updated automatically.',\n      input_schema: {\n        type: 'object',\n        properties: {\n          appointment_id: { type: 'string', description: 'The appointment_id from UPCOMING VIEWINGS' },\n          action: { type: 'string', enum: ['confirm', 'reschedule', 'cancel'] },\n          new_starts_at: { type: 'string', description: 'For reschedule: ISO 8601 start, exactly as returned by check_availability' },\n          new_ends_at: { type: 'string', description: 'For reschedule: ISO 8601 end, exactly as returned by check_availability' },\n          reason: { type: 'string', description: 'For cancel or reschedule: the reason, if they gave one' }\n        },\n        required: ['appointment_id', 'action']\n      }\n    }\n  ]))\n}) }}",
-        "options": {}
+        "options": {
+          "timeout": 45000
+        }
       },
       "id": "78741f55-c53e-426d-be49-c20d5cef0278",
       "name": "Call Claude",
@@ -227,7 +229,11 @@
           "name": "Anthropic account"
         }
       },
-      "notes": "Single Claude call node used by every turn of the agentic tool loop. Claude API uses x-api-key auth (handled by the anthropicApi credential), not Bearer."
+      "notes": "Single Claude call node used by every turn of the agentic tool loop. Claude API uses x-api-key auth (handled by the anthropicApi credential), not Bearer. 0048: tried up to 3 times (5 s apart, 45 s each). If Claude still can't be reached, the error output goes to \"Elliot Unavailable\": the client gets a holding reply and the team an escalation, instead of the workflow crashing.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -585,11 +591,12 @@
       "position": [
         3584,
         0
-      ]
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Append this iteration's assistant tool_use turn + the tool_result to the\n// running message history, then loop back to Assemble Request for another\n// Claude call. Uses .item (loop-safe) so accumulation is correct across turns.\n// Where a client can see a property: the agency's own page for it when it\n// has one, otherwise Elliot's property page with the photos (/p/<id> on the\n// dashboard; photos added in Listings or imported from Google Drive). A\n// Google Drive / Dropbox folder isn't a property page, so it gets ours.\nconst DASHBOARD_URL = 'https://app.getelliot.eu'; // change if the dashboard moves to its own domain\nfunction propertyLink(id, url) {\n  const own = String(url || '').trim();\n  if (/^https?:\\/\\//i.test(own) && !/drive\\.google\\.com|dropbox\\.com/i.test(own)) return own;\n  return id ? `${DASHBOARD_URL}/p/${id}` : null;\n}\n\nconst state = $('Assemble Request').item.json;\nconst priorMessages = state.claude_messages;\nconst claudeResp = $('Call Claude').item.json;\nconst toolCall = $('Extract Tool Call').item.json;\nconst output = $input.first().json;\n\nlet resultText;\n\nif (toolCall.held_tool === 'book_appointment') {\n  // 0047: this agency confirms bookings itself; the request went to the team.\n  resultText = 'NOT BOOKED. This agency confirms every booking itself, so nothing was put in the calendar. ' +\n    'The requested time has been passed to the team, who will confirm it with the client or propose another. ' +\n    'Tell the client exactly that: the time is requested, not confirmed yet, and the team will be in touch shortly. ' +\n    'Do not say it is booked, and do not call book_appointment again for this request.';\n\n} else if (toolCall.tool_name === 'search_company_knowledge') {\n  const results = output.results || [];\n  resultText = output.found && results.length\n    ? results.map(r => `[source: ${r.section_ref || r.document_id}] ${r.content}`).join('\\n\\n')\n    : (output.message || 'No relevant results found in the knowledge base.');\n\n} else if (toolCall.tool_name === 'check_availability') {\n  const slots = output.available_slots || [];\n  resultText = slots.length\n    ? `Available slots (times in ${output.timezone || 'UTC'}):\\n` +\n      slots.map(s => `- ${s.starts_at} to ${s.ends_at}`).join('\\n')\n    : 'No available slots were found in that date range.';\n\n} else if (toolCall.tool_name === 'book_appointment' && output.kind === 'consultation') {\n  // getelliot.eu's own assistant booked a call (0037).\n  resultText = output.success\n    ? `Call booked: ${output.call_label || 'call'} from ${output.starts_at} to ${output.ends_at}.` +\n      (output.meet_link ? ` Google Meet link: ${output.meet_link}.` : ' The Google Meet link will be in the calendar invitation.') +\n      (output.confirmation_sent_to\n        ? ` A confirmation email was sent to ${output.confirmation_sent_to}.`\n        : output.confirmation_error\n          ? ` The call IS booked, but the confirmation email couldn't be sent (${output.confirmation_error}). Give them the link here.`\n          : ' No confirmation email was sent. Do not say one is coming.')\n    : `Booking failed: ${output.error || 'That time is no longer free. Offer other times.'}`;\n\n} else if (toolCall.tool_name === 'book_appointment') {\n  resultText = output.success\n    ? `${output.kind === 'valuation' ? `Valuation visit booked${output.location ? ` at ${output.location}` : ''}` : 'Appointment booked successfully'}. Appointment ID: ${output.appointment_id}, from ${output.starts_at} to ${output.ends_at}, status: ${output.status}.` +\n      (output.agent_name ? ` Agent: ${output.agent_name}.` : '') +\n      (output.listing_title ? ` Property: ${output.listing_title}${output.listing_address ? `, ${output.listing_address}` : ''}.` : '') +\n      (output.listing_link ? ` Property link: ${output.listing_link}.` : '') +\n      (output.confirmation_sent_to\n        ? ` A confirmation email was sent to ${output.confirmation_sent_to}.`\n        : output.confirmation_error\n          ? ` The viewing IS booked, but the confirmation email to ${output.confirmation_to || 'the visitor'} could not be sent (${output.confirmation_error}). Tell the visitor the booking is confirmed here in the chat and that the email didn't go through.`\n          : ' No confirmation email was sent (no email address on file). Do not say one is coming.')\n    : `Booking failed: ${output.error || 'That time slot is no longer available. Please choose a different time.'}`;\n\n} else if (toolCall.tool_name === 'change_viewing') {\n  // 0038: the client confirmed, moved or cancelled one of their bookings (workflow 37).\n  if (!output.success) {\n    resultText = `Not done: ${output.error || 'the booking could not be changed'}. Tell the client plainly and offer what you can (other times, or a person from the team).`;\n  } else if (output.action === 'confirm') {\n    resultText = `Confirmed: the client is coming on ${output.when}. Thank them briefly.`;\n  } else if (output.action === 'cancel') {\n    resultText = `Cancelled the booking on ${output.when}. The team has been told and the calendar updated.` +\n      (output.email_sent_to ? ` A cancellation email went to ${output.email_sent_to}.` : '') + ' Offer to book another time if it fits.';\n  } else {\n    resultText = `Moved: the booking is now ${output.when} (was ${output.previous_when}). The team has been told.` +\n      (output.calendar === 'failed' ? ' (The calendar entry could not be updated; the team will fix it.)' : '') +\n      (output.email_sent_to ? ` A confirmation of the new time went to ${output.email_sent_to}.` : ' No email was sent.');\n  }\n\n} else if (toolCall.tool_name === 'capture_lead') {\n  resultText = output.success\n    ? `Lead saved successfully. Status: ${output.status}, score: ${output.score}${output.contact_email ? `, contact: ${output.contact_email}` : ''}.`\n    : `Failed to save lead information.`;\n\n} else if (toolCall.tool_name === 'search_listings') {\n  const r = output.result || {};\n  const list = r.listings || [];\n  const alternatives = r.alternatives || [];\n  const fmt = (l) => [\n    `- ${l.title}${l.reference ? ` (ref ${l.reference})` : ''}`,\n    l.listing_id ? `  listing_id: ${l.listing_id} (pass this to book_appointment for a viewing; never show it to the visitor)` : null,\n    `  ${l.transaction_type === 'rent' ? 'For rent' : 'For sale'}: ${l.price != null ? `${l.price} ${l.currency}${l.transaction_type === 'rent' ? '/month' : ''}` : 'price on request'}`,\n    `  ${[l.address, l.district, l.city].filter(Boolean).join(', ')}${l.area_m2 ? `, ${l.area_m2} m2` : ''}${l.rooms ? `, ${l.rooms} rooms` : ''}${l.floor != null ? `, floor ${l.floor}` : ''}`,\n    l.available_from ? `  Available from ${l.available_from} (not before)` : '  Available now',\n    l.features && l.features.length ? `  Features: ${l.features.join(', ')}` : null,\n    l.description ? `  ${l.description}` : null,\n    propertyLink(l.listing_id, l.url) ? `  Link (send this to the visitor): ${propertyLink(l.listing_id, l.url)}` : null,\n    l.photo_count ? `  Photos: ${l.photo_count} (on the link)` : '  No photos yet (the link still shows the details)',\n  ].filter(Boolean).join('\\n');\n  if (list.length) {\n    resultText = `${list.length} available listing(s) found:\\n` + list.map(fmt).join('\\n');\n  } else if (alternatives.length) {\n    resultText = 'No exact match for those filters. These are the closest available options -- show them now with their links, ' +\n      'say honestly how each differs from what the visitor asked for (price, area, size) and why it could still suit them, ' +\n      'and offer a viewing. Do not say the team will look for options instead:\\n' + alternatives.map(fmt).join('\\n');\n  } else {\n    resultText = 'No available listings match, and there is nothing close either. Do not invent any. Tell the visitor honestly, ' +\n      'capture what they want with capture_lead, and offer to have the team contact them when something comes up (call escalate_to_human if they accept).';\n  }\n\n} else if (toolCall.tool_name === 'record_valuation_request') {\n  // 0043: a seller or landlord.\n  let r = output.result;\n  if (typeof r === 'string') { try { r = JSON.parse(r); } catch (e) { r = null; } }\n  resultText = r && r.lead_id\n    ? `Saved: ${r.intent === 'let' ? 'landlord' : 'seller'} lead (${r.status}). Now: do not give any price or estimate. Offer a free valuation visit by an agent at their property: call check_availability, offer real times, then book_appointment with kind \"valuation\" and property_address. Call escalate_to_human with reason hot_lead and a short summary of the property and what they want.`\n    : `Not saved (${(output.error && (output.error.message || output.error)) || 'unknown error'}). If you don't have their contact_id yet, call capture_lead with their name and phone or email first, then call record_valuation_request again.`;\n\n} else if (toolCall.tool_name === 'escalate_to_human') {\n  resultText = `Escalated to a human team member (reason: ${output.reason}, priority: ${output.priority}). Continue the conversation naturally -- let the visitor know someone will follow up, without mentioning this tool or any internal process.`;\n\n} else {\n  resultText = JSON.stringify(output);\n}\n\nconst updatedMessages = [\n  ...priorMessages,\n  { role: 'assistant', content: claudeResp.content },\n  { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolCall.tool_use_id, content: resultText }] }\n];\n\nreturn [{ json: {\n  tenant_id: state.tenant_id,\n  tenant_name: state.tenant_name,\n  tenant_industry: state.tenant_industry,\n  conversation_id: state.conversation_id,\n  system_prompt: state.system_prompt,\n  claude_messages: updatedMessages,\n  tool_turns: (state.tool_turns || 0) + 1,\n  // input-equivalent: cache reads count 0.1x, cache writes 1.25x (prompt caching)\n  usage_input_tokens: (state.usage_input_tokens || 0) + ((u) => u ? (u.input_tokens || 0) + Math.round((u.cache_read_input_tokens || 0) * 0.1) + Math.round((u.cache_creation_input_tokens || 0) * 1.25) : 0)(claudeResp.usage),\n  usage_output_tokens: (state.usage_output_tokens || 0) + ((claudeResp.usage && claudeResp.usage.output_tokens) || 0)\n} }];"
+        "jsCode": "// Append this iteration's assistant tool_use turn + the tool_result to the\n// running message history, then loop back to Assemble Request for another\n// Claude call. Uses .item (loop-safe) so accumulation is correct across turns.\n// Where a client can see a property: the agency's own page for it when it\n// has one, otherwise Elliot's property page with the photos (/p/<id> on the\n// dashboard; photos added in Listings or imported from Google Drive). A\n// Google Drive / Dropbox folder isn't a property page, so it gets ours.\nconst DASHBOARD_URL = 'https://app.getelliot.eu'; // change if the dashboard moves to its own domain\nfunction propertyLink(id, url) {\n  const own = String(url || '').trim();\n  if (/^https?:\\/\\//i.test(own) && !/drive\\.google\\.com|dropbox\\.com/i.test(own)) return own;\n  return id ? `${DASHBOARD_URL}/p/${id}` : null;\n}\n\nconst state = $('Assemble Request').item.json;\nconst priorMessages = state.claude_messages;\nconst claudeResp = $('Call Claude').item.json;\nconst toolCall = $('Extract Tool Call').item.json;\nconst output = $input.first().json;\n\n// 0048: the tool itself broke (a sub-workflow crashed: Google refused, a\n// database error, a missing workflow). n8n hands back { error } instead of\n// stopping, and Claude is told the truth so it never claims it was done.\n// (record_valuation_request answers { error } for things Claude can fix, such as a\n// missing contact; it has its own wording below.)\nconst toolCrashed = toolCall.tool_name !== 'record_valuation_request' && !!output && output.error !== undefined && output.error !== null\n  && !['success', 'found', 'available_slots', 'results', 'result', 'reason', 'action', 'status'].some((k) => k in output);\nconst toolError = toolCrashed\n  ? String(typeof output.error === 'string' ? output.error : (output.error.message || output.error.description || JSON.stringify(output.error))).slice(0, 400)\n  : null;\nconst FAILED_TEXT = (name) => `TOOL FAILED: ${name} could not be completed because of a technical problem on our side. Nothing was done. ` +\n  (name === 'escalate_to_human'\n    ? 'The team has been alerted another way. Tell the client that someone from the team will contact them, and do not call escalate_to_human again.'\n    : 'Do not say or imply it was done. Apologise in one short sentence, then call escalate_to_human (reason \"other\") with what the client wanted, so the team finishes it; tell the client the team will follow up. Do not call this tool again in this reply.');\n\nlet resultText;\n\nif (toolCrashed) {\n  resultText = FAILED_TEXT(toolCall.requested_tool || toolCall.tool_name);\n\n} else if (toolCall.held_tool === 'book_appointment') {\n  // 0047: this agency confirms bookings itself; the request went to the team.\n  resultText = 'NOT BOOKED. This agency confirms every booking itself, so nothing was put in the calendar. ' +\n    'The requested time has been passed to the team, who will confirm it with the client or propose another. ' +\n    'Tell the client exactly that: the time is requested, not confirmed yet, and the team will be in touch shortly. ' +\n    'Do not say it is booked, and do not call book_appointment again for this request.';\n\n} else if (toolCall.tool_name === 'search_company_knowledge') {\n  const results = output.results || [];\n  resultText = output.found && results.length\n    ? results.map(r => `[source: ${r.section_ref || r.document_id}] ${r.content}`).join('\\n\\n')\n    : (output.message || 'No relevant results found in the knowledge base.');\n\n} else if (toolCall.tool_name === 'check_availability') {\n  const slots = output.available_slots || [];\n  resultText = slots.length\n    ? `Available slots (times in ${output.timezone || 'UTC'}):\\n` +\n      slots.map(s => `- ${s.starts_at} to ${s.ends_at}`).join('\\n')\n    : 'No available slots were found in that date range.';\n\n} else if (toolCall.tool_name === 'book_appointment' && output.kind === 'consultation') {\n  // getelliot.eu's own assistant booked a call (0037).\n  resultText = output.success\n    ? `Call booked: ${output.call_label || 'call'} from ${output.starts_at} to ${output.ends_at}.` +\n      (output.meet_link ? ` Google Meet link: ${output.meet_link}.` : ' The Google Meet link will be in the calendar invitation.') +\n      (output.confirmation_sent_to\n        ? ` A confirmation email was sent to ${output.confirmation_sent_to}.`\n        : output.confirmation_error\n          ? ` The call IS booked, but the confirmation email couldn't be sent (${output.confirmation_error}). Give them the link here.`\n          : ' No confirmation email was sent. Do not say one is coming.')\n    : `Booking failed: ${output.error || 'That time is no longer free. Offer other times.'}`;\n\n} else if (toolCall.tool_name === 'book_appointment') {\n  resultText = output.success\n    ? `${output.kind === 'valuation' ? `Valuation visit booked${output.location ? ` at ${output.location}` : ''}` : 'Appointment booked successfully'}. Appointment ID: ${output.appointment_id}, from ${output.starts_at} to ${output.ends_at}, status: ${output.status}.` +\n      (output.agent_name ? ` Agent: ${output.agent_name}.` : '') +\n      (output.listing_title ? ` Property: ${output.listing_title}${output.listing_address ? `, ${output.listing_address}` : ''}.` : '') +\n      (output.listing_link ? ` Property link: ${output.listing_link}.` : '') +\n      (output.confirmation_sent_to\n        ? ` A confirmation email was sent to ${output.confirmation_sent_to}.`\n        : output.confirmation_error\n          ? ` The viewing IS booked, but the confirmation email to ${output.confirmation_to || 'the visitor'} could not be sent (${output.confirmation_error}). Tell the visitor the booking is confirmed here in the chat and that the email didn't go through.`\n          : ' No confirmation email was sent (no email address on file). Do not say one is coming.')\n    : `Booking failed: ${output.error || 'That time slot is no longer available. Please choose a different time.'}`;\n\n} else if (toolCall.tool_name === 'change_viewing') {\n  // 0038: the client confirmed, moved or cancelled one of their bookings (workflow 37).\n  if (!output.success) {\n    resultText = `Not done: ${output.error || 'the booking could not be changed'}. Tell the client plainly and offer what you can (other times, or a person from the team).`;\n  } else if (output.action === 'confirm') {\n    resultText = `Confirmed: the client is coming on ${output.when}. Thank them briefly.`;\n  } else if (output.action === 'cancel') {\n    resultText = `Cancelled the booking on ${output.when}. The team has been told and the calendar updated.` +\n      (output.email_sent_to ? ` A cancellation email went to ${output.email_sent_to}.` : '') + ' Offer to book another time if it fits.';\n  } else {\n    resultText = `Moved: the booking is now ${output.when} (was ${output.previous_when}). The team has been told.` +\n      (output.calendar === 'failed' ? ' (The calendar entry could not be updated; the team will fix it.)' : '') +\n      (output.email_sent_to ? ` A confirmation of the new time went to ${output.email_sent_to}.` : ' No email was sent.');\n  }\n\n} else if (toolCall.tool_name === 'capture_lead') {\n  resultText = output.success\n    ? `Lead saved successfully. Status: ${output.status}, score: ${output.score}${output.contact_email ? `, contact: ${output.contact_email}` : ''}.`\n    : `Failed to save lead information.`;\n\n} else if (toolCall.tool_name === 'search_listings') {\n  const r = output.result || {};\n  const list = r.listings || [];\n  const alternatives = r.alternatives || [];\n  const fmt = (l) => [\n    `- ${l.title}${l.reference ? ` (ref ${l.reference})` : ''}`,\n    l.listing_id ? `  listing_id: ${l.listing_id} (pass this to book_appointment for a viewing; never show it to the visitor)` : null,\n    `  ${l.transaction_type === 'rent' ? 'For rent' : 'For sale'}: ${l.price != null ? `${l.price} ${l.currency}${l.transaction_type === 'rent' ? '/month' : ''}` : 'price on request'}`,\n    `  ${[l.address, l.district, l.city].filter(Boolean).join(', ')}${l.area_m2 ? `, ${l.area_m2} m2` : ''}${l.rooms ? `, ${l.rooms} rooms` : ''}${l.floor != null ? `, floor ${l.floor}` : ''}`,\n    l.available_from ? `  Available from ${l.available_from} (not before)` : '  Available now',\n    l.features && l.features.length ? `  Features: ${l.features.join(', ')}` : null,\n    l.description ? `  ${l.description}` : null,\n    propertyLink(l.listing_id, l.url) ? `  Link (send this to the visitor): ${propertyLink(l.listing_id, l.url)}` : null,\n    l.photo_count ? `  Photos: ${l.photo_count} (on the link)` : '  No photos yet (the link still shows the details)',\n  ].filter(Boolean).join('\\n');\n  if (list.length) {\n    resultText = `${list.length} available listing(s) found:\\n` + list.map(fmt).join('\\n');\n  } else if (alternatives.length) {\n    resultText = 'No exact match for those filters. These are the closest available options -- show them now with their links, ' +\n      'say honestly how each differs from what the visitor asked for (price, area, size) and why it could still suit them, ' +\n      'and offer a viewing. Do not say the team will look for options instead:\\n' + alternatives.map(fmt).join('\\n');\n  } else {\n    resultText = 'No available listings match, and there is nothing close either. Do not invent any. Tell the visitor honestly, ' +\n      'capture what they want with capture_lead, and offer to have the team contact them when something comes up (call escalate_to_human if they accept).';\n  }\n\n} else if (toolCall.tool_name === 'record_valuation_request') {\n  // 0043: a seller or landlord.\n  let r = output.result;\n  if (typeof r === 'string') { try { r = JSON.parse(r); } catch (e) { r = null; } }\n  resultText = r && r.lead_id\n    ? `Saved: ${r.intent === 'let' ? 'landlord' : 'seller'} lead (${r.status}). Now: do not give any price or estimate. Offer a free valuation visit by an agent at their property: call check_availability, offer real times, then book_appointment with kind \"valuation\" and property_address. Call escalate_to_human with reason hot_lead and a short summary of the property and what they want.`\n    : `Not saved (${(output.error && (output.error.message || output.error)) || 'unknown error'}). If you don't have their contact_id yet, call capture_lead with their name and phone or email first, then call record_valuation_request again.`;\n\n} else if (toolCall.tool_name === 'escalate_to_human') {\n  resultText = `Escalated to a human team member (reason: ${output.reason}, priority: ${output.priority}). Continue the conversation naturally -- let the visitor know someone will follow up, without mentioning this tool or any internal process.`;\n\n} else {\n  resultText = JSON.stringify(output);\n}\n\nconst updatedMessages = [\n  ...priorMessages,\n  { role: 'assistant', content: claudeResp.content },\n  { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolCall.tool_use_id, content: resultText }] }\n];\n\nreturn [{ json: {\n  tenant_id: state.tenant_id,\n  tenant_name: state.tenant_name,\n  tenant_industry: state.tenant_industry,\n  conversation_id: state.conversation_id,\n  system_prompt: state.system_prompt,\n  claude_messages: updatedMessages,\n  // 0048: for 'Tool Failed?' -> 'Record Tool Failure'\n  tool_failed: toolCrashed,\n  failed_tool: toolCall.requested_tool || toolCall.tool_name,\n  tool_error: toolError,\n  tool_turns: (state.tool_turns || 0) + 1,\n  // input-equivalent: cache reads count 0.1x, cache writes 1.25x (prompt caching)\n  usage_input_tokens: (state.usage_input_tokens || 0) + ((u) => u ? (u.input_tokens || 0) + Math.round((u.cache_read_input_tokens || 0) * 0.1) + Math.round((u.cache_creation_input_tokens || 0) * 1.25) : 0)(claudeResp.usage),\n  usage_output_tokens: (state.usage_output_tokens || 0) + ((claudeResp.usage && claudeResp.usage.output_tokens) || 0)\n} }];"
       },
       "id": "047843a5-5996-4d40-a382-ca7e36ee0c6d",
       "name": "Build Tool Result Message",
@@ -683,11 +690,12 @@
       "position": [
         3584,
         192
-      ]
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Append the lead-capture assistant tool_use turn + tool_result to the running\n// message history, then loop back to Assemble Request for another Claude call.\nconst state = $('Assemble Request').item.json;\nconst priorMessages = state.claude_messages;\nconst claudeResp = $('Call Claude').item.json;\nconst toolCall = $('Extract Tool Call').item.json;\n\nconst leadResult = $input.first().json;\nlet resultText;\nif (leadResult.success) {\n  resultText = `Lead captured successfully. Status: ${leadResult.status}.`;\n  if (leadResult.contact_id) {\n    resultText += ` The contact_id for this visitor is ${leadResult.contact_id} -- use this exact value as contact_id when calling book_appointment.`;\n  } else {\n    resultText += ` Note: no contact_id is available yet, so do not call book_appointment until a contact has been created.`;\n  }\n} else {\n  resultText = 'There was a problem recording this lead information -- continue the conversation normally without mentioning this to the visitor.';\n}\n\nconst updatedMessages = [\n  ...priorMessages,\n  { role: 'assistant', content: claudeResp.content },\n  { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolCall.tool_use_id, content: resultText }] }\n];\n\nreturn [{ json: {\n  tenant_id: state.tenant_id,\n  tenant_name: state.tenant_name,\n  tenant_industry: state.tenant_industry,\n  conversation_id: state.conversation_id,\n  system_prompt: state.system_prompt,\n  claude_messages: updatedMessages,\n  tool_turns: (state.tool_turns || 0) + 1,\n  usage_input_tokens: (state.usage_input_tokens || 0) + ((claudeResp.usage && claudeResp.usage.input_tokens) || 0),\n  usage_output_tokens: (state.usage_output_tokens || 0) + ((claudeResp.usage && claudeResp.usage.output_tokens) || 0)\n} }];"
+        "jsCode": "// Append the lead-capture assistant tool_use turn + tool_result to the running\n// message history, then loop back to Assemble Request for another Claude call.\nconst state = $('Assemble Request').item.json;\nconst priorMessages = state.claude_messages;\nconst claudeResp = $('Call Claude').item.json;\nconst toolCall = $('Extract Tool Call').item.json;\n\nconst leadResult = $input.first().json;\nconst output = leadResult;\n// 0048: the tool itself broke (a sub-workflow crashed: Google refused, a\n// database error, a missing workflow). n8n hands back { error } instead of\n// stopping, and Claude is told the truth so it never claims it was done.\nconst toolCrashed = !!output && output.error !== undefined && output.error !== null\n  && !['success', 'found', 'available_slots', 'results', 'result', 'reason', 'action', 'status'].some((k) => k in output);\nconst toolError = toolCrashed\n  ? String(typeof output.error === 'string' ? output.error : (output.error.message || output.error.description || JSON.stringify(output.error))).slice(0, 400)\n  : null;\nconst FAILED_TEXT = (name) => `TOOL FAILED: ${name} could not be completed because of a technical problem on our side. Nothing was done. ` +\n  (name === 'escalate_to_human'\n    ? 'The team has been alerted another way. Tell the client that someone from the team will contact them, and do not call escalate_to_human again.'\n    : 'Do not say or imply it was done. Apologise in one short sentence, then call escalate_to_human (reason \"other\") with what the client wanted, so the team finishes it; tell the client the team will follow up. Do not call this tool again in this reply.');\nlet resultText;\nif (toolCrashed) {\n  // The client's details were NOT saved: the team must be told, or the lead is lost.\n  resultText = 'TOOL FAILED: the client\\'s details could not be saved because of a technical problem on our side. ' +\n    'Call escalate_to_human (reason \"other\") now and put the client\\'s name, phone, email and what they are looking for in the summary, so the team has them. ' +\n    'Carry on the conversation normally; do not mention a problem. Do not call capture_lead again in this reply.';\n} else if (leadResult.success) {\n  resultText = `Lead captured successfully. Status: ${leadResult.status}.`;\n  if (leadResult.contact_id) {\n    resultText += ` The contact_id for this visitor is ${leadResult.contact_id} -- use this exact value as contact_id when calling book_appointment.`;\n  } else {\n    resultText += ` Note: no contact_id is available yet, so do not call book_appointment until a contact has been created.`;\n  }\n} else {\n  resultText = 'There was a problem recording this lead information -- continue the conversation normally without mentioning this to the visitor.';\n}\n\nconst updatedMessages = [\n  ...priorMessages,\n  { role: 'assistant', content: claudeResp.content },\n  { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolCall.tool_use_id, content: resultText }] }\n];\n\nreturn [{ json: {\n  tenant_id: state.tenant_id,\n  tenant_name: state.tenant_name,\n  tenant_industry: state.tenant_industry,\n  conversation_id: state.conversation_id,\n  system_prompt: state.system_prompt,\n  claude_messages: updatedMessages,\n  tool_failed: toolCrashed,\n  failed_tool: 'capture_lead',\n  tool_error: toolError,\n  tool_turns: (state.tool_turns || 0) + 1,\n  usage_input_tokens: (state.usage_input_tokens || 0) + ((claudeResp.usage && claudeResp.usage.input_tokens) || 0),\n  usage_output_tokens: (state.usage_output_tokens || 0) + ((claudeResp.usage && claudeResp.usage.output_tokens) || 0)\n} }];"
       },
       "id": "beb8a1e7-b155-47ea-a12b-cfd1dfafec20",
       "name": "Build Lead Result Message",
@@ -781,7 +789,8 @@
       "position": [
         3584,
         384
-      ]
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -932,7 +941,8 @@
       "position": [
         3584,
         576
-      ]
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1017,7 +1027,8 @@
         3584,
         768
       ],
-      "notes": "TODO: after importing '24 - Escalate To Human' into n8n, open this node and reselect the workflow from the dropdown -- the value here is a placeholder, not a real workflow ID (24 doesn't exist in your instance until you import it, so its real ID can't be known ahead of time). Same one-time manual step as setting a credential on an imported node."
+      "notes": "TODO: after importing '24 - Escalate To Human' into n8n, open this node and reselect the workflow from the dropdown -- the value here is a placeholder, not a real workflow ID (24 doesn't exist in your instance until you import it, so its real ID can't be known ahead of time). Same one-time manual step as setting a credential on an imported node.",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1154,7 +1165,8 @@
           "name": "Elliot Postgres (service role)"
         }
       },
-      "notes": "search_listings() (db/migrations/0027) filters by the tenant id passed in, and only returns available listings."
+      "notes": "search_listings() (db/migrations/0027) filters by the tenant id passed in, and only returns available listings.",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1381,7 +1393,8 @@
         3584,
         1152
       ],
-      "notes": "Workflow 37. After importing, select '37 - Client Viewing Changes' here. contact_id comes from the conversation, so a client can only change their own bookings."
+      "notes": "Workflow 37. After importing, select '37 - Client Viewing Changes' here. contact_id comes from the conversation, so a client can only change their own bookings.",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1504,6 +1517,117 @@
         110,
         1196
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 0048: Claude couldn't be reached after three tries (overloaded, timed out,\n// key or credit problem). The client must not be left without an answer and\n// the team must know: a short holding reply in the client's language, an\n// escalation, and a line in the audit log that the health alerts pick up.\nconst ctx = $('Merge Tenant Context').first().json;\nlet conversationId = null;\ntry { conversationId = $('Get or Create Conversation').first().json.conversation_id; } catch (e) { conversationId = null; }\nconst input = $input.first().json || {};\nconst err = input.error;\nconst detail = typeof err === 'string' ? err\n  : (err && (err.message || err.description || (err.cause && err.cause.message))) || input.message || 'no response';\nconst polish = /[ąćęłńóśźż]|\\b(dzień dobry|dziękuj\\w*|proszę|mieszkani\\w*|prezentacj\\w*|czy|jest|są|nie|się|oraz)\\b/i.test(String(ctx.message || ''));\nconst reply = polish\n  ? 'Przepraszamy, w tej chwili nie mogę odpowiedzieć. Przekazałem wiadomość do zespołu i ktoś wkrótce się z Państwem skontaktuje.'\n  : \"Sorry, I can't answer right now. I've passed your message to the team and someone will get back to you shortly.\";\nreturn [{ json: {\n  tenant_id: ctx.tenant_id,\n  conversation_id: conversationId,\n  channel: ctx.channel || 'chat_widget',\n  error: ('Claude: ' + String(detail)).slice(0, 400),\n  reply,\n} }];"
+      },
+      "id": "9bef42a6-bd54-5d4e-8a06-f33a1749a4a7",
+      "name": "Elliot Unavailable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        708
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0048: audit log (alerts), the holding reply in the conversation, and an\n-- escalation so someone from the team answers the client.\nselect record_elliot_failure($1::uuid, nullif($2, '')::uuid, $3, $4, $5) as escalation_id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, String($json.conversation_id || ''), $json.channel, $json.error, $json.reply ] }}"
+        }
+      },
+      "id": "a6cbc6d6-3afb-5e7d-a067-f1da4b8e7d82",
+      "name": "Record Elliot Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2688,
+        708
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "notes": "Never blocks the reply: if the database is the problem too, the client still gets the holding message."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { conversation_id: $('Elliot Unavailable').first().json.conversation_id, reply: $('Elliot Unavailable').first().json.reply, degraded: true } }}",
+        "options": {}
+      },
+      "id": "f286f34b-17c7-5fa1-b469-469dffbf8c60",
+      "name": "Respond: Elliot Unavailable",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2912,
+        708
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e168edca-9492-5ba6-b37c-5a2514af062c",
+              "leftValue": "={{ $json.tool_failed === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "06ab7990-0304-595c-a603-2b040ae36d1c",
+      "name": "Tool Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4032,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0048: a tool that failed is in the audit log (and so in the health alerts);\n-- a failed hand-over still opens an escalation.\nselect record_tool_failure($1::uuid, nullif($2, '')::uuid, $3, $4);",
+        "options": {
+          "queryReplacement": "={{ [ $json.tenant_id, String($json.conversation_id || ''), $json.failed_tool, $json.tool_error || 'unknown error' ] }}"
+        }
+      },
+      "id": "228de468-e72d-5ed0-a370-869984428d86",
+      "name": "Record Tool Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        4256,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {
@@ -1637,6 +1761,13 @@
         [
           {
             "node": "Did Claude Request a Tool?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Elliot Unavailable",
             "type": "main",
             "index": 0
           }
@@ -1779,6 +1910,11 @@
             "node": "Assemble Request",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Tool Failed?",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -1799,6 +1935,11 @@
         [
           {
             "node": "Assemble Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tool Failed?",
             "type": "main",
             "index": 0
           }
@@ -2022,6 +2163,40 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "Elliot Unavailable": {
+      "main": [
+        [
+          {
+            "node": "Record Elliot Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Elliot Failure": {
+      "main": [
+        [
+          {
+            "node": "Respond: Elliot Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool Failed?": {
+      "main": [
+        [
+          {
+            "node": "Record Tool Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },

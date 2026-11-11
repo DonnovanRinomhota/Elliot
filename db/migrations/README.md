@@ -63,6 +63,7 @@ set supabase_url = …`); the feature doc for each migration lists its set-up.
 | 0045 | Follow-ups by WhatsApp |
 | 0046 | Email attachments (private Storage bucket) |
 | 0047 | Security: agency isolation, roles, public key locked down ([security](../../docs/security.md)) |
+| 0048 | Reliability: follow-up steps claimed once, STOP for follow-ups, escalation when Elliot can't answer, failed tools and WhatsApp deliveries logged, spaced-out CRM retries ([reliability](../../docs/reliability.md)) |
 
 ## Tests
 

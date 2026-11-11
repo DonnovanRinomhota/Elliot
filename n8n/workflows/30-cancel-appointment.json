@@ -163,7 +163,9 @@
         "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.google_calendar_id) }}/events/{{ encodeURIComponent($json.external_calendar_id) }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleCalendarOAuth2Api",
-        "options": {}
+        "options": {
+          "timeout": 20000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,

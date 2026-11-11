@@ -25,7 +25,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "select\n  r.id as run_id,\n  r.tenant_id,\n  r.lead_id,\n  r.sequence_id,\n  r.current_step_index,\n  r.created_at as run_created_at,\n  s.steps,\n  l.contact_id,\n  c.name as contact_name,\n  c.email as contact_email,\n  c.phone as contact_phone,\n  ac.autonomy_rules,\n  ac.connected_gmail_address,\n  -- 0045: WhatsApp, for clients who have written to the agency there.\n  ac.whatsapp_phone_number_id,\n  wa.conversation_id as wa_conversation_id,\n  wa.last_inbound_at as wa_last_inbound_at,\n  exists (\n    select 1 from messages m\n    join conversations conv on conv.id = m.conversation_id\n    where conv.contact_id = l.contact_id\n      and m.role = 'user'\n      and m.created_at > r.created_at\n  ) as contact_replied\nfrom follow_up_runs r\njoin follow_up_sequences s on s.id = r.sequence_id\njoin leads l on l.id = r.lead_id\njoin contacts c on c.id = l.contact_id\njoin ai_config ac on ac.tenant_id = r.tenant_id\nleft join lateral (\n  select conv.id as conversation_id,\n         (select max(m.created_at) from messages m where m.conversation_id = conv.id and m.role = 'user') as last_inbound_at\n  from conversations conv\n  where conv.tenant_id = r.tenant_id and conv.contact_id = l.contact_id and conv.channel = 'whatsapp'\n  order by conv.created_at desc\n  limit 1\n) wa on true\nwhere r.status = 'running' and r.next_run_at <= now()\norder by r.next_run_at asc\nlimit 25;",
+        "query": "-- 0048: each due step is claimed and its run moved on in one transaction, so\n-- a sweep that crashes half-way or overlaps the next one can't send a step\n-- twice. Runs with nothing to send (client replied or said STOP, lead closed,\n-- no steps left) are closed inside the function and don't come back here.\nselect * from claim_due_follow_up_runs(25);",
         "options": {}
       },
       "id": "828fa7a9-af45-41a3-8c54-c527ba566bf7",
@@ -123,52 +123,6 @@
         896,
         96
       ]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "update follow_up_runs\nset status = 'stopped', stop_reason = 'contact_replied', next_run_at = null, updated_at = now()\nwhere id = $1;",
-        "options": {
-          "queryReplacement": "={{ [$json.run_id] }}"
-        }
-      },
-      "id": "ff152e87-4b73-402f-985c-1b6cdc7d015d",
-      "name": "Stop Run (Replied)",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        896,
-        -96
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "TfAL8Z0epZ1Tqiib",
-          "name": "Elliot Postgres (service role)"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "update follow_up_runs\nset status = 'completed', next_run_at = null, updated_at = now()\nwhere id = $1;",
-        "options": {
-          "queryReplacement": "={{ [$json.run_id] }}"
-        }
-      },
-      "id": "720ed208-2c21-414c-a446-a20c76f69110",
-      "name": "Complete Run",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        1120,
-        192
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "TfAL8Z0epZ1Tqiib",
-          "name": "Elliot Postgres (service role)"
-        }
-      }
     },
     {
       "parameters": {
@@ -311,7 +265,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Passes every item through so Advance Run can read $('Determine Action').item\n// for run_id/is_final/next_step_day_offset whichever branch fed it (email\n// sent, email waiting for approval, WhatsApp, or nothing to send) -- and\n// whatever $json the send step produced, even a failed one.\nreturn $input.all().map((it, i) => ({ json: it.json, pairedItem: i }));"
+        "jsCode": "// 0048: the end of the line. The run was already moved on to its next step\n// when the step was claimed (claim_due_follow_up_runs), whichever way this\n// one went: sent, waiting in Approvals, or nothing to send it to.\nreturn $input.all().map((it, i) => ({ json: it.json, pairedItem: i }));"
       },
       "id": "f77b5543-3dd0-4e1a-8ce5-489815635ff7",
       "name": "Merge Before Advance",
@@ -320,32 +274,8 @@
       "position": [
         2464,
         96
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "update follow_up_runs r\nset current_step_index = current_step_index + 1,\n    status = case when $2 then 'completed' else 'running' end,\n    next_run_at = case when $2 then null else r.created_at + ($3 || ' days')::interval end,\n    updated_at = now()\nfrom (select id from follow_up_runs where id = $1) sub\nwhere r.id = sub.id;",
-        "options": {
-          "queryReplacement": "={{ [$('Determine Action').item.json.run_id, $('Determine Action').item.json.is_final, $('Determine Action').item.json.next_step_day_offset || 0] }}"
-        }
-      },
-      "id": "28018bfc-3a79-4d02-a18e-275091fab451",
-      "name": "Advance Run",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        2688,
-        0
       ],
-      "notesInFlow": true,
-      "credentials": {
-        "postgres": {
-          "id": "TfAL8Z0epZ1Tqiib",
-          "name": "Elliot Postgres (service role)"
-        }
-      },
-      "notes": "KNOWN, DELIBERATE LIMITATION: this runs immediately after queuing the draft, regardless of whether an approval_required draft has actually been approved and sent yet by a human. If approvals lag, the sequence keeps advancing to the next scheduled step on time anyway rather than waiting -- drafts can pile up in the approvals queue while the schedule marches forward. Documented here and in the spec doc, not hidden. Fixing it properly would mean tying advancement to 15 (Send Approved Email) confirming an actual send, which would require editing an already-live production workflow -- deliberately out of scope for this version."
+      "notes": "KNOWN, DELIBERATE: the sequence keeps its schedule even while a step waits in Approvals; drafts can pile up there if nobody approves them."
     },
     {
       "parameters": {
@@ -564,13 +494,7 @@
     },
     "Contact Replied?": {
       "main": [
-        [
-          {
-            "node": "Stop Run (Replied)",
-            "type": "main",
-            "index": 0
-          }
-        ],
+        [],
         [
           {
             "node": "No Next Step?",
@@ -582,13 +506,7 @@
     },
     "No Next Step?": {
       "main": [
-        [
-          {
-            "node": "Complete Run",
-            "type": "main",
-            "index": 0
-          }
-        ],
+        [],
         [
           {
             "node": "Send By WhatsApp?",
@@ -651,13 +569,7 @@
     },
     "Merge Before Advance": {
       "main": [
-        [
-          {
-            "node": "Advance Run",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Send By WhatsApp?": {

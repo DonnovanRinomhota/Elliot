@@ -86,7 +86,12 @@ A variable of the same name (`WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET`,
   numbers added in Meta's API Setup, `131047` more than 24 hours since the
   client's last message.
 - Several quick messages in a row are answered one by one (each runs
-  through Elliot separately), as on the website.
+  through Elliot separately), as on the website. If Meta puts several in
+  *one* delivery, the first is answered and the rest are counted in the
+  alerts (`whatsapp_unanswered_failed`, 0048).
+- Meta accepted a message and later reports it as failed (status update)
+  → `record_whatsapp_delivery_failure` (0048): `audit_log` + a note in the
+  client's conversation, once per message.
 
 ## Expected output
 None; a top-level trigger.

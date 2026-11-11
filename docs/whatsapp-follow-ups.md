@@ -12,6 +12,9 @@ Any step of a follow-up sequence can be sent by WhatsApp instead of email: in **
 
 WhatsApp only goes to clients who have messaged the agency's WhatsApp number themselves. That is their opt-in, which WhatsApp requires before a business may message someone. Leads reachable only on WhatsApp are now auto-enrolled into sequences too.
 
+A client who answers STOP (or wypisz, unsubscribe…) gets no more follow-up
+steps on any channel: see [reliability](reliability.md#clients-can-stop-follow-ups).
+
 ## How a WhatsApp step is sent
 
 - **Within 24 hours** of the client's last WhatsApp message: as written, line breaks and all.
