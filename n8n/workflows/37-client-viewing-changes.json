@@ -64,9 +64,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- Only the client's own booking (0038).\nselect * from client_appointment($1::uuid, $2::uuid, $3::uuid);",
+        "query": "-- Only the client's own booking (0038). 0047: on the website chat, where the\n-- visitor's identity is only typed in, also only a viewing booked in this\n-- same conversation ($4); email and WhatsApp pass null.\nselect * from client_appointment($1::uuid, $2::uuid, $3::uuid, nullif($4, '')::uuid);",
         "options": {
-          "queryReplacement": "={{ [ $json.tenant_id, $json.contact_id, $json.appointment_id ] }}"
+          "queryReplacement": "={{ (() => { const t = $('When Executed by Another Workflow').first().json; return [ $json.tenant_id, $json.contact_id, $json.appointment_id, ['email', 'whatsapp'].includes(String(t.channel || '')) ? '' : String(t.conversation_id || '00000000-0000-0000-0000-000000000000') ]; })() }}"
         }
       },
       "id": "c460d7b6-daf6-509f-8fe9-10c2d1687912",

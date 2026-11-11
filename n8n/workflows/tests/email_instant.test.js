@@ -132,7 +132,7 @@ test('16: Elliot is asked as an email conversation with the sender\'s email', ()
     'Get or Create Conversation (Email)': { id: 'conv' },
   };
   const out = run(nodeOf(wf16, 'Build Elliot Request').parameters.jsCode, { json: { id: 'conv' }, nodes, execution: { resumeUrl: 'https://makodevops.app.n8n.cloud/webhook-waiting/1' } })[0].json;
-  assert.strictEqual(out.chat_url, 'https://makodevops.app.n8n.cloud/webhook/chat');
+  assert.strictEqual(out.chat_url, 'https://makodevops.app.n8n.cloud/webhook/chat-internal');
   assert.deepStrictEqual(out.request, {
     tenant_slug: 'simon',
     message: 'Subject: Availability of studio on Płochocińska\n\nHi, is the studio still available? I could view it on Friday.',
@@ -188,7 +188,7 @@ test('16: team takeover, Elliot failures and Gmail refusals', () => {
 });
 
 test('01: email is a channel of its own: no details form, write an email', () => {
-  const v = run(nodeOf(wf01, 'Validate Input').parameters.jsCode, { json: { body: { tenant_slug: 's', message: 'Hi', channel: 'email' } } })[0].json;
+  const v = run(nodeOf(wf01, 'Validate Input').parameters.jsCode, { json: { internal: true, body: { tenant_slug: 's', message: 'Hi', channel: 'email' } } })[0].json;
   assert.strictEqual(v.channel, 'email');
   const c = cond(wf01, 'Visitor Identified?');
   const em = { 'Merge Tenant Context': { channel: 'email' } };

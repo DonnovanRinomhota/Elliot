@@ -66,14 +66,14 @@ test('01: no answer until the visitor has given a name and an email or phone', (
 
   const ident = nodeOf(wf01, 'Identify Visitor');
   assert.strictEqual(ident.credentials.postgres.name, SERVICE);
-  assert.match(ident.parameters.query, /identify_chat_visitor\(\$1, \$2::uuid, \$3, \$4, \$5\)/);
+  assert.match(ident.parameters.query, /identify_chat_visitor\(\$1, \$2::uuid, \$3, \$4, \$5, \$6::boolean\)/);
   const params = expr(ident.parameters.options.queryReplacement, {
     nodes: {
       'Merge Tenant Context': { tenant_id: 't', contact_name: 'Anna', contact_email: 'a@x.pl', contact_phone: null },
       'Get or Create Conversation': { conversation_id: 'conv' },
     },
   });
-  assert.deepStrictEqual(params, ['t', 'conv', 'Anna', 'a@x.pl', '']);
+  assert.deepStrictEqual(params, ['t', 'conv', 'Anna', 'a@x.pl', '', false], 'the website chat is never a verified identity');
 
   const cond = nodeOf(wf01, 'Visitor Identified?').parameters.conditions.conditions[0].leftValue;
   const web = { 'Merge Tenant Context': { channel: 'chat_widget' } };
