@@ -24,12 +24,15 @@ timeouts in eight more. See [`docs/reliability.md`](docs/reliability.md).
 (including the crash case: a second sweep straight after the first hands out
 nothing) and `n8n/workflows/tests/reliability.test.js`. Not run in a live n8n.
 
-## OPEN — Importing a workflow resets sub-workflow links and the error workflow
-`01` and `10` refer to workflows 24 and 37 by placeholder, and no file names
-workflow 34 as its error workflow, because the real IDs were never recorded
-in the repo. After every import they must be picked again by hand
-([`docs/reliability.md`](docs/reliability.md#after-importing-a-workflow-into-n8n)).
-Fix: put the three real IDs in the files.
+## RESOLVED (Nov 2026) — Importing a workflow reset sub-workflow links and the error workflow
+`01` and `10` referred to workflows 24 and 37 by placeholder, and no file
+named workflow 34 as its error workflow, so every import silently broke
+hand-overs and viewing changes and stopped crashes being recorded until they
+were picked again by hand.
+
+**Fix:** the real IDs are in the files (24 `jfcGGkCo29OLxONR`, 37
+`ySMoLU4Vf6EM6FAE`, 34 `seDI8X3d4J3gLEgw` as `settings.errorWorkflow` on
+every other workflow). `reliability.test.js` guards it.
 
 ## RESOLVED (Nov 2026) — Security review: agency isolation and roles
 The public Supabase key could call n8n's helper functions with any agency's

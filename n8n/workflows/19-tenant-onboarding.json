@@ -13,7 +13,10 @@
       "name": "Onboarding Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "PLACEHOLDER_SET_ON_IMPORT",
@@ -31,7 +34,10 @@
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [224, 0]
+      "position": [
+        224,
+        0
+      ]
     },
     {
       "parameters": {
@@ -45,7 +51,10 @@
       "name": "Insert Tenant",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [448, 0],
+      "position": [
+        448,
+        0
+      ],
       "notesInFlow": true,
       "credentials": {
         "postgres": {
@@ -83,7 +92,10 @@
       "name": "Tenant Created?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [672, 0],
+      "position": [
+        672,
+        0
+      ],
       "notes": "Explicit boolean expression, not n8n's built-in empty-check operator -- that operator has behaved inconsistently with null before (see 15's proposed_appointment bug in KNOWN_ISSUES). Don't swap this for 'exists'/'isNotEmpty' without retesting."
     },
     {
@@ -98,7 +110,10 @@
       "name": "Insert AI Config",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [896, -96],
+      "position": [
+        896,
+        -96
+      ],
       "notesInFlow": true,
       "credentials": {
         "postgres": {
@@ -116,7 +131,10 @@
       "name": "Format Onboarding Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, -96]
+      "position": [
+        1120,
+        -96
+      ]
     },
     {
       "parameters": {
@@ -128,7 +146,10 @@
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1344, -96]
+      "position": [
+        1344,
+        -96
+      ]
     },
     {
       "parameters": {
@@ -142,38 +163,94 @@
       "name": "Respond Slug Taken",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [896, 96]
+      "position": [
+        896,
+        96
+      ]
     }
   ],
   "pinData": {},
   "connections": {
     "Onboarding Webhook": {
-      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validate Input": {
-      "main": [[{ "node": "Insert Tenant", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Insert Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Insert Tenant": {
-      "main": [[{ "node": "Tenant Created?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Tenant Created?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Tenant Created?": {
       "main": [
-        [{ "node": "Insert AI Config", "type": "main", "index": 0 }],
-        [{ "node": "Respond Slug Taken", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Insert AI Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Slug Taken",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Insert AI Config": {
-      "main": [[{ "node": "Format Onboarding Result", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Format Onboarding Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Format Onboarding Result": {
-      "main": [[{ "node": "Respond Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "a4d55f30-e68b-4ebb-b24e-22da376d7759",
   "meta": {

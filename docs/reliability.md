@@ -70,20 +70,18 @@ question for the legal review, not something this code decides.
 
 ## After importing a workflow into n8n
 
-Until the real workflow IDs are in these files, an import resets three things
-that then fail **silently**. Check them after every import:
+The files carry the real n8n IDs of every workflow they call, and each names
+*34 - Workflow Error Recorder* as its error workflow, so an import no longer
+resets those. What an import still asks for: **credentials** (pick the same
+ones as before on any node n8n flags) and, where a workflow has them, the
+secrets pasted into its Code nodes (listed in that workflow's doc).
 
-1. **01**: nodes "Execute: Escalate To Human Sub-Workflow" → pick
-   *24 - Escalate To Human*, and "Execute: Change Viewing Sub-Workflow" → pick
-   *37 - Client Viewing Changes*.
-2. **10**: node "Escalate Hot Lead (24)" → pick *24 - Escalate To Human*.
-3. **Every workflow you import**: ⋯ → Settings → Error workflow →
-   *34 - Workflow Error Recorder*. Without it a crash of that workflow is not
-   recorded anywhere.
+The IDs are in [`workflow-specs/README.md`](workflow-specs/README.md#workflow-ids-in-n8n).
+`reliability.test.js` fails if a file points at a placeholder or forgets the
+error workflow.
 
-Since 0048 a missed step 1 or 2 is at least visible: Elliot tells the client
-the team will follow up, the database opens the escalation itself, and
-`tool_failed` shows up in the alerts.
+If a workflow is ever deleted and re-created in n8n it gets a new ID: update
+the table and the files that call it.
 
 ## Known limits
 

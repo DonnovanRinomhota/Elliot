@@ -13,7 +13,10 @@
       "name": "Queue Sync Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "PLACEHOLDER_SET_ON_IMPORT",
@@ -31,7 +34,10 @@
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [224, 0]
+      "position": [
+        224,
+        0
+      ]
     },
     {
       "parameters": {
@@ -45,23 +51,37 @@
       "name": "Verify Entity Belongs To Tenant",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [448, 0],
+      "position": [
+        448,
+        0
+      ],
       "notesInFlow": true,
       "credentials": {
-        "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" }
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
       },
       "notes": "Scalar subqueries again, same reason as 21's resolver -- always exactly one row, entity_id comes back NULL rather than the item vanishing if the tenant/entity combo doesn't actually match. This is a real safety check, not just validation: without it, one tenant could queue a sync for another tenant's data by guessing a UUID."
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
           "conditions": [
             {
               "id": "cond-found",
               "leftValue": "={{ !!($json.tenant_id && $json.entity_id) }}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -72,7 +92,10 @@
       "name": "Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [672, 0]
+      "position": [
+        672,
+        0
+      ]
     },
     {
       "parameters": {
@@ -86,10 +109,16 @@
       "name": "Insert Sync Log",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [896, -96],
+      "position": [
+        896,
+        -96
+      ],
       "notesInFlow": true,
       "credentials": {
-        "postgres": { "id": "TfAL8Z0epZ1Tqiib", "name": "Elliot Postgres (service role)" }
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
       },
       "notes": "No dedup -- calling this twice for the same entity creates two log rows. Acceptable for an audit-log-shaped table (crm_sync_log has no unique constraint to conflict on); the sweep just processes both. Not worth adding dedup logic without a real usage pattern showing it's actually a problem."
     },
@@ -103,47 +132,100 @@
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1120, -96]
+      "position": [
+        1120,
+        -96
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ JSON.stringify({ success: false, error: 'tenant not found, or entity_id does not belong to this tenant' }) }}",
-        "options": { "responseCode": 404 }
+        "options": {
+          "responseCode": 404
+        }
       },
       "id": "346983b4-214d-49e7-95c8-f5e1e00f10f7",
       "name": "Respond Not Found",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [896, 96]
+      "position": [
+        896,
+        96
+      ]
     }
   ],
   "pinData": {},
   "connections": {
     "Queue Sync Webhook": {
-      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validate Input": {
-      "main": [[{ "node": "Verify Entity Belongs To Tenant", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Verify Entity Belongs To Tenant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Verify Entity Belongs To Tenant": {
-      "main": [[{ "node": "Found?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Found?": {
       "main": [
-        [{ "node": "Insert Sync Log", "type": "main", "index": 0 }],
-        [{ "node": "Respond Not Found", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Insert Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Insert Sync Log": {
-      "main": [[{ "node": "Respond Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "versionId": "940a9001-4b1e-49d0-90c6-3db7f8ae2995",
   "meta": {

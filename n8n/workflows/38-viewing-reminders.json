@@ -448,7 +448,8 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "timezone": "Europe/Warsaw"
+    "timezone": "Europe/Warsaw",
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
   },
   "tags": []
 }
