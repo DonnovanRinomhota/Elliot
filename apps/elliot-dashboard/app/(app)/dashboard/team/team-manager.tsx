@@ -106,8 +106,10 @@ export default function TeamManager({
     .filter((m) => m.receives_leads && m.role !== "viewer")
     .sort((a, b) => (a.last_assigned_at ? new Date(a.last_assigned_at).getTime() : 0) - (b.last_assigned_at ? new Date(b.last_assigned_at).getTime() : 0))[0];
 
+  // minmax(0,1fr): a grid column otherwise grows to the members table's width on
+  // phones, so the whole page scrolled sideways instead of just the table.
   return (
-    <div className="grid gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       {error && <ErrorText>{error}</ErrorText>}
 
       <Panel
