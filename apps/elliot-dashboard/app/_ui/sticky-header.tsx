@@ -27,7 +27,7 @@ export default function StickyHeader({
 
   return (
     <div
-      className={`sticky top-[54px] z-10 -mx-4 bg-[#eef1f6] px-4 md:top-0 md:-mx-6 md:px-6 lg:-mx-7 lg:px-7 ${
+      className={`sticky top-[58px] z-10 -mx-4 px-4 md:top-0 md:-mx-6 md:px-6 lg:-mx-7 lg:px-7 ${stuck ? "bg-[#eef2f8]/90 backdrop-blur-md" : "bg-transparent"} ${
         tabs
           ? // The tabs' own bottom line is the divider.
             `mb-5 pb-0 ${stuck ? "pt-3" : "pt-0"}`
@@ -36,8 +36,8 @@ export default function StickyHeader({
     >
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className={`m-0 font-semibold leading-tight tracking-[-0.02em] text-ink ${stuck ? "text-[17px]" : "text-[26px]"}`}>{title}</h1>
-          {description && !stuck && <div className="mb-0 mt-1 max-w-2xl text-[13.5px] text-gray-500">{description}</div>}
+          <h1 className={`m-0 font-semibold leading-tight tracking-[-0.03em] text-ink ${stuck ? "text-[17px]" : "text-[30px]"}`}>{title}</h1>
+          {description && !stuck && <div className="mb-0 mt-1.5 max-w-2xl text-[14px] text-gray-600">{description}</div>}
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>

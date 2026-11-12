@@ -14,7 +14,7 @@ export function openAskElliot(question?: string) {
 }
 
 /** The search-style box in the sidebar (and anywhere else) that opens the assistant. */
-export function AskElliotButton({ compact = false }: { compact?: boolean }) {
+export function AskElliotButton({ compact = false, onDark = false }: { compact?: boolean; onDark?: boolean }) {
   const [mac, setMac] = useState(false);
   useEffect(() => setMac(/Mac|iPhone|iPad/.test(navigator.platform)), []);
   if (compact) {
@@ -22,9 +22,13 @@ export function AskElliotButton({ compact = false }: { compact?: boolean }) {
       <button
         type="button"
         onClick={() => openAskElliot()}
-        className="inline-flex h-9 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-[13px] font-medium text-ink shadow-sm hover:bg-gray-50"
+        className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-medium ${
+          onDark
+            ? "border border-white/30 bg-[#071a3a]/45 text-white backdrop-blur-sm hover:bg-[#071a3a]/60"
+            : "border border-gray-200 bg-white text-ink shadow-sm hover:bg-gray-50"
+        }`}
       >
-        <Sparkles size={15} className="text-accent" aria-hidden="true" />
+        <Sparkles size={15} className={onDark ? "text-gold-light" : "text-brass"} aria-hidden="true" />
         Ask Elliot
       </button>
     );
@@ -33,11 +37,11 @@ export function AskElliotButton({ compact = false }: { compact?: boolean }) {
     <button
       type="button"
       onClick={() => openAskElliot()}
-      className="flex h-10 w-full items-center gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-3 text-left text-[13px] text-gray-500 hover:border-gray-300 hover:bg-white"
+      className="flex h-10 w-full items-center gap-2.5 rounded-full border border-white/15 bg-white/[0.07] px-3.5 text-left text-[13px] text-white/70 hover:border-white/25 hover:bg-white/10"
     >
-      <Sparkles size={15} className="flex-shrink-0 text-accent" aria-hidden="true" />
+      <Sparkles size={15} className="flex-shrink-0 text-gold-light" aria-hidden="true" />
       <span className="flex-1 truncate">Search or ask Elliot</span>
-      <kbd className="rounded-md border border-gray-200 bg-white px-1.5 font-sans text-[11px] text-gray-400">{mac ? "⌘K" : "Ctrl K"}</kbd>
+      <kbd className="rounded-md border border-white/20 px-1.5 font-sans text-[11px] text-white/55">{mac ? "⌘K" : "Ctrl K"}</kbd>
     </button>
   );
 }
@@ -130,7 +134,7 @@ export default function AskElliot() {
         aria-modal="true"
         aria-label="Ask Elliot"
         onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-full max-w-[680px] flex-col overflow-hidden rounded-[22px] border border-[#e8ebf1] bg-white shadow-lift"
+        className="flex max-h-[80vh] w-full max-w-[680px] flex-col overflow-hidden rounded-[22px] border border-[rgba(15,31,56,0.08)] bg-white shadow-lift"
       >
         <form
           onSubmit={(e) => {
@@ -156,7 +160,7 @@ export default function AskElliot() {
             type="submit"
             disabled={!q.trim() || busy}
             aria-label="Ask"
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-ink text-white disabled:bg-gray-200"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center gold-fill rounded-full text-ink disabled:bg-none disabled:bg-gray-200 disabled:text-gray-400"
           >
             <ArrowUp size={16} aria-hidden="true" />
           </button>

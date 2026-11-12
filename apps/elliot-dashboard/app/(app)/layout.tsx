@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ElliotMark } from "@/app/_ui/elliot-logo";
+import { ElliotLogo, ElliotMark } from "@/app/_ui/elliot-logo";
 import { isAdminEmail } from "@/lib/admin";
 import { getAdminView, getMembership } from "@/lib/tenant";
 import SignOutButton from "./dashboard/sign-out-button";
@@ -98,7 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <NavLink href="/" icon={<LayoutDashboard {...navIcon} />} label="Overview" />
 
       <div className="mt-5">
-        <p className="mb-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.06em] text-gray-400">Needs attention</p>
+        <p className="mb-1.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.2em] text-white/40">Needs attention</p>
         <NavLink href="/dashboard/inbox" icon={<Inbox {...navIcon} />} label="Inbox" badge={openEscalations} badgeTone="danger" />
         <NavLink
           href="/dashboard/escalations"
@@ -115,7 +115,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
 
       <div className="mt-5">
-        <p className="mb-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.06em] text-gray-400">Customers</p>
+        <p className="mb-1.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.2em] text-white/40">Customers</p>
         <NavLink href="/dashboard/leads" icon={<Users {...navIcon} />} label="Leads" />
         <NavLink href="/dashboard/appointments" icon={<Calendar {...navIcon} />} label="Appointments" />
         <NavLink href="/dashboard/calendar" icon={<CalendarDays {...navIcon} />} label="Calendar" />
@@ -124,7 +124,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
 
       <div className="mt-5">
-        <p className="mb-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.06em] text-gray-400">Your agency</p>
+        <p className="mb-1.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.2em] text-white/40">Your agency</p>
         <NavLink href="/dashboard/listings" icon={<Home {...navIcon} />} label="Listings" />
         <NavLink href="/dashboard/knowledge" icon={<BookOpen {...navIcon} />} label="Knowledge base" />
         <NavLink href="/dashboard/team" icon={<UserCog {...navIcon} />} label="Team" />
@@ -132,7 +132,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {isAdmin && (
         <div className="mt-5">
-          <p className="mb-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.06em] text-gray-400">Platform</p>
+          <p className="mb-1.5 px-3 text-[10.5px] font-medium uppercase tracking-[0.2em] text-white/40">Platform</p>
           <NavLink href="/platform" icon={<Building2 {...navIcon} />} label="Control panel" />
         </div>
       )}
@@ -148,17 +148,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .join("");
 
   const yourDay = (
-    <a href="/dashboard/calendar" className="block rounded-2xl bg-gray-50 px-3.5 py-3 no-underline hover:bg-gray-100">
+    <a href="/dashboard/calendar" className="block rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-3 no-underline hover:bg-white/10">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] font-semibold text-ink">Your day</span>
-        <span className="tabular text-[12px] text-gray-500">
+        <span className="text-[13px] font-semibold text-white">Your day</span>
+        <span className="tabular text-[12px] text-white/60">
           {todays.length ? `${doneToday} of ${todays.length} viewings done` : "No viewings"}
         </span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${todays.length ? (doneToday / todays.length) * 100 : 0}%` }} />
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15" aria-hidden="true">
+        <div className="gold-fill h-full rounded-full" style={{ width: `${todays.length ? (doneToday / todays.length) * 100 : 0}%` }} />
       </div>
-      <p className="m-0 mt-2 truncate text-[12px] text-gray-500">
+      <p className="m-0 mt-2 truncate text-[12px] text-white/60">
         {nextViewing
           ? `Next: ${timeOf(nextViewing.starts_at, tz)}${nextViewing.contact?.name ? `, ${nextViewing.contact.name}` : ""}`
           : todays.length
@@ -168,17 +168,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     </a>
   );
 
-  const brand = (
+  const brand = <ElliotLogo size={28} color="#eef2f9" />;
+
+  // The agency this dashboard belongs to.
+  const agency = (
     <div className="flex min-w-0 items-center gap-2.5">
       <span
         aria-hidden="true"
-        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-ink text-[15px] font-semibold text-white"
+        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#1d4b8f,#2f6bff)] text-[13px] font-bold text-white"
       >
         {tenantName.charAt(0).toUpperCase()}
       </span>
       <div className="min-w-0 leading-tight">
-        <div className="truncate text-[14px] font-semibold tracking-[-0.01em] text-ink">{tenantName}</div>
-        <div className="flex items-center gap-1 text-[12px] text-gray-500">
+        <div className="truncate text-[13.5px] font-semibold text-white">{tenantName}</div>
+        <div className="flex items-center gap-1 text-[11.5px] text-white/55">
           <ElliotMark size={11} />
           Elliot assistant
         </div>
@@ -188,46 +191,50 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen md:flex">
-      {/* Desktop: a floating sidebar card */}
-      <aside className="sticky top-0 hidden h-screen w-[268px] flex-shrink-0 p-3 pr-0 md:block">
-        <div className="flex h-full flex-col rounded-[22px] border border-[#e8ebf1] bg-white shadow-card">
-          <div className="px-4 pb-3 pt-4">{brand}</div>
-          <div className="px-3">
+      {/* Desktop: the navy sidebar, as in the website's colours */}
+      <aside className="navy sticky top-0 z-20 hidden h-screen w-[256px] flex-shrink-0 shadow-[12px_0_40px_-22px_rgba(3,24,58,0.7)] md:block">
+        <div className="flex h-full flex-col">
+          <div className="px-6 pb-4 pt-6">{brand}</div>
+          <div className="px-4">
             <AskElliotButton />
           </div>
           <nav aria-label="Main" className="flex-1 overflow-y-auto px-3 py-4">
             {navSections}
           </nav>
-          <div className="grid gap-2 px-3 pb-3">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-2 px-3 pb-4">
             {yourDay}
             <NavLink href="/dashboard/settings" icon={<Settings {...navIcon} />} label="Settings" />
-            <div className="flex min-w-0 items-center gap-2.5 rounded-2xl px-2 py-1.5">
-              <span aria-hidden="true" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-accent-soft text-[12px] font-semibold text-accent-dark">
-                {initials || "?"}
-              </span>
-              <span className="min-w-0 flex-1 leading-tight">
-                <span className="block truncate text-[13px] font-medium text-ink">{displayName}</span>
-                <span className="block truncate text-[11.5px] text-gray-500" title={userEmail}>
-                  {userEmail}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-3">
+              {agency}
+              <div className="mt-3 flex min-w-0 items-center gap-2.5 border-t border-white/10 pt-3">
+                <span aria-hidden="true" className="gold-fill flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold text-ink">
+                  {initials || "?"}
                 </span>
-              </span>
-              <SignOutButton />
+                <span className="min-w-0 flex-1 leading-tight">
+                  <span className="block truncate text-[13px] font-medium text-white">{displayName}</span>
+                  <span className="block truncate text-[11.5px] text-white/55" title={userEmail}>
+                    {userEmail}
+                  </span>
+                </span>
+                <SignOutButton />
+              </div>
             </div>
           </div>
         </div>
       </aside>
 
-      {/* Mobile: top bar with a menu */}
-      <header className="sticky top-0 z-20 border-b border-gray-200 bg-white md:hidden">
+      {/* Mobile: navy top bar with a menu */}
+      <header className="navy sticky top-0 z-20 md:hidden">
         <details className="group">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3.5 [&::-webkit-details-marker]:hidden">
             {brand}
-            <span className="rounded-full border border-gray-200 px-3 py-1 text-[13px] text-ink">Menu</span>
+            <span className="rounded-full border border-white/25 px-3 py-1 text-[13px] text-white">Menu</span>
           </summary>
-          <nav aria-label="Main" className="border-t border-gray-200 px-3 pb-4 pt-3">
+          <nav aria-label="Main" className="max-h-[calc(100vh-58px)] overflow-y-auto border-t border-white/10 px-3 pb-4 pt-3">
             <AskElliotButton />
             <div className="mt-4">{navSections}</div>
-            <div className="mt-5 grid gap-2 border-t border-gray-200 pt-3">
+            <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-2 border-t border-white/10 pt-3">
+              {agency}
               {yourDay}
               <NavLink href="/dashboard/settings" icon={<Settings {...navIcon} />} label="Settings" />
               <SignOutButton />
@@ -257,7 +264,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 ? "border-alert/25 bg-alert-soft text-alert-dark"
                 : trial.tone === "warning"
                   ? "border-brass/25 bg-brass-soft text-brass-dark"
-                  : "border-gray-200 bg-white text-gray-600"
+                  : "border-gray-200 bg-white/80 text-gray-600"
             }`}
           >
             {trial.text}

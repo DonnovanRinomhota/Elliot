@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ElliotGoldDefs } from "./_ui/elliot-logo";
 
 export const metadata: Metadata = {
   title: "Elliot",
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ElliotGoldDefs />
+        {children}
+      </body>
     </html>
   );
 }

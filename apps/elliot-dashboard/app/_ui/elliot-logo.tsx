@@ -5,23 +5,32 @@
 
 const GOLD = ["#F3D4A4", "#D9A56C", "#B97E47", "#E2B47E"];
 
+/**
+ * The gold gradient every mark uses, defined once at the top of the page
+ * (app/layout.tsx). A gradient defined inside a hidden element (the desktop
+ * sidebar on a phone) doesn't paint, so it lives in its own tiny SVG that is
+ * always rendered.
+ */
+export function ElliotGoldDefs() {
+  return (
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+      <defs>
+        <linearGradient id="elliot-gold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={GOLD[0]} />
+          <stop offset="0.38" stopColor={GOLD[1]} />
+          <stop offset="0.72" stopColor={GOLD[2]} />
+          <stop offset="1" stopColor={GOLD[3]} />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 /** The house-E mark. `tone`: gold (default), or a flat colour for one-colour use. */
 export function ElliotMark({ size = 28, tone = "gold", className = "" }: { size?: number; tone?: "gold" | string; className?: string }) {
-  // Same gradient everywhere, so one id is fine even with several logos on a page.
-  const id = "elliot-gold";
-  const fill = tone === "gold" ? `url(#${id})` : tone;
+  const fill = tone === "gold" ? "url(#elliot-gold)" : tone;
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true" className={className} fill={fill}>
-      {tone === "gold" && (
-        <defs>
-          <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor={GOLD[0]} />
-            <stop offset="0.38" stopColor={GOLD[1]} />
-            <stop offset="0.72" stopColor={GOLD[2]} />
-            <stop offset="1" stopColor={GOLD[3]} />
-          </linearGradient>
-        </defs>
-      )}
       <path d="M0 100 V24 L47 0 L100 30 V40.5 L47 14.5 L17.5 29.5 V100 Z" />
       <path d="M56 100 V35 L56 34.6 L100 54 V64 L71.5 51.5 V100 Z" />
       <path d="M74 86 H100 V100 H74 Z" />
