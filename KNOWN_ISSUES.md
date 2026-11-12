@@ -1,5 +1,13 @@
 # Known Issues / Resolved-but-worth-remembering
 
+## RESOLVED (Nov 2026) — n8n kept every client message in its run history
+Every successful run was saved with all its data (messages, emails, names,
+phones). The 29 workflows that handle clients now keep only failed runs and
+runs started by hand; successful ones aren't stored. The conversation itself
+is in the database and the dashboard. Applies once each workflow is
+re-imported. `n8n/workflows/tests/execution_data.test.js` fails if a new
+workflow isn't put in one group or the other.
+
 ## RESOLVED (Nov 2026) — Privacy promises the system couldn't keep
 - The privacy policy promised deletion after 12 months; nothing deleted
   anything. 0051 + workflow 43 now delete inactive clients once a retention
@@ -356,10 +364,13 @@ takes the tenant from the session; the send route only sends drafts that
 belong to the user's tenant and are `approved`. See
 `docs/workflow-specs/internal-webhook-auth.md`.
 
-## OPEN — Gmail (workflow 16) answers only the first of several new emails
+## RESOLVED (Nov 2026) — Gmail (workflow 16) answered only the first of several new emails
 The Gmail trigger checks the inbox every minute and can hand over several
 new emails at once, but the nodes after it read the first one only
-(`.first()`). If two clients email in the same minute, the second isn't
-answered. Rare at today's volume; agencies that forward to their Elliot
-address (workflow 40) aren't affected, since each forwarded email starts its
-own run. Fix: process the trigger's items one at a time (Loop Over Items).
+(`.first()`), so the second client wasn't answered (and its attachments
+would have been the first email's). Each email now goes through the steps on
+its own ("One Email at a Time" loop) and every path ends at "Next Email".
+Tested by `n8n/workflows/tests/email_batch.test.js`; not yet seen on live
+Gmail. Still true: if a step *crashes* (not an ordinary refusal, which is
+handled), the run stops and later emails in that same check wait for a person
+to see the failed run in n8n.

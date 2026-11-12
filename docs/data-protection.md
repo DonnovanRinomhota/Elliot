@@ -21,7 +21,7 @@ first paying agency.
 | Email attachments (IDs, payslips, mortgage letters…) | Supabase Storage, bucket `email-attachments`, under `<agency id>/` | Yes, often sensitive |
 | Listing photos | Supabase Storage, bucket `listing-photos` | Normally no |
 | Logs: `tool_call_log`, `crm_sync_log`, `audit_log` | Supabase | Some rows hold message text or client details |
-| Workflow runs | n8n Cloud → Executions | **Yes**: each run stores its input and output (messages, emails) |
+| Workflow runs | n8n Cloud → Executions | Failed runs and runs started by hand only (they hold messages and emails). Successful runs aren't saved by the workflows that handle clients. |
 | Viewings | The agent's Google Calendar | Client name, phone, notes |
 | Sent and received email | The agency's Gmail / your Gmail; Resend's logs | Yes |
 | CRM copies | The agency's CRM (webhook, ASARI) | Yes |
@@ -138,7 +138,7 @@ days of the end of the contract, unless they ask for a copy first).
 
 | Where | What to do |
 |---|---|
-| n8n Executions | n8n Cloud keeps execution data for a limited time that depends on the plan. In n8n → each workflow's Settings you can choose not to save successful executions. At least know the retention period and write it here. |
+| n8n Executions | Successful runs aren't saved by the 29 workflows that handle clients (setting carried in the files). Failed runs are, for as long as your n8n Cloud plan keeps executions: check that period in n8n and write it here. To remove one: n8n → Executions → select → Delete. |
 | Google Calendar events | Listed after deletion; delete by hand |
 | Gmail inboxes, Resend logs | The mail itself stays with the mailbox owner |
 | CRM / ASARI | The agency deletes it there |

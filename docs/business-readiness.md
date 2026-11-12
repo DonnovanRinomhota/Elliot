@@ -12,7 +12,7 @@ two need you, a company registration, or a lawyer.
 |---|---|---|---|
 | T1 | **Backups** | Supabase Free has no restorable backups. One bad migration or mistaken delete loses every agency's data. | Move to Pro, or own dumps before each migration and weekly ([RELEASING.md](../RELEASING.md#backups)). Try one restore. |
 | T2 | **Retention running** | The privacy policy promises deletion after 12 months; nothing deletes until set. | Run 0051, import workflow 43, set `retention_months = 12` for the `elliot` account after `retention_preview()` ([data-protection](data-protection.md#keeping-data-only-as-long-as-needed-retention)). |
-| T3 | **n8n execution data** | Executions store client messages; their retention isn't known or documented. | Check the plan's execution retention in n8n Cloud; turn off saving successful executions where you don't need them. Write the period in data-protection.md. |
+| T3 | **n8n execution data** | Failed runs still hold client messages; how long n8n keeps them isn't documented. | Successful runs are no longer saved (Nov 2026, after re-import). Check the plan's execution retention in n8n Cloud and write it in data-protection.md. |
 | T4 | **Support access permission** | Testing mode lets you open any agency's dashboard without their permission. | Control panel → Agencies → require permission, before real clients ([support-access](support-access.md)). |
 | T5 | **Google OAuth app in production** | An unverified Google app shows a warning screen, is limited to test users and its tokens can expire after 7 days in testing mode. | Google Cloud Console → OAuth consent screen → publish; verification for Gmail/Calendar scopes may be required. Not verified from here. |
 | T6 | **Per-agency credentials** | Each agency's Gmail/forwarding address, calendars shared with Elliot, CRM webhook or ASARI key. | The go-live checklist on the agency's control-panel page ([onboarding](onboarding.md)). Never paste them in chat or the repository. |
@@ -30,7 +30,7 @@ two need you, a company registration, or a lawyer.
 
 | | What |
 |---|---|
-| L1 | **Agency agreement** with the data processing agreement (umowa powierzenia, GDPR Art. 28): subject, duration, data types, security measures (see the annex list in data-protection.md), subprocessors and how you notify changes, deletion at the end, breach notification timing, audits. |
+| L1 | **Agency agreement** with the data processing agreement (umowa powierzenia, GDPR Art. 28): subject, duration, data types, security measures (see the annex list in data-protection.md), subprocessors and how you notify changes, deletion at the end, breach notification timing, audits. A first draft for the lawyer (EN + PL, built from how Elliot works) is in the doc "Elliot Agency Agreement and DPA (draft)" (12 Nov 2026); not legally reviewed. |
 | L2 | **Review of the privacy policy and terms on getelliot.eu**, in both languages. Engineering checked that they match what the system does (12 Nov 2026); not that they are legally sufficient. |
 | L3 | **Transfers to US providers** (Anthropic, Voyage AI, Resend; possibly others): confirm each one's DPA and transfer basis. |
 | L4 | **AI disclosure**: Elliot says it is an AI in its replies and on the website. Check this against the EU AI Act transparency duties that apply from August 2026 and any Polish requirements. |
@@ -64,6 +64,10 @@ Health and Problems, n8n Executions (red runs), an agency telling you.
    Elliot then stops answering that agency's clients (no reply at all,
    unlike an ended trial) and its follow-ups and reminders stop.
 2. **Find the cause.** The Problems page and the failing n8n execution.
+   Successful runs aren't saved (privacy), so for a wrong answer that didn't
+   fail, read the conversation in the dashboard. If you need a successful run's
+   details, turn on n8n → that workflow → Settings → "Save successful
+   production executions" while you reproduce it, then turn it off again.
    A dashboard deploy can be rolled back in seconds (RELEASING.md §3).
 3. **Fix and release** the usual way (pull request, checks, release order).
 4. **Tell the affected agencies** what happened and when it was fixed.
