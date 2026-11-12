@@ -244,7 +244,8 @@
           "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -375,7 +376,7 @@
           "conditions": [
             {
               "id": "cond-has-reply",
-              "leftValue": "={{ !!($json.reply && $json.reply.trim()) }}",
+              "leftValue": "={{ !!($('Read Elliot Answer').first().json.reply && $('Read Elliot Answer').first().json.reply.trim()) }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -398,7 +399,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Elliot's answer as a reply in the same Gmail thread: \"Re:\" subject,\n// In-Reply-To / References set to the client's Message-ID, plain text\n// (Elliot's Markdown turned into clean text), UTF-8 throughout.\nfunction toPlain(text) {\n  let t = String(text || '').replace(/\\r\\n/g, '\\n');\n  t = t.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, (m, label, url) => (label.trim() === url ? url : `${label.trim()}: ${url}`));\n  t = t.replace(/\\*\\*(.+?)\\*\\*/g, '$1').replace(/__(.+?)__/g, '$1');\n  t = t.replace(/^#{1,6}\\s+/gm, '');\n  t = t.replace(/^(\\s*)\\*\\s+/gm, '$1- ');\n  return t.replace(/\\n{3,}/g, '\\n\\n').trim();\n}\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst f = $('Extract Email Fields').first().json;\nconst tenant = $('Lookup Tenant by Mailbox').first().json;\nconst answer = $input.first().json;\nconst base = f.subject || 'Your enquiry';\nconst subject = /^(re|odp)\\s*:/i.test(base) ? base : `Re: ${base}`;\nconst text = toPlain(answer.reply) + '\\n';\nconst headers = [\n  `To: ${f.from_email}`,\n  `Subject: =?UTF-8?B?${b64(subject)}?=`,\n  f.rfc_message_id ? `In-Reply-To: ${f.rfc_message_id}` : null,\n  f.rfc_message_id ? `References: ${f.rfc_message_id}` : null,\n  'MIME-Version: 1.0',\n  'Content-Type: text/plain; charset=UTF-8',\n  'Content-Transfer-Encoding: base64',\n].filter(Boolean);\nconst raw = headers.join('\\r\\n') + '\\r\\n\\r\\n' + b64(text);\nreturn [{ json: {\n  tenant_id: tenant.tenant_id,\n  conversation_id: answer.conversation_id,\n  to: f.from_email,\n  subject,\n  text,\n  thread_id: f.gmail_thread_id,\n  raw_message: Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '')\n} }];"
+        "jsCode": "// Elliot's answer as a reply in the same Gmail thread: \"Re:\" subject,\n// In-Reply-To / References set to the client's Message-ID, plain text\n// (Elliot's Markdown turned into clean text), UTF-8 throughout.\nfunction toPlain(text) {\n  let t = String(text || '').replace(/\\r\\n/g, '\\n');\n  t = t.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^\\s)]+)\\)/g, (m, label, url) => (label.trim() === url ? url : `${label.trim()}: ${url}`));\n  t = t.replace(/\\*\\*(.+?)\\*\\*/g, '$1').replace(/__(.+?)__/g, '$1');\n  t = t.replace(/^#{1,6}\\s+/gm, '');\n  t = t.replace(/^(\\s*)\\*\\s+/gm, '$1- ');\n  return t.replace(/\\n{3,}/g, '\\n\\n').trim();\n}\nconst b64 = (s) => Buffer.from(String(s), 'utf8').toString('base64');\nconst f = $('Extract Email Fields').first().json;\nconst tenant = $('Lookup Tenant by Mailbox').first().json;\nconst answer = $('Read Elliot Answer').first().json;\nconst base = f.subject || 'Your enquiry';\nconst subject = /^(re|odp)\\s*:/i.test(base) ? base : `Re: ${base}`;\nconst text = toPlain(answer.reply) + '\\n';\nconst headers = [\n  `To: ${f.from_email}`,\n  `Subject: =?UTF-8?B?${b64(subject)}?=`,\n  f.rfc_message_id ? `In-Reply-To: ${f.rfc_message_id}` : null,\n  f.rfc_message_id ? `References: ${f.rfc_message_id}` : null,\n  'MIME-Version: 1.0',\n  'Content-Type: text/plain; charset=UTF-8',\n  'Content-Transfer-Encoding: base64',\n].filter(Boolean);\nconst raw = headers.join('\\r\\n') + '\\r\\n\\r\\n' + b64(text);\nreturn [{ json: {\n  tenant_id: tenant.tenant_id,\n  conversation_id: answer.conversation_id,\n  to: f.from_email,\n  subject,\n  text,\n  thread_id: f.gmail_thread_id,\n  raw_message: Buffer.from(raw).toString('base64').replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '')\n} }];"
       },
       "id": "8f84dd7f-887d-5052-b7ce-0ab768259311",
       "name": "Build Reply Email",
@@ -511,7 +512,8 @@
           "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -567,7 +569,8 @@
           "id": "TfAL8Z0epZ1Tqiib",
           "name": "Elliot Postgres (service role)"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -593,7 +596,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Which files are kept, and which Elliot reads (Claude opens PDFs and\n// JPEG/PNG/GIF/WebP photos; the rest are kept for the team).\nconst MAX_FILES = 10;            // per email\nconst MAX_BYTES = 25 * 1024 * 1024;\nconst READ_MAX = 5;              // files Elliot reads per email\nconst isImage = (t) => /^image\\//i.test(t);\nconst readableType = (t) => /^image\\/(jpeg|png|gif|webp)$/i.test(t) || /^application\\/pdf$/i.test(t);\nconst readLimit = (t) => (/pdf/i.test(t) ? 10 : 5) * 1024 * 1024;\n// Logos and icons in email signatures arrive as small images: not kept.\nconst isSignatureImage = (t, size, inline) => isImage(t) && size > 0 && (size < 15000 || (inline && size < 100000));\nconst safeName = (n) => String(n || 'file').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(-120) || 'file';\nfunction plan(list, ctx) {\n  const base = String(ctx.base || '').replace(/\\/+$/, '');\n  let reading = 0;\n  const kept = list.filter((f) => f.size <= MAX_BYTES && !isSignatureImage(f.content_type, f.size, f.inline)).slice(0, MAX_FILES);\n  return kept.map((f, i) => {\n    const readable = readableType(f.content_type) && f.size > 0 && f.size <= readLimit(f.content_type) && reading < READ_MAX;\n    if (readable) reading += 1;\n    const path = `${ctx.tenant_id}/${ctx.conversation_id}/${ctx.stamp}-${i + 1}-${safeName(f.filename)}`;\n    return { ...f, tenant_id: ctx.tenant_id, conversation_id: ctx.conversation_id, email_message_id: ctx.email_message_id || null,\n      path, readable, upload_url: `${base}/storage/v1/object/email-attachments/${path}`, sign_url: `${base}/storage/v1/object/sign/email-attachments/${path}` };\n  });\n}\n\n// Gmail Trigger (Download Attachments on) puts each file in binary attachment_0, _1...\nconst base = $('Storage Address').first().json.supabase_url;\nconst f = $('Extract Email Fields').first().json;\nconst ctx = { base, tenant_id: $('Lookup Tenant by Mailbox').first().json.tenant_id, conversation_id: $('Get or Create Conversation (Email)').first().json.id,\n  email_message_id: f.rfc_message_id, stamp: Date.now() };\nlet bin = {};\ntry { bin = $('Gmail Trigger').first().binary || {}; } catch (e) { bin = {}; }\nconst toBytes = (s) => {\n  const m = String(s || '').trim().match(/^([\\d.,]+)\\s*(B|kB|KB|MB|GB)?$/i);\n  if (!m) return Number(s) || 0;\n  const n = Number(m[1].replace(',', '.'));\n  return Math.round(n * ({ b: 1, kb: 1024, mb: 1048576, gb: 1073741824 }[(m[2] || 'b').toLowerCase()]));\n};\nconst keys = Object.keys(bin).filter((k) => /^attachment_\\d+$/.test(k)).sort((a, b) => Number(a.split('_')[1]) - Number(b.split('_')[1]));\nconst list = keys.map((k) => ({ key: k, filename: bin[k].fileName || k, content_type: String(bin[k].mimeType || 'application/octet-stream').toLowerCase(),\n  size: toBytes(bin[k].fileSize), inline: false }));\nif (!list.length) return [{ json: { none: true } }];\nif (!base) return [{ json: { none: true, not_saved: list.map((x) => x.filename), reason: 'platform_settings.supabase_url is not set' } }];\nconst files = plan(list, ctx);\nif (!files.length) return [{ json: { none: true } }];\nreturn files.map((x) => ({ json: x, binary: { file: bin[x.key] } }));"
+        "jsCode": "// Which files are kept, and which Elliot reads (Claude opens PDFs and\n// JPEG/PNG/GIF/WebP photos; the rest are kept for the team).\nconst MAX_FILES = 10;            // per email\nconst MAX_BYTES = 25 * 1024 * 1024;\nconst READ_MAX = 5;              // files Elliot reads per email\nconst isImage = (t) => /^image\\//i.test(t);\nconst readableType = (t) => /^image\\/(jpeg|png|gif|webp)$/i.test(t) || /^application\\/pdf$/i.test(t);\nconst readLimit = (t) => (/pdf/i.test(t) ? 10 : 5) * 1024 * 1024;\n// Logos and icons in email signatures arrive as small images: not kept.\nconst isSignatureImage = (t, size, inline) => isImage(t) && size > 0 && (size < 15000 || (inline && size < 100000));\nconst safeName = (n) => String(n || 'file').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(-120) || 'file';\nfunction plan(list, ctx) {\n  const base = String(ctx.base || '').replace(/\\/+$/, '');\n  let reading = 0;\n  const kept = list.filter((f) => f.size <= MAX_BYTES && !isSignatureImage(f.content_type, f.size, f.inline)).slice(0, MAX_FILES);\n  return kept.map((f, i) => {\n    const readable = readableType(f.content_type) && f.size > 0 && f.size <= readLimit(f.content_type) && reading < READ_MAX;\n    if (readable) reading += 1;\n    const path = `${ctx.tenant_id}/${ctx.conversation_id}/${ctx.stamp}-${i + 1}-${safeName(f.filename)}`;\n    return { ...f, tenant_id: ctx.tenant_id, conversation_id: ctx.conversation_id, email_message_id: ctx.email_message_id || null,\n      path, readable, upload_url: `${base}/storage/v1/object/email-attachments/${path}`, sign_url: `${base}/storage/v1/object/sign/email-attachments/${path}` };\n  });\n}\n\n// Gmail Trigger (Download Attachments on) puts each file in binary attachment_0, _1...\n// Read from the email being handled now (output 1 of the loop is the current\n// email; the Gmail Trigger's own first() would always be the first email).\nconst base = $('Storage Address').first().json.supabase_url;\nconst f = $('Extract Email Fields').first().json;\nconst ctx = { base, tenant_id: $('Lookup Tenant by Mailbox').first().json.tenant_id, conversation_id: $('Get or Create Conversation (Email)').first().json.id,\n  email_message_id: f.rfc_message_id, stamp: Date.now() };\nlet bin = {};\ntry { bin = $('One Email at a Time').first(1).binary || {}; } catch (e) { bin = {}; }\nconst toBytes = (s) => {\n  const m = String(s || '').trim().match(/^([\\d.,]+)\\s*(B|kB|KB|MB|GB)?$/i);\n  if (!m) return Number(s) || 0;\n  const n = Number(m[1].replace(',', '.'));\n  return Math.round(n * ({ b: 1, kb: 1024, mb: 1048576, gb: 1073741824 }[(m[2] || 'b').toLowerCase()]));\n};\nconst keys = Object.keys(bin).filter((k) => /^attachment_\\d+$/.test(k)).sort((a, b) => Number(a.split('_')[1]) - Number(b.split('_')[1]));\nconst list = keys.map((k) => ({ key: k, filename: bin[k].fileName || k, content_type: String(bin[k].mimeType || 'application/octet-stream').toLowerCase(),\n  size: toBytes(bin[k].fileSize), inline: false }));\nif (!list.length) return [{ json: { none: true } }];\nif (!base) return [{ json: { none: true, not_saved: list.map((x) => x.filename), reason: 'platform_settings.supabase_url is not set' } }];\nconst files = plan(list, ctx);\nif (!files.length) return [{ json: { none: true } }];\nreturn files.map((x) => ({ json: x, binary: { file: bin[x.key] } }));"
       },
       "id": "ee2d9f2e-a7a2-5db4-8e78-dece8a8d4482",
       "name": "Attachment Files",
@@ -759,6 +762,32 @@
         1700,
         324
       ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "19620c07-1624-59d7-87f1-e62a7a7f872c",
+      "name": "One Email at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1480,
+        224
+      ],
+      "notes": "Gmail can hand over several emails in one check. Each goes through the steps below on its own; every path ends at Next Email, which brings the next one."
+    },
+    {
+      "parameters": {},
+      "id": "1a88e374-f9f5-5bb0-ac2f-3ebf78ead4ba",
+      "name": "Next Email",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1480,
+        424
+      ]
     }
   ],
   "pinData": {},
@@ -767,7 +796,7 @@
       "main": [
         [
           {
-            "node": "Extract Email Fields",
+            "node": "One Email at a Time",
             "type": "main",
             "index": 0
           }
@@ -790,6 +819,13 @@
         [
           {
             "node": "Lookup Tenant by Mailbox",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Next Email",
             "type": "main",
             "index": 0
           }
@@ -833,6 +869,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Next Email",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -852,6 +895,13 @@
         [
           {
             "node": "Upsert Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Next Email",
             "type": "main",
             "index": 0
           }
@@ -906,11 +956,6 @@
       "main": [
         [
           {
-            "node": "Has Reply?",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Elliot Failed?",
             "type": "main",
             "index": 0
@@ -923,6 +968,13 @@
         [
           {
             "node": "Build Reply Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Next Email",
             "type": "main",
             "index": 0
           }
@@ -970,6 +1022,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Next Email",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -978,6 +1037,13 @@
         [
           {
             "node": "Log Elliot Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Reply?",
             "type": "main",
             "index": 0
           }
@@ -1062,6 +1128,62 @@
         [
           {
             "node": "Build Elliot Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One Email at a Time": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Extract Email Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Email": {
+      "main": [
+        [
+          {
+            "node": "One Email at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Unmatched Mailbox": {
+      "main": [
+        [
+          {
+            "node": "Next Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Elliot Failure": {
+      "main": [
+        [
+          {
+            "node": "Has Reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Send Failure": {
+      "main": [
+        [
+          {
+            "node": "Next Email",
             "type": "main",
             "index": 0
           }

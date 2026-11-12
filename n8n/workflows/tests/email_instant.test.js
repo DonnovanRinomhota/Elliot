@@ -62,12 +62,18 @@ const extract = (over) => run(nodeOf(wf16, 'Extract Email Fields').parameters.js
 test('16: email goes to Elliot and the answer back by email (no more drafts)', () => {
   const names = wf16.nodes.map((n) => n.name);
   for (const gone of ['Execute: Classify Email', 'Execute: Draft Email Reply', 'Insert Inbound Message']) assert.ok(!names.includes(gone), gone);
-  const chain = ['Gmail Trigger', 'Extract Email Fields', 'Should Process?', 'Lookup Tenant by Mailbox', 'If Tenant Found', 'If Not Self-Sent',
+  // Several emails in one Gmail check go through one at a time (loop output 1).
+  assert.deepStrictEqual(next(wf16, 'Gmail Trigger'), ['One Email at a Time']);
+  assert.deepStrictEqual(next(wf16, 'One Email at a Time', 1), ['Extract Email Fields']);
+  const chain = ['Extract Email Fields', 'Should Process?', 'Lookup Tenant by Mailbox', 'If Tenant Found', 'If Not Self-Sent',
     'Claim Message', 'Is New Message?', 'Upsert Contact', 'Get or Create Conversation (Email)', 'Storage Address', 'Attachment Files', 'Has Attachments?', 'Upload Attachment',
     'Record Attachment', 'Sign Attachment', 'Collect Attachments', 'Build Elliot Request', 'Ask Elliot', 'Read Elliot Answer']; // 0046: attachments
   for (let i = 0; i < chain.length - 1; i += 1) assert.ok(next(wf16, chain[i]).includes(chain[i + 1]), `${chain[i]} -> ${chain[i + 1]}`);
   assert.deepStrictEqual(next(wf16, 'If Tenant Found', 1), ['Log Unmatched Mailbox']);
-  assert.deepStrictEqual(next(wf16, 'Read Elliot Answer'), ['Has Reply?', 'Elliot Failed?']);
+  assert.deepStrictEqual(next(wf16, 'Read Elliot Answer'), ['Elliot Failed?']);
+  assert.deepStrictEqual(next(wf16, 'Elliot Failed?'), ['Log Elliot Failure']);
+  assert.deepStrictEqual(next(wf16, 'Elliot Failed?', 1), ['Has Reply?']);
+  assert.deepStrictEqual(next(wf16, 'Log Elliot Failure'), ['Has Reply?']);
   assert.deepStrictEqual(next(wf16, 'Has Reply?'), ['Build Reply Email']);
   assert.deepStrictEqual(next(wf16, 'Build Reply Email'), ['Send Reply via Gmail']);
   assert.deepStrictEqual(next(wf16, 'Send Reply via Gmail'), ['Check Send Result']);
@@ -144,11 +150,10 @@ test('16: Elliot is asked as an email conversation with the sender\'s email', ()
 });
 
 test('16: the reply goes in the same thread, as clean plain text, UTF-8', () => {
-  const nodes = { 'Extract Email Fields': extract(), 'Lookup Tenant by Mailbox': { tenant_id: 't' } };
-  const out = run(nodeOf(wf16, 'Build Reply Email').parameters.jsCode, {
-    json: { conversation_id: 'conv', reply: 'Hi Don,\n\n**Studio, Płochocińska 16c/19** – 2300 PLN/month\nSee [the listing](https://x.pl/p/1)\n\nBest regards,\nSimon Real Estate' },
-    nodes,
-  })[0].json;
+  const answer = { conversation_id: 'conv', reply: 'Hi Don,\n\n**Studio, Płochocińska 16c/19** – 2300 PLN/month\nSee [the listing](https://x.pl/p/1)\n\nBest regards,\nSimon Real Estate' };
+  // The answer is read by name: Log Elliot Failure can sit in between.
+  const nodes = { 'Extract Email Fields': extract(), 'Lookup Tenant by Mailbox': { tenant_id: 't' }, 'Read Elliot Answer': answer };
+  const out = run(nodeOf(wf16, 'Build Reply Email').parameters.jsCode, { json: { log: 'not the answer' }, nodes })[0].json;
   assert.strictEqual(out.subject, 'Re: Availability of studio on Płochocińska');
   assert.strictEqual(out.thread_id, 't-1');
   assert.strictEqual(out.to, 'don@example.com');
@@ -160,7 +165,7 @@ test('16: the reply goes in the same thread, as clean plain text, UTF-8', () => 
   const subj = head.match(/Subject: =\?UTF-8\?B\?([^?]+)\?=/)[1];
   assert.strictEqual(Buffer.from(subj, 'base64').toString('utf8'), 'Re: Availability of studio on Płochocińska');
   assert.strictEqual(Buffer.from(body, 'base64').toString('utf8'), out.text);
-  const already = run(nodeOf(wf16, 'Build Reply Email').parameters.jsCode, { json: { reply: 'x' }, nodes: { ...nodes, 'Extract Email Fields': { ...extract(), subject: 'RE: Flat' } } })[0].json;
+  const already = run(nodeOf(wf16, 'Build Reply Email').parameters.jsCode, { json: {}, nodes: { ...nodes, 'Read Elliot Answer': { reply: 'x' }, 'Extract Email Fields': { ...extract(), subject: 'RE: Flat' } } })[0].json;
   assert.strictEqual(already.subject, 'RE: Flat');
 
   const send = nodeOf(wf16, 'Send Reply via Gmail');
@@ -174,7 +179,8 @@ test('16: team takeover, Elliot failures and Gmail refusals', () => {
   const nodes = { 'Build Elliot Request': { request: { conversation_id: 'conv' } } };
   assert.strictEqual(run(read, { json: { statusCode: 200, body: { reply: 'Hi' } }, nodes })[0].json.reply, 'Hi');
   const human = run(read, { json: { statusCode: 200, body: { reply: null, human: true } }, nodes })[0].json;
-  assert.strictEqual(expr(cond(wf16, 'Has Reply?'), { json: human }), false);
+  assert.strictEqual(expr(cond(wf16, 'Has Reply?'), { nodes: { 'Read Elliot Answer': human } }), false);
+  assert.strictEqual(expr(cond(wf16, 'Has Reply?'), { nodes: { 'Read Elliot Answer': { reply: 'Hi' } } }), true);
   const broken = run(read, { json: { statusCode: 500, body: {} }, nodes })[0].json;
   assert.match(broken.reply, /Someone from our team will get back to you/);
   assert.strictEqual(expr(cond(wf16, 'Elliot Failed?'), { json: broken }), true);

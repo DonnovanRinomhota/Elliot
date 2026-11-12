@@ -287,8 +287,6 @@ Each is unit- and database-tested (`db/seed/test_00NN_*.sql`,
 
 ## Next
 
-- Workflow 16 (Gmail) answers only the first of several emails that arrive
-  in the same minute; make it handle each one.
 - WhatsApp: open photos and documents clients send (like email attachments).
 - Elliot could prefer fresh ASARI listings when suggesting properties.
 - Outlook / Microsoft 365 calendars; phone calls (voice).
