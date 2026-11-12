@@ -103,7 +103,7 @@
             "tenant_id": "={{ $json.tenant_id }}",
             "date_range_start": "={{ $('Validate Slots Request').first().json.date_range_start }}",
             "date_range_end": "={{ $('Validate Slots Request').first().json.date_range_end }}",
-            "duration_minutes": "={{ $('Validate Slots Request').first().json.minutes }}",
+            "duration_minutes": "={{ String($('Validate Slots Request').first().json.minutes) }}",
             "min_notice_minutes": "120"
           },
           "matchingColumns": [],

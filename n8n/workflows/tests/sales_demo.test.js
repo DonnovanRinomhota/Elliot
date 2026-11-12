@@ -121,13 +121,13 @@ test('01: sales gets 6 tools (no listings) with call types; agencies keep all 7'
   assert.deepStrictEqual(tools('demo').map((t) => t.name), a.map((t) => t.name));
 });
 
-test('01: call type sets the slot length (15/30) and a 2-hour notice for sales only', () => {
+test('01: call type sets the slot length (15/30) and a 2-hour notice for sales only, as text (11 declares strings)', () => {
   const v = nodeOf(wf01, 'Execute: Check Availability Sub-Workflow').parameters.workflowInputs.value;
   const nodes = (mode, call_type) => ({ 'Extract Tool Call': { tool_input: { call_type } }, 'Merge Tenant Context': ctx(mode) });
-  assert.strictEqual(expr(v.duration_minutes, { nodes: nodes('sales', 'intro') }), 15);
-  assert.strictEqual(expr(v.duration_minutes, { nodes: nodes('sales', 'demo') }), 30);
+  assert.strictEqual(expr(v.duration_minutes, { nodes: nodes('sales', 'intro') }), '15');
+  assert.strictEqual(expr(v.duration_minutes, { nodes: nodes('sales', 'demo') }), '30');
   assert.strictEqual(expr(v.duration_minutes, { nodes: nodes('agency', undefined) }), '');
-  assert.strictEqual(expr(v.min_notice_minutes, { nodes: nodes('sales', 'intro') }), 120);
+  assert.strictEqual(expr(v.min_notice_minutes, { nodes: nodes('sales', 'intro') }), '120');
   assert.strictEqual(expr(v.min_notice_minutes, { nodes: nodes('agency') }), '');
 });
 
@@ -327,7 +327,7 @@ test('35: free times come from 11 with the call length and 2 hours notice', () =
   const call = nodeOf(wf35, 'Free Times Via 11').parameters;
   assert.strictEqual(call.workflowId.cachedResultName, '11 - Check Availability');
   assert.strictEqual(call.workflowInputs.value.min_notice_minutes, '120');
-  assert.strictEqual(expr(call.workflowInputs.value.duration_minutes, { nodes: { 'Validate Slots Request': v } }), 30);
+  assert.strictEqual(expr(call.workflowInputs.value.duration_minutes, { nodes: { 'Validate Slots Request': v } }), '30');
   const out = run(nodeOf(wf35, 'Slots Response').parameters.jsCode, {
     json: { available_slots: [{ starts_at: 'a', ends_at: 'b' }], timezone: 'Europe/Warsaw' }, nodes: { 'Validate Slots Request': v } })[0].json;
   assert.deepStrictEqual(out.body, { success: true, type: 'demo', minutes: 30, timezone: 'Europe/Warsaw', slots: [{ starts_at: 'a', ends_at: 'b' }] });
