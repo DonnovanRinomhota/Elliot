@@ -222,14 +222,14 @@ export default async function CalendarPage({
               key={ws}
               href={link({ week: ws })}
               aria-current={ws === week ? "true" : undefined}
-              className={`block rounded-[18px] border bg-white shadow-card px-3 py-2.5 no-underline hover:border-ink-400 ${ws === week ? "border-accent ring-1 ring-accent" : "border-gray-200"}`}
+              className={`card block px-3 py-2.5 no-underline hover:shadow-lift ${ws === week ? "!border-gold ring-2 ring-gold/60" : ""}`}
             >
               <div className="text-[12px] text-gray-500">
                 {ws === weekStart(today) ? "This week" : weekLabel(ws).replace(/ \d{4}$/, "")}
               </div>
               <div className="tabular text-[18px] font-semibold text-ink">{perWeek[i]}</div>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-100" aria-hidden="true">
-                <div className="h-full rounded-full bg-accent" style={{ width: `${(perWeek[i] / busiest) * 100}%` }} />
+                <div className="gold-fill h-full rounded-full" style={{ width: `${(perWeek[i] / busiest) * 100}%` }} />
               </div>
               <div className="mt-1 text-[11.5px] text-gray-500">viewing{perWeek[i] === 1 ? "" : "s"}</div>
             </a>
@@ -251,21 +251,21 @@ function AgentWeek({ days, today, tz, byDay }: { days: string[]; today: string; 
         return (
           <section
             key={day}
-            className={`min-w-0 rounded-[18px] border bg-white shadow-card ${isToday ? "border-accent ring-1 ring-accent" : "border-gray-200"} ${past ? "opacity-70" : ""}`}
+            className={`card min-w-0 ${isToday ? "!border-gold ring-2 ring-gold/60" : ""} ${past ? "opacity-70" : ""}`}
           >
-            <h3 className={`m-0 border-b border-gray-100 px-3 py-2 text-[13px] font-medium ${isToday ? "text-ink" : "text-gray-600"}`}>
-              {isToday ? "Today" : dayLabel(day, "weekday")} <span className="tabular text-gray-400">{Number(day.slice(8))}</span>
-              {list.length > 0 && <span className="tabular float-right text-[12px] text-gray-400">{list.length}</span>}
+            <h3 className={`m-0 rounded-t-[22px] border-b border-gray-100 px-3 py-2.5 text-[13px] font-semibold ${isToday ? "gold-fill text-ink" : "text-gray-600"}`}>
+              {isToday ? "Today" : dayLabel(day, "weekday")} <span className={`tabular ${isToday ? "text-ink/70" : "text-gray-400"}`}>{Number(day.slice(8))}</span>
+              {list.length > 0 && <span className={`tabular float-right text-[12px] ${isToday ? "text-ink" : "text-gray-400"}`}>{list.length}</span>}
             </h3>
             <div className="grid gap-2 p-2 md:min-h-[160px]">
               {list.length === 0 ? (
-                <p className="m-0 px-1 py-1 text-[12.5px] text-gray-400">Free</p>
+                <p className="m-0 rounded-xl border border-dashed border-gray-200 px-2 py-2 text-center text-[12.5px] text-gray-400">Free</p>
               ) : (
                 list.map((a) => (
                   <a
                     key={a.id}
                     href={`/dashboard/appointments/${a.id}`}
-                    className="block min-w-0 rounded-md border border-gray-200 p-2 no-underline hover:border-ink-400 hover:bg-gray-50"
+                    className="block min-w-0 rounded-xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] p-2 no-underline hover:border-gold/40 hover:bg-white"
                   >
                     <div className="tabular text-[12.5px] font-medium text-ink">{timeRange(a, tz)}</div>
                     <div className="mb-1.5 truncate text-[12.5px] text-gray-600">{a.contact?.name || a.contact?.email || "Client"}</div>

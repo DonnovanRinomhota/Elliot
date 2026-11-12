@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { contactLabel } from "@/lib/contacts";
 import { getMembership } from "@/lib/tenant";
-import { Badge, EmptyState, PER_PAGE, PageHeader, Pagination, humanize, paginate, timeAgo, type Tone } from "../../../_ui/ui";
+import { ArrowRight, Phone, Radio, UserCheck, Users } from "lucide-react";
+import { Badge, PER_PAGE, PageHeader, Pagination, btn, humanize, paginate, timeAgo, type Tone } from "../../../_ui/ui";
+import { ChannelTile } from "../../../_ui/brands";
 import AutoRefresh from "../auto-refresh";
 
 export const dynamic = "force-dynamic";
@@ -172,51 +174,90 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
         }
       />
 
-      <Section
-        title="Needs a person"
-        count={shownNeeds.length}
-        rows={pg.items}
-        offset={pg.offset}
-        empty={view === "mine" ? "You're not handling any chats." : "Nothing is waiting for a person."}
-      />
-      {pg.pages > 1 && (
-        <div className="-mt-4 mb-8">
-          <Pagination {...pg} shown={pg.items.length} basePath="/dashboard/inbox" params={{ view: view === "mine" ? "mine" : undefined }} noun="chats" />
+      {/* At a glance */}
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          { label: "Waiting for a person", value: needsPerson.filter((r) => r.state.tone !== "ink" && r.state.tone !== "neutral").length, icon: Users, tone: "text-alert-dark" },
+          { label: "You're handling", value: needsPerson.filter((r) => r.mine).length, icon: UserCheck, tone: "text-ink" },
+          { label: "Live on your website", value: liveRows.length, icon: Radio, tone: "text-[#237a49]" },
+        ].map((f) => {
+          const Icon = f.icon;
+          return (
+            <div key={f.label} className="card flex items-center gap-3 px-4 py-3.5">
+              <span className="gold-tile h-10 w-10 rounded-xl">
+                <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] text-gray-600">{f.label}</span>
+                <span className={`tabular block text-[24px] font-semibold leading-tight tracking-[-0.02em] ${f.tone}`}>{f.value}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div>
+          <Section
+            title="Needs a person"
+            count={shownNeeds.length}
+            rows={pg.items}
+            empty={view === "mine" ? "You're not handling any chats." : "Nothing is waiting for a person."}
+          />
+          {pg.pages > 1 && (
+            <div className="-mt-2 mb-6">
+              <Pagination {...pg} shown={pg.items.length} basePath="/dashboard/inbox" params={{ view: view === "mine" ? "mine" : undefined }} noun="chats" />
+            </div>
+          )}
         </div>
-      )}
-      {view === "all" && (
-        <Section title="Live on your website now" count={liveRows.length} rows={liveRows.slice(0, PER_PAGE)} offset={0} empty="No website chats in the last 30 minutes." />
-      )}
+        {view === "all" && (
+          <Section title="Live on your website now" count={liveRows.length} rows={liveRows.slice(0, PER_PAGE)} empty="No website chats in the last 30 minutes." live />
+        )}
+      </div>
     </div>
   );
 }
 
-function Section({ title, count, rows, offset, empty }: { title: string; count: number; rows: Row[]; offset: number; empty: string }) {
+function Section({ title, count, rows, empty, live = false }: { title: string; count: number; rows: Row[]; empty: string; live?: boolean }) {
   return (
-    <section className="mb-8">
-      <h2 className="mb-2 text-[14px] font-semibold text-ink">
-        {title} <span className="font-normal text-gray-500">({count})</span>
+    <section className="card mb-5 p-4 md:p-5">
+      <h2 className="m-0 mb-3 flex items-center gap-2 text-[17px] font-semibold tracking-[-0.01em] text-ink">
+        {live && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#4ade80] shadow-[0_0_8px_2px_rgba(74,222,128,0.55)]" />}
+        {title}
+        <span className="tabular rounded-full bg-gray-100 px-2 py-0.5 text-[12px] font-bold text-gray-600">{count}</span>
       </h2>
       {rows.length === 0 ? (
-        <EmptyState title={empty} />
+        <p className="m-0 rounded-2xl bg-[#f3f6fb] px-4 py-4 text-[13.5px] text-gray-600">{empty}</p>
       ) : (
-        <ul className="m-0 list-none overflow-hidden card p-0">
-          {rows.map((r, i) => (
-            <li key={r.id} className="border-t border-gray-100 first:border-t-0">
-              <a href={`/dashboard/conversations/${r.id}`} className="block px-4 py-3.5 no-underline hover:bg-gray-50 sm:px-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="tabular w-6 text-[12.5px] text-gray-400">{offset + i + 1}</span>
-                    <span className="truncate text-[14px] font-medium text-ink">{r.contactName}</span>
+        <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-2 p-0">
+          {rows.map((r) => (
+            <li key={r.id}>
+              <a
+                href={`/dashboard/conversations/${r.id}`}
+                className="group flex gap-3 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-3.5 py-3 no-underline transition-colors hover:border-gold/40 hover:bg-white"
+              >
+                <ChannelTile channel={r.channel} size={36} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-[14.5px] font-semibold text-ink">{r.contactName}</span>
                     <Badge tone={r.state.tone}>{r.state.label}</Badge>
-                  </div>
-                  <span className="whitespace-nowrap text-[12.5px] text-gray-500">
-                    {humanize(r.channel)} · {timeAgo(r.lastAt)}
+                    <span className="ml-auto whitespace-nowrap text-[12px] text-gray-500">
+                      {humanize(r.channel)} · {timeAgo(r.lastAt)}
+                    </span>
                   </span>
-                </div>
-                {r.detail && <p className="m-0 mt-1 line-clamp-2 text-[13px] text-gray-700">{r.detail}</p>}
-                {r.lastMessage && <p className="m-0 mt-1 truncate text-[13px] text-gray-500">{r.lastMessage}</p>}
-                {r.contactPhone && <p className="m-0 mt-1 text-[12.5px] text-gray-500">{r.contactPhone}</p>}
+                  {r.detail && <span className="mt-1.5 block rounded-xl border border-gold/35 bg-white px-3 py-2 text-[13px] leading-snug text-gray-800">{r.detail}</span>}
+                  {r.lastMessage && <span className="mt-1.5 block truncate text-[13px] text-gray-600">{r.lastMessage}</span>}
+                  <span className="mt-2 flex flex-wrap items-center gap-2">
+                    {r.contactPhone && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-0.5 text-[12.5px] text-gray-700 ring-1 ring-gray-200">
+                        <Phone size={12} aria-hidden="true" /> {r.contactPhone}
+                      </span>
+                    )}
+                    <span className={`${btn.primary} ${btn.small} ml-auto`}>
+                      Open <ArrowRight size={14} aria-hidden="true" />
+                    </span>
+                  </span>
+                </span>
               </a>
             </li>
           ))}

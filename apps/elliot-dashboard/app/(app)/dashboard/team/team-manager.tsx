@@ -131,10 +131,10 @@ export default function TeamManager({
         }
         flush
       >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-left text-[13px]">
+        <div className="overflow-x-auto px-3">
+          <table className="w-full min-w-[760px] border-separate border-spacing-y-2 text-left text-[13px]">
             <thead>
-              <tr className="border-b border-gray-200 text-[12px] text-gray-500">
+              <tr className="text-[11.5px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                 <th className="px-5 py-2.5 font-medium">Person</th>
                 <th className="px-3 py-2.5 font-medium">Role</th>
                 <th className="px-3 py-2.5 text-center font-medium" title="Included when new leads are shared out in turn">Gets new leads</th>
@@ -151,9 +151,19 @@ export default function TeamManager({
                 const busy = busyId === m.id;
                 const digest = m.notify_digest ?? m.role === "admin";
                 return (
-                  <tr key={m.id} className="border-b border-gray-100 last:border-b-0">
-                    <td className="px-5 py-3">
-                      <div className="font-medium text-ink">
+                  <tr key={m.id} className="[&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl [&>td]:bg-[#f3f6fb]">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                      <span aria-hidden="true" className="gold-fill flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-ink">
+                        {(m.full_name || m.email)
+                          .split(/[\s.@_-]+/)
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((w: string) => w[0]!.toUpperCase())
+                          .join("")}
+                      </span>
+                      <div className="min-w-0">
+                      <div className="font-semibold text-ink">
                         {m.full_name || m.email}
                         {isMe && <span className="ml-1.5 text-[12px] font-normal text-gray-500">(you)</span>}
                       </div>
@@ -170,6 +180,8 @@ export default function TeamManager({
                           Add name
                         </button>
                       )}
+                      </div>
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       {canManage ? (

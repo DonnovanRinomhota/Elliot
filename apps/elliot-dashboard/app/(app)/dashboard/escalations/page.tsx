@@ -61,7 +61,7 @@ export default async function EscalationsPage({
       {visible.length === 0 ? (
         <EmptyState title="Nothing to handle">When Elliot needs a person to step in, the conversation appears here.</EmptyState>
       ) : (
-        <ul className="m-0 grid list-none gap-3 p-0">
+        <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 2xl:grid-cols-2">
           {pg.items.map((escalation: any) => (
             <EscalationCard key={escalation.id} escalation={escalation} />
           ))}
