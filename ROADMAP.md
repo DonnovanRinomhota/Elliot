@@ -273,6 +273,12 @@ Each is unit- and database-tested (`db/seed/test_00NN_*.sql`,
   recorded. Tested on a scratch database and from the workflow files;
   pending roll-out. `docs/reliability.md`.
 
+- 🟡 **Release checks** (0049, GitHub Actions, `RELEASING.md`). Every pull
+  request in both repos runs tests, types, lint, builds, a key scan, every
+  migration on a fresh database, every SQL query in the workflows against it,
+  and seven customer journeys. `migration_status()` shows which migrations
+  Supabase has. Pending: run 0049; set the missing Vercel variable.
+
 ## Next
 
 - Workflow 16 (Gmail) answers only the first of several emails that arrive

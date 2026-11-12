@@ -1,5 +1,33 @@
 # Known Issues / Resolved-but-worth-remembering
 
+## OPEN (Nov 2026) — No database backups on the Free plan
+Supabase's Free plan has no backups you can restore from (daily backups start
+at Pro). Before the first paying agency: move to Pro, or take your own dump
+before every migration and weekly. Steps in [`RELEASING.md`](RELEASING.md#backups).
+
+## OPEN (Nov 2026) — `N8N_SEND_WHATSAPP_WEBHOOK_URL` not set in Vercel
+Found by comparing the dashboard's code with the variable names in Vercel
+(values not read). Sending an approved WhatsApp draft from the dashboard
+answers "not configured". Fix: add it in Vercel, set to workflow 28's
+production webhook URL, then redeploy.
+
+## RESOLVED (Nov 2026) — Release process: what's live was a matter of memory
+- Nothing recorded which migrations Supabase had. The migrations README said
+  every file was "safe to run again"; 13 fail on a second run, and others
+  would silently put back older function definitions (re-running 0009 undoes
+  part of 0047). **Fix:** 0049 (`migration_status()`, `begin_migration()`);
+  from 0049 on a migration refuses to run twice or out of order.
+- No automatic checks on pull requests. **Fix:** GitHub Actions in both
+  repos (`.github/workflows/checks.yml`).
+- The SQL inside workflows was never run before n8n ran it. The new check
+  found one real bug: 25's "Log Unanswered Messages" (added in 0048's patch)
+  would have failed every time with "could not determine data type of
+  parameter $3". **Fixed** (`$3::text`).
+- The dashboard had no ESLint configuration, so `npm run lint` only asked
+  questions. **Fix:** `.eslintrc.json` (Next.js rules); no warnings.
+- `apps/elliot-dashboard/public/widget.js` was out of date with
+  `apps/web-chat-widget/widget.js` (the build copies it anyway; now in sync).
+
 ## RESOLVED (Nov 2026) — Reliability review: silent failures and duplicates
 - **Claude unavailable crashed workflow 01.** No retry, no timeout. Email and
   WhatsApp clients got "someone will get back to you" from the channel
