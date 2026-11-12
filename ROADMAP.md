@@ -295,6 +295,9 @@ Each is unit- and database-tested (`db/seed/test_00NN_*.sql`,
 
 ## Business / non-code
 
+The full list of what blocks the first paying agency (technical,
+administrative, legal) is `docs/business-readiness.md`.
+
 Not something to build -- these are decisions, listed here so they don't
 get lost either:
 

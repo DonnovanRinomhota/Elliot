@@ -103,9 +103,7 @@ Elliot-web (website).
 
 Checked against Vercel on 12 Nov 2026 (names only, values not read):
 
-- **Missing in `elliot-real-estate`: `N8N_SEND_WHATSAPP_WEBHOOK_URL`.**
-  Without it, sending an approved WhatsApp draft from the dashboard fails with
-  "not configured". Set it to workflow 28's production webhook URL.
+- `N8N_SEND_WHATSAPP_WEBHOOK_URL` was missing in `elliot-real-estate`; added.
 - Four are still set under their old `NEXT_PUBLIC_…` names (onboard, ingest,
   send, plus the missing one above). They work; rename them to the
   `N8N_…` names when convenient. They are only used on the server.
