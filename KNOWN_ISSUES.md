@@ -1,5 +1,20 @@
 # Known Issues / Resolved-but-worth-remembering
 
+## RESOLVED (Nov 2026) — Monitoring gaps; trials that never ended
+- A suspended agency's follow-ups still went out: `claim_due_follow_up_runs`
+  (0048) didn't look at the agency's status. Now nothing goes out for an
+  agency that is suspended or whose trial has ended (0050), and the run
+  waits untouched.
+- Failures were only visible in the alert emails. The control panel now has a
+  **Problems** page (every failure, 14 days, with what to do) and flags
+  failures, calendars Elliot can't use and AI cost above 30% of the price on
+  each agency.
+- The Approvals badge counted emails only; WhatsApp drafts waiting for
+  approval are now included.
+- A trial end date did nothing. Trials started from the control panel now
+  pause Elliot when they end (holding reply, see `docs/onboarding.md`).
+  Agencies created before 0050 are not affected.
+
 ## OPEN (Nov 2026) — No database backups on the Free plan
 Supabase's Free plan has no backups you can restore from (daily backups start
 at Pro). Before the first paying agency: move to Pro, or take your own dump

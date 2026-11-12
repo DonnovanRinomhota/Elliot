@@ -118,6 +118,7 @@ for f in n8n/workflows/tests/*.test.js; do node "$f" || echo "FAILED: $f"; done
 |---|---|
 | [`ROADMAP.md`](ROADMAP.md) | What's built, what's verified live, what's next |
 | [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) | Bugs fixed and limits still open |
+| [`docs/onboarding.md`](docs/onboarding.md) | **Setting up a new agency**: every step to go-live, the 7-day trial and what happens when it ends |
 | [`RELEASING.md`](RELEASING.md) | **How to release a change**: checks, migrations, workflow imports, Vercel settings, rollback, backups |
 | [`docs/security.md`](docs/security.md) | Agency isolation, roles, the security review and its roll-out steps |
 | [`docs/reliability.md`](docs/reliability.md) | What happens when something fails: retries, duplicates, STOP, what to check after importing a workflow |

@@ -279,6 +279,12 @@ Each is unit- and database-tested (`db/seed/test_00NN_*.sql`,
   and seven customer journeys. `migration_status()` shows which migrations
   Supabase has. Pending: run 0049; set the missing Vercel variable.
 
+- 🟡 **Trials, onboarding and monitoring** (0050, workflow 01, control
+  panel). "Start trial" at go-live; when it ends Elliot pauses (one holding
+  reply a day, nothing sent on its own). Go-live checklist per agency from
+  their real data. Problems page and per-agency failures, calendar problems
+  and AI cost against price. Agencies see a trial banner. `docs/onboarding.md`.
+
 ## Next
 
 - Workflow 16 (Gmail) answers only the first of several emails that arrive
