@@ -72,7 +72,7 @@ console.log('sales_demo');
 
 // ── 01 ──
 test('01: the account mode comes with the tenant', () => {
-  assert.match(nodeOf(wf01, 'Resolve Tenant').parameters.query, /industry as tenant_industry, assistant_mode from tenants/);
+  assert.match(nodeOf(wf01, 'Resolve Tenant').parameters.query, /industry as tenant_industry, assistant_mode,\s+tenant_service_state\(id\) as service_state\s+from tenants/);
 });
 
 test('01: the sales assistant answers without asking for details first; agencies still ask', () => {
