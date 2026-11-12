@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst TYPES = { intro: { minutes: 15, en: '15-minute intro call', pl: '15-minutowa rozmowa wstępna' },\n                demo: { minutes: 30, en: '30-minute live demo', pl: '30-minutowa prezentacja na żywo' } };\nconst clean = (v, max = 200) => String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max);\nconst EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n// GET /webhook/consultation-slots?type=intro|demo[&days=14]\nconst q = ($input.first().json.query || {});\nconst type = TYPES[q.type] ? q.type : 'intro';\nconst days = Math.min(Math.max(parseInt(q.days, 10) || 14, 1), 31);\nconst start = new Date();\nconst end = new Date(start.getTime() + days * 86400000);\nconst ymd = (d) => d.toISOString().slice(0, 10);\nreturn [{ json: { type, minutes: TYPES[type].minutes, date_range_start: ymd(start), date_range_end: ymd(end) } }];\n"
+        "jsCode": "\nconst TYPES = { intro: { minutes: 15, en: '15-minute intro call', pl: '15-minutowa rozmowa wstępna' },\n                demo: { minutes: 30, en: '30-minute live demo', pl: '30-minutowa prezentacja na żywo' } };\nconst clean = (v, max = 200) => String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max);\nconst EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n// GET /webhook/consultation-slots?type=intro|demo[&from=YYYY-MM-DD&to=YYYY-MM-DD]\n// The booking page asks for one month at a time (its calendar) and for one\n// day when a visitor opens it. Without from/to: the next 14 days, as before.\n// Bookable up to HORIZON_DAYS ahead; one request covers at most 42 days.\nconst HORIZON_DAYS = 90;\nconst q = ($input.first().json.query || {});\nconst type = TYPES[q.type] ? q.type : 'intro';\nconst DAY = 86400000;\nconst ymd = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);\nconst asDate = (s) => (/^\\d{4}-\\d{2}-\\d{2}$/.test(String(s || '')) && !isNaN(new Date(`${s}T12:00:00Z`).getTime())) ? new Date(`${s}T12:00:00Z`) : null;\nconst today = new Date(`${ymd(new Date())}T12:00:00Z`);\nconst last = new Date(today.getTime() + HORIZON_DAYS * DAY);\nlet start = asDate(q.from) || today;\nlet end = asDate(q.to) || new Date(start.getTime() + 14 * DAY);\nif (start < today) start = today;\nif (end > last) end = last;\nif (end.getTime() - start.getTime() > 42 * DAY) end = new Date(start.getTime() + 42 * DAY);\nconst iso = (d) => d.toISOString().slice(0, 10);\nconst empty = end < start;   // a month entirely in the past or beyond the horizon\nreturn [{ json: { type, minutes: TYPES[type].minutes, horizon_days: HORIZON_DAYS, last_date: iso(last), empty,\n                  date_range_start: iso(start), date_range_end: iso(empty ? start : end) } }];\n"
       },
       "id": "3d214435-12f5-51c6-bd51-56672da2f09d",
       "name": "Validate Slots Request",
@@ -104,7 +104,8 @@
             "date_range_start": "={{ $('Validate Slots Request').first().json.date_range_start }}",
             "date_range_end": "={{ $('Validate Slots Request').first().json.date_range_end }}",
             "duration_minutes": "={{ String($('Validate Slots Request').first().json.minutes) }}",
-            "min_notice_minutes": "120"
+            "min_notice_minutes": "120",
+            "max_slots": "3000"
           },
           "matchingColumns": [],
           "schema": [
@@ -157,6 +158,16 @@
               "canBeUsedToMatch": true,
               "type": "string",
               "removed": false
+            },
+            {
+              "id": "max_slots",
+              "displayName": "max_slots",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -176,7 +187,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\n// What the booking page shows: free slots, grouped by day by the page itself.\nconst r = $input.first().json || {};\nconst req = $('Validate Slots Request').first().json;\nconst slots = (r.available_slots || []).slice(0, 120);\nreturn [{ json: { code: 200, body: { success: true, type: req.type, minutes: req.minutes, timezone: r.timezone || 'Europe/Warsaw', slots } } }];\n"
+        "jsCode": "\n// What the booking page shows: free slots, grouped by day by the page itself.\nconst r = $input.first().json || {};\nconst req = $('Validate Slots Request').first().json;\nconst tz = r.timezone || 'Europe/Warsaw';\nconst all = req.empty ? [] : (r.available_slots || []);\n// Days with at least one free time (for the calendar), then the times themselves.\nconst dayOf = (iso) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));\nconst counts = {};\nfor (const s of all) { const k = dayOf(s.starts_at); counts[k] = (counts[k] || 0) + 1; }\nconst days = Object.keys(counts).sort().map((date) => ({ date, count: counts[date] }));\nconst slots = all.slice(0, 200);\nreturn [{ json: { code: 200, body: { success: true, type: req.type, minutes: req.minutes, timezone: tz,\n  last_date: req.last_date, days, slots, more: all.length > slots.length } } }];\n"
       },
       "id": "d6713959-4f7a-51a1-990e-4fd431e34749",
       "name": "Slots Response",
@@ -226,7 +237,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst TYPES = { intro: { minutes: 15, en: '15-minute intro call', pl: '15-minutowa rozmowa wstępna' },\n                demo: { minutes: 30, en: '30-minute live demo', pl: '30-minutowa prezentacja na żywo' } };\nconst clean = (v, max = 200) => String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max);\nconst EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n// POST /webhook/book-consultation from getelliot.eu/book:\n// { type, starts_at, name, email, phone?, agency, agents?, listings?, crm?, message?, lang?, website (honeypot) }\nconst b = $input.first().json.body || {};\nconst fail = (code, error) => [{ json: { ok: false, code, error } }];\nif (clean(b.website)) return fail(400, 'Something went wrong. Please try again.');   // bots fill hidden fields\nconst type = TYPES[b.type] ? b.type : null;\nif (!type) return fail(400, 'Choose an intro call or a live demo.');\nconst start = new Date(b.starts_at);\nif (isNaN(start.getTime())) return fail(400, 'Choose a time.');\nif (start.getTime() < Date.now() + 60 * 60000) return fail(409, 'That time is too soon. Please choose another.');\nconst name = clean(b.name, 120);\nconst email = clean(b.email, 200).toLowerCase();\nconst agency = clean(b.agency, 160);\nif (!name) return fail(400, 'Please enter your name.');\nif (!EMAIL.test(email)) return fail(400, 'Please enter a valid email address.');\nif (!agency) return fail(400, 'Please enter your agency name.');\nconst end = new Date(start.getTime() + TYPES[type].minutes * 60000);\nconst details = { call_type: type, agency, agents: clean(b.agents, 40) || undefined, listings: clean(b.listings, 40) || undefined,\n                  crm: clean(b.crm, 80) || undefined, lang: b.lang === 'pl' ? 'pl' : 'en' };\nreturn [{ json: {\n  ok: true, type, name, email, agency, phone: clean(b.phone, 40), message: clean(b.message, 1000),\n  starts_at: start.toISOString(), ends_at: end.toISOString(), details, details_json: JSON.stringify(details),\n} }];\n"
+        "jsCode": "\nconst TYPES = { intro: { minutes: 15, en: '15-minute intro call', pl: '15-minutowa rozmowa wstępna' },\n                demo: { minutes: 30, en: '30-minute live demo', pl: '30-minutowa prezentacja na żywo' } };\nconst clean = (v, max = 200) => String(v == null ? '' : v).replace(/\\s+/g, ' ').trim().slice(0, max);\nconst EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\n// POST /webhook/book-consultation from getelliot.eu/book:\n// { type, starts_at, name, email, phone?, agency, agents?, listings?, crm?, message?, lang?, website (honeypot) }\nconst b = $input.first().json.body || {};\nconst fail = (code, error) => [{ json: { ok: false, code, error } }];\nif (clean(b.website)) return fail(400, 'Something went wrong. Please try again.');   // bots fill hidden fields\nconst type = TYPES[b.type] ? b.type : null;\nif (!type) return fail(400, 'Choose an intro call or a live demo.');\nconst start = new Date(b.starts_at);\nif (isNaN(start.getTime())) return fail(400, 'Choose a time.');\nif (start.getTime() < Date.now() + 60 * 60000) return fail(409, 'That time is too soon. Please choose another.');\nif (start.getTime() > Date.now() + 92 * 86400000) return fail(400, 'Please choose a time in the next three months.');\nconst name = clean(b.name, 120);\nconst email = clean(b.email, 200).toLowerCase();\nconst agency = clean(b.agency, 160);\nif (!name) return fail(400, 'Please enter your name.');\nif (!EMAIL.test(email)) return fail(400, 'Please enter a valid email address.');\nif (!agency) return fail(400, 'Please enter your agency name.');\nconst end = new Date(start.getTime() + TYPES[type].minutes * 60000);\nconst details = { call_type: type, agency, agents: clean(b.agents, 40) || undefined, listings: clean(b.listings, 40) || undefined,\n                  crm: clean(b.crm, 80) || undefined, lang: b.lang === 'pl' ? 'pl' : 'en' };\nreturn [{ json: {\n  ok: true, type, name, email, agency, phone: clean(b.phone, 40), message: clean(b.message, 1000),\n  starts_at: start.toISOString(), ends_at: end.toISOString(), details, details_json: JSON.stringify(details),\n} }];\n"
       },
       "id": "32dae963-61d6-5683-aa16-92908fca6fc3",
       "name": "Validate Booking",

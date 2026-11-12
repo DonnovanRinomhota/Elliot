@@ -179,6 +179,22 @@ test('11: 15- and 30-minute slots with notice; viewings keep 60 minutes', () => 
   assert.deepStrictEqual([slots(15), slots(30), slots(60), slots(undefined)], [4, 2, 1, 1]);
 });
 
+test('11: a caller can ask for more than 200 slots (a month of 15-minute calls), up to 3000', () => {
+  const merge = (max_slots) => run(nodeOf(wf11, 'Merge Config').parameters.jsCode, {
+    json: {}, nodes: { 'When Executed by Another Workflow': { tenant_id: 't', date_range_start: 'a', date_range_end: 'b', max_slots } } })[0].json.max_slots;
+  assert.deepStrictEqual([merge(undefined), merge(''), merge('3000'), merge('99999')], [200, 200, 3000, 3000]);
+  if (!DateTime) return;
+  const start = DateTime.now().setZone('Europe/Warsaw').plus({ days: 1 }).toISODate();
+  const end = DateTime.fromISO(start).plus({ days: 29 }).toISODate();
+  const hours = Object.fromEntries(['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].map((d) => [d, { open: '09:00', close: '21:00' }]));
+  const count = (max_slots) => run(nodeOf(wf11, 'Compute Available Slots').parameters.jsCode, {
+    json: { calendars: { primary: { busy: [] } } },
+    nodes: { 'Merge Config': { google_calendar_id: 'primary', business_hours: hours, timezone: 'Europe/Warsaw', date_range_start: start, date_range_end: end, duration_minutes: 15, min_notice_minutes: 0, max_slots } },
+    globals: { DateTime },
+  })[0].json.available_slots.length;
+  assert.deepStrictEqual([count(undefined), count(3000)], [200, 30 * 48]);
+});
+
 // ── 12 ──
 const info = { timezone: 'Europe/Warsaw', contact_name: 'Anna Nowak', contact_email: 'anna@agency.pl', contact_phone: '+48600', tenant_name: 'Elliot', assistant_mode: 'sales' };
 const callReq = { starts_at: '2026-11-12T09:00:00.000Z', ends_at: '2026-11-12T09:30:00.000Z', kind: 'consultation', notes: 'Wants WhatsApp',
@@ -328,9 +344,45 @@ test('35: free times come from 11 with the call length and 2 hours notice', () =
   assert.strictEqual(call.workflowId.cachedResultName, '11 - Check Availability');
   assert.strictEqual(call.workflowInputs.value.min_notice_minutes, '120');
   assert.strictEqual(expr(call.workflowInputs.value.duration_minutes, { nodes: { 'Validate Slots Request': v } }), '30');
+  assert.strictEqual(call.workflowInputs.value.max_slots, '3000');
+  const slot = (iso) => ({ starts_at: iso, ends_at: iso });
   const out = run(nodeOf(wf35, 'Slots Response').parameters.jsCode, {
-    json: { available_slots: [{ starts_at: 'a', ends_at: 'b' }], timezone: 'Europe/Warsaw' }, nodes: { 'Validate Slots Request': v } })[0].json;
-  assert.deepStrictEqual(out.body, { success: true, type: 'demo', minutes: 30, timezone: 'Europe/Warsaw', slots: [{ starts_at: 'a', ends_at: 'b' }] });
+    json: { available_slots: [slot('2026-12-01T08:00:00.000Z'), slot('2026-12-01T23:30:00.000Z'), slot('2026-12-03T09:00:00.000Z')], timezone: 'Europe/Warsaw' },
+    nodes: { 'Validate Slots Request': v } })[0].json;
+  // 23:30 UTC on 1 Dec is 00:30 on 2 Dec in Warsaw.
+  assert.deepStrictEqual(out.body.days, [{ date: '2026-12-01', count: 1 }, { date: '2026-12-02', count: 1 }, { date: '2026-12-03', count: 1 }]);
+  assert.deepStrictEqual([out.body.success, out.body.type, out.body.minutes, out.body.slots.length, out.body.more, out.body.last_date], [true, 'demo', 30, 3, false, v.last_date]);
+});
+
+test('35: the booking calendar asks for any month up to three months ahead, at most 42 days at once', () => {
+  const ask = (query) => run(nodeOf(wf35, 'Validate Slots Request').parameters.jsCode, { json: { query: { type: 'intro', ...query } } })[0].json;
+  const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const r1 = ask({ from: day(30), to: day(45) });
+  assert.deepStrictEqual([r1.date_range_start, r1.date_range_end, r1.empty], [day(30), day(45), false]);
+  // A month that started in the past begins today; one past the horizon is cut at it.
+  assert.strictEqual(ask({ from: day(-10), to: day(5) }).date_range_start, today);
+  const r2 = ask({ from: day(80), to: day(120) });
+  assert.deepStrictEqual([r2.date_range_end, r2.last_date], [r2.last_date, r2.date_range_end]);
+  assert.ok(new Date(r2.last_date) - new Date(today) <= 91 * 86400000);
+  // Beyond the horizon altogether: nothing to show.
+  assert.strictEqual(ask({ from: day(150), to: day(170) }).empty, true);
+  // Longer than 42 days is cut; nonsense falls back to the next two weeks.
+  const r3 = ask({ from: day(1), to: day(80) });
+  assert.strictEqual((new Date(r3.date_range_end) - new Date(r3.date_range_start)) / 86400000, 42);
+  const r4 = ask({ from: 'x', to: '2026-13-45' });
+  assert.deepStrictEqual([r4.date_range_start, (new Date(r4.date_range_end) - new Date(r4.date_range_start)) / 86400000], [today, 14]);
+  // Empty requests return no times even if 11 found some.
+  const out = run(nodeOf(wf35, 'Slots Response').parameters.jsCode, {
+    json: { available_slots: [{ starts_at: '2026-12-01T08:00:00.000Z', ends_at: 'b' }] }, nodes: { 'Validate Slots Request': { ...ask({ from: day(150) }), empty: true } } })[0].json;
+  assert.deepStrictEqual([out.body.days, out.body.slots], [[], []]);
+});
+
+test('35: a booking more than three months ahead is refused', () => {
+  const code = nodeOf(wf35, 'Validate Booking').parameters.jsCode;
+  const body = (days) => ({ type: 'intro', starts_at: new Date(Date.now() + days * 86400000).toISOString(), name: 'A', email: 'a@x.pl', agency: 'Ag' });
+  assert.strictEqual(run(code, { json: { body: body(60) } })[0].json.ok, true);
+  assert.strictEqual(run(code, { json: { body: body(120) } })[0].json.ok, false);
 });
 
 test('35: demo access needs name, email and agency, and returns the demo agency', () => {
