@@ -126,7 +126,7 @@ export default function AsariCard({ status, canChange, timeZone }: { status: Asa
                 type="button"
                 onClick={() => call("save")}
                 disabled={!!busy}
-                className="inline-flex h-9 cursor-pointer items-center rounded-full border-0 bg-ink px-3.5 text-[13px] font-medium text-white hover:bg-ink-800 disabled:opacity-50"
+                className="inline-flex h-9 cursor-pointer items-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:opacity-50"
               >
                 {busy === "save" ? "Saving…" : connected ? "Save changes" : "Connect ASARI"}
               </button>

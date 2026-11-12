@@ -32,10 +32,10 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+    <div className="sky flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-[380px]">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <ElliotLogo size={34} className="text-ink" />
+          <ElliotLogo size={34} className="text-white" />
         </div>
       <div className="card p-7">
         <h1 className="m-0 mb-2 text-[20px] font-semibold text-ink">Reset your password</h1>
@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Sending..." : "Send reset link"}
             </button>

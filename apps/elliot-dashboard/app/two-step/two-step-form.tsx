@@ -112,7 +112,7 @@ export default function TwoStepForm({ mode, email }: { mode: "enroll" | "verify"
       <button
         type="submit"
         disabled={busy || !factorId || code.replace(/\s+/g, "").length !== 6}
-        className="mt-4 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 bg-ink px-4 text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-4 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-4 text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? "Checking…" : mode === "enroll" ? "Turn on and continue" : "Continue"}
       </button>

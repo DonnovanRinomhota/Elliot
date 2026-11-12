@@ -107,7 +107,7 @@ export default function LoginPage() {
             setMode("sign-in");
             setPassword("");
           }}
-          className="mt-5 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-5 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Back to sign in
         </button>
@@ -152,7 +152,7 @@ export default function LoginPage() {
 
           {error && <p className="mb-3 mt-0 text-[13px] text-alert" role="alert">{error}</p>}
 
-          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60">
             {loading ? "Signing in…" : "Sign in"}
           </button>
 
@@ -191,7 +191,7 @@ export default function LoginPage() {
 
           {error && <p className="mb-3 mt-0 text-[13px] text-alert" role="alert">{error}</p>}
 
-          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 bg-ink text-[14px] font-medium text-white hover:bg-ink-800 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60">
             {loading ? "Creating…" : "Create business"}
           </button>
         </form>
@@ -202,13 +202,13 @@ export default function LoginPage() {
 
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+    <div className="sky flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-[380px]">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <ElliotLogo size={34} className="text-ink" />
+          <ElliotLogo size={34} className="text-white" />
         </div>
         <div className="card p-7">{children}</div>
-        <p className="mt-6 text-center text-[12.5px] text-gray-400">Your AI front office for leads, viewings and client messages.</p>
+        <p className="mt-6 text-center text-[12.5px] text-white/70">Your AI front office for leads, viewings and client messages.</p>
       </div>
     </div>
   );

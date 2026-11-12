@@ -91,7 +91,7 @@ export default async function PublicListingPage({ params }: { params: { id: stri
 
   if (!l) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#eef1f6] px-4">
+      <main className="flex min-h-screen items-center justify-center bg-[#eef2f8] px-4">
         <div className="card max-w-md px-7 py-8 text-center">
           <h1 className="m-0 text-[20px] font-semibold text-ink">This property isn&apos;t available any more</h1>
           <p className="m-0 mt-2 text-[14px] text-gray-600">
@@ -122,7 +122,7 @@ export default async function PublicListingPage({ params }: { params: { id: stri
   ].filter(Boolean) as { icon: typeof Ruler; label: string; value: string }[];
 
   return (
-    <main className="min-h-screen bg-[#eef1f6]">
+    <main className="min-h-screen bg-[#eef2f8]">
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-[960px] items-center justify-between gap-3 px-4 py-3.5 md:px-6">
           <span className="truncate text-[15px] font-semibold text-ink">{l.agency}</span>
