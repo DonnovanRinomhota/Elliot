@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getCurrentTenantId, getMembership } from "@/lib/tenant";
+import { getAdminView, getCurrentTenantId, getMembership } from "@/lib/tenant";
+import { isAdminEmail } from "@/lib/admin";
 import { contactLabel, withoutRepeats } from "@/lib/contacts";
 import ReplyForm from "./reply-form";
 import ChatControls from "./chat-controls";
 import AutoRefresh from "../../auto-refresh";
 import ContactPanel from "./contact-panel";
+import ClientData from "./client-data";
 import { attachmentNote, fileKind, placeAttachments, withoutAttachedNote, type Attachment } from "@/lib/attachments";
 import { PageHeader, Panel, StatusBadge, formatDate, humanize } from "../../../../_ui/ui";
 import BackButton from "@/app/_ui/back-button";
@@ -16,13 +18,15 @@ export default async function ConversationDetailPage({ params }: { params: { id:
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const [me, tenantId] = await Promise.all([getMembership(supabase, user.id), getCurrentTenantId(supabase)]);
+  const [me, tenantId, adminView] = await Promise.all([getMembership(supabase, user.id), getCurrentTenantId(supabase), getAdminView(supabase)]);
+  // Exporting or deleting a client's data: agency admins (or you, viewing the agency).
+  const canManageData = me?.role === "admin" || Boolean(tenantId && adminView === tenantId && isAdminEmail(user.email));
 
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
     .select("id, channel, status, created_at, assigned_human, handler:tenant_users!conversations_assigned_human_fkey(full_name, email), contact:contacts(id, name, email, phone)")
     .eq("id", params.id)
-    .single();
+    .maybeSingle();
 
   const { data: messages, error: msgError } = await supabase
     .from("messages")
@@ -37,6 +41,16 @@ export default async function ConversationDetailPage({ params }: { params: { id:
     .eq("conversation_id", params.id)
     .order("created_at", { ascending: true });
 
+  if (!convError && !conversation) {
+    return (
+      <p className="text-[13px] text-gray-600">
+        This conversation no longer exists (it may have been deleted).{" "}
+        <a href="/dashboard/conversations" className="text-ink underline">
+          All conversations
+        </a>
+      </p>
+    );
+  }
   if (convError || !conversation) {
     return <p className="text-[13px] text-alert">Couldn&apos;t load this conversation: {convError?.message}</p>;
   }
@@ -187,7 +201,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
         </div>
 
         {/* Stays in view while the messages scroll (desktop; it sits under them on a phone). */}
-        <aside className="lg:sticky lg:top-20 lg:self-start">
+        <aside className="grid gap-4 lg:sticky lg:top-20 lg:self-start">
           <ContactPanel
             tenantId={tenantId}
             conversationId={conversation.id}
@@ -198,6 +212,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
               ["Started", formatDate(conversation.created_at, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })],
             ]}
           />
+          {canManageData && contact && <ClientData contactId={contact.id} name={contactName} />}
         </aside>
       </div>
     </div>

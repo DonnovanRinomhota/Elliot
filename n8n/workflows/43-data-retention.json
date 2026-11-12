@@ -1,0 +1,201 @@
+{
+  "name": "43 - Data Retention",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "15 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "974376db-a89d-54f3-b73c-9733a2936e9e",
+      "name": "Every Night at 03:15",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "notes": "Workflow time zone is Europe/Warsaw (Settings). Does nothing for agencies without a retention period (Settings → ai_config.retention_months)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- 0051: erase clients with no activity for longer than their agency's\n-- retention period (agencies without one are skipped), and Elliot's own\n-- website enquiries past the sales account's period. Returns the stored\n-- files to delete next. retention_preview() shows who would go.\nselect apply_retention(200) as result,\n       (select supabase_url from platform_settings limit 1) as supabase_url;",
+        "options": {}
+      },
+      "id": "a9107815-4052-5fc7-9525-ab482f4588bf",
+      "name": "Apply Retention",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        224,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The files of the erased clients (email attachments), 100 per request.\nconst row = $input.first().json;\nconst paths = ((row.result && row.result.storage_paths) || []).filter((p) => typeof p === 'string' && p);\nconst base = String(row.supabase_url || '').replace(/\\/$/, '');\nif (!paths.length) return [];\nif (!/^https:\\/\\//.test(base)) {\n  return [{ json: { skip: true, error: 'platform_settings.supabase_url is not set (see 0046)', count: paths.length } }];\n}\nconst out = [];\nfor (let i = 0; i < paths.length; i += 100) {\n  out.push({ json: { skip: false, url: `${base}/storage/v1/object/email-attachments`, prefixes: paths.slice(i, i + 100) } });\n}\nreturn out;"
+      },
+      "id": "65bd8ac6-4fc5-5335-ae44-2e8bb462181a",
+      "name": "Files To Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prefixes: $json.prefixes || [] }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "eb592491-c6c7-5849-b8b4-1dc88b27d04b",
+      "name": "Delete Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        300
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "PLACEHOLDER_SET_ON_IMPORT",
+          "name": "Supabase Storage (service role)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "notes": "Supabase Storage, private bucket email-attachments. Deleting is safe to repeat."
+    },
+    {
+      "parameters": {
+        "jsCode": "// A file that couldn't be deleted is logged (as *_failed, so the health\n// alerts and the Problems page show it). The client's data in the database is\n// already gone; the paths are kept so the files can be removed by hand.\nconst out = [];\n$input.all().forEach((it, i) => {\n  const req = $('Files To Delete').all()[i]?.json || {};\n  const status = Number(it.json.statusCode || 0);\n  if (req.skip || !(status >= 200 && status < 300)) {\n    out.push({ json: { error: req.error || `Storage answered HTTP ${status || 'no response'}`, count: (req.prefixes || []).length || req.count || 0, paths: req.prefixes || [] } });\n  }\n});\nreturn out;"
+      },
+      "id": "2afe36df-2e78-5a7b-ac93-0f1f9124b1f5",
+      "name": "Failed Deletes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into audit_log (tenant_id, actor_type, actor_id, event_type, details)\nvalues (null, 'system', 'workflow_43', 'retention_files_failed',\n        jsonb_build_object('error', $1::text, 'files', $2::int, 'paths', $3::jsonb));",
+        "options": {
+          "queryReplacement": "={{ [ $json.error, $json.count, JSON.stringify($json.paths) ] }}"
+        }
+      },
+      "id": "b8ecb50a-1e43-57ec-b91a-bd93fbc58f3c",
+      "name": "Log Failed Deletes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1120,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TfAL8Z0epZ1Tqiib",
+          "name": "Elliot Postgres (service role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Night at 03:15": {
+      "main": [
+        [
+          {
+            "node": "Apply Retention",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Retention": {
+      "main": [
+        [
+          {
+            "node": "Files To Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Files To Delete": {
+      "main": [
+        [
+          {
+            "node": "Delete Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Files": {
+      "main": [
+        [
+          {
+            "node": "Failed Deletes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Failed Deletes": {
+      "main": [
+        [
+          {
+            "node": "Log Failed Deletes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Warsaw",
+    "errorWorkflow": "seDI8X3d4J3gLEgw"
+  },
+  "pinData": {},
+  "meta": {
+    "description": "0051: nightly, erases clients past their agency's retention period and deletes their stored files. Does nothing until a retention period is set."
+  }
+}

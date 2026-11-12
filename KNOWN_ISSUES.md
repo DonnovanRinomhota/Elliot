@@ -1,5 +1,28 @@
 # Known Issues / Resolved-but-worth-remembering
 
+## RESOLVED (Nov 2026) — Privacy promises the system couldn't keep
+- The privacy policy promised deletion after 12 months; nothing deleted
+  anything. 0051 + workflow 43 now delete inactive clients once a retention
+  period is set (off until set; set 12 months for the `elliot` account).
+- A client's access or deletion request had no tool: it meant hand-written
+  SQL across a dozen tables. Agency admins now have **Client's data →
+  Download a copy / Delete this client** on the conversation page.
+- A cancelled agency's data had no way out. The control panel can now delete
+  it all (status Cancelled + typed short name).
+- getelliot.eu's policy said the site stores only the theme; it also keeps
+  the chat visitor's details and demo access. Voyage AI and Gmail were
+  missing from the providers. Both fixed in Elliot-web.
+
+## OPEN (Nov 2026) — Erasure can't reach outside Elliot
+Google Calendar events, inboxes, Resend logs, CRM copies and n8n execution
+data keep their copies. The dashboard lists the calendar events to delete;
+the rest are manual. See `docs/data-protection.md`.
+
+## OPEN (Nov 2026) — Legal and administrative steps before paying agencies
+No data processing agreement (umowa powierzenia) with agencies yet, no
+lawyer review of the policy and terms, business not yet registered. Listed
+with owners in `docs/business-readiness.md`.
+
 ## RESOLVED (Nov 2026) — Monitoring gaps; trials that never ended
 - A suspended agency's follow-ups still went out: `claim_due_follow_up_runs`
   (0048) didn't look at the agency's status. Now nothing goes out for an
@@ -20,11 +43,9 @@ Supabase's Free plan has no backups you can restore from (daily backups start
 at Pro). Before the first paying agency: move to Pro, or take your own dump
 before every migration and weekly. Steps in [`RELEASING.md`](RELEASING.md#backups).
 
-## OPEN (Nov 2026) — `N8N_SEND_WHATSAPP_WEBHOOK_URL` not set in Vercel
-Found by comparing the dashboard's code with the variable names in Vercel
-(values not read). Sending an approved WhatsApp draft from the dashboard
-answers "not configured". Fix: add it in Vercel, set to workflow 28's
-production webhook URL, then redeploy.
+## RESOLVED (Nov 2026) — `N8N_SEND_WHATSAPP_WEBHOOK_URL` not set in Vercel
+Sending an approved WhatsApp draft from the dashboard answered "not
+configured". The variable was added in Vercel and locally.
 
 ## RESOLVED (Nov 2026) — Release process: what's live was a matter of memory
 - Nothing recorded which migrations Supabase had. The migrations README said

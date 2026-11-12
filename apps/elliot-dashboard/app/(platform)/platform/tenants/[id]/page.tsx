@@ -11,6 +11,7 @@ import { Badge, Panel, formatDate, humanize, timeAgo } from "../../../../_ui/ui"
 import TenantForm from "./tenant-form";
 import ViewAsButton from "./view-as-button";
 import StartTrial from "./start-trial";
+import EraseAgency from "./erase-agency";
 import { PROBLEM_FILTER, describeProblem, problemDetail } from "@/lib/problems";
 import { describeEvent } from "@/lib/platform-events";
 import BackButton from "@/app/_ui/back-button";
@@ -291,6 +292,12 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
               {!events?.length && <li className="px-5 py-3 text-gray-500">No changes recorded yet.</li>}
             </ul>
           </Panel>
+
+          {tenant.status === "cancelled" && tenant.assistant_mode === "agency" && (
+            <Panel title="Delete this agency's data">
+              <EraseAgency tenantId={tenant.id} slug={tenant.slug} name={tenant.name} />
+            </Panel>
+          )}
         </div>
       </div>
     </div>

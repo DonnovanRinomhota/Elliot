@@ -41,6 +41,7 @@ saved. Internal webhooks need the "Elliot Internal Webhook Secret" header
 | 40 | Email Inbound (Forwarded) | Email forwarded to `<slug>@in.getelliot.eu` → Elliot → reply; attachments | [agency email](../agency-email.md), [attachments](../email-attachments.md) |
 | 41 | Calendar Access Check | What Elliot may do with each agent's calendar | [agent calendars](../agent-calendars.md) |
 | 42 | ASARI Sync | Listings from ASARI CRM, hourly or on "Sync now" | [ASARI](../asari-sync.md) |
+| 43 | Data Retention | Nightly: deletes clients inactive longer than the agency's retention period, and their files | [data protection](../data-protection.md) |
 
 Retired workflows stay in the repo for their history; they can be switched
 off in n8n.

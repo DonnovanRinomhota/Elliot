@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { contactLabel } from "@/lib/contacts";
 import FolderTabs, { FolderTab } from "../folder-tabs";
+import { ErasedNotice } from "./[id]/client-data";
 import { EmptyState, PageHeader, Pagination, RowNumber, StatusBadge, humanize, paginate, timeAgo } from "../../../_ui/ui";
 
 export default async function ConversationsPage({
@@ -78,6 +79,7 @@ export default async function ConversationsPage({
           <FolderTabs tabs={tabs} activeKey={activeStatus} basePath="/dashboard/conversations" extraParams={extraParams} />
         }
       />
+      <ErasedNotice />
 
       {visible.length === 0 ? (
         <EmptyState title="No conversations here">Conversations appear as soon as someone writes to Elliot.</EmptyState>
