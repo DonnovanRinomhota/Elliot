@@ -1338,7 +1338,10 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "errorWorkflow": "seDI8X3d4J3gLEgw"
+    "errorWorkflow": "seDI8X3d4J3gLEgw",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
   },
   "pinData": {},
   "active": false,

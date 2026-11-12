@@ -72,7 +72,7 @@ test('wiring: conversation → attachments → Elliot, in both email workflows',
 });
 
 const gmailFiles = (binary, extra = {}) => run(nodeOf(w16, 'Attachment Files').parameters.jsCode, [{}], {
-  ...common, 'Lookup Tenant by Mailbox': { tenant_id: 't1' }, 'Gmail Trigger': { __binary: binary, json: {} }, ...extra,
+  ...common, 'Lookup Tenant by Mailbox': { tenant_id: 't1' }, 'One Email at a Time': { __binary: binary, json: {} }, ...extra,
 });
 
 test('Gmail: files kept, signature logos dropped, what Elliot reads', () => {

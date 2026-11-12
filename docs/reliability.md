@@ -85,8 +85,9 @@ the table and the files that call it.
 
 ## Known limits
 
-- **Gmail (workflow 16)** answers only the first of several emails that arrive
-  in the same minute. Agencies on forwarding (workflow 40) are not affected.
+- **Gmail (workflow 16)**: several emails in one check are handled one at a
+  time. If a step crashes outright, the later emails of that check wait until
+  someone looks at the failed run in n8n.
 - **WhatsApp (workflow 25)** answers the first message when Meta puts several
   in one delivery; the others are counted in the alerts
   (`whatsapp_unanswered_failed`) so someone reads the chat.

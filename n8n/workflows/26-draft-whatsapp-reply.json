@@ -650,7 +650,10 @@
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": false,
-    "errorWorkflow": "seDI8X3d4J3gLEgw"
+    "errorWorkflow": "seDI8X3d4J3gLEgw",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
   },
   "versionId": "d8ae447f-449c-41f3-be8e-82555841b4e6",
   "meta": {

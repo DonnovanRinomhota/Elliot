@@ -268,7 +268,10 @@
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": false,
-    "errorWorkflow": "seDI8X3d4J3gLEgw"
+    "errorWorkflow": "seDI8X3d4J3gLEgw",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": true
   },
   "versionId": "1a143233-8121-408b-abf9-51ba17b5d3b0",
   "meta": {
