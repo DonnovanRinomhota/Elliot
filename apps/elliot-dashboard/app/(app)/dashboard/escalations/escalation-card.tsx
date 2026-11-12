@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { AlertTriangle, ArrowRight, CircleCheck, Hand } from "lucide-react";
 import { Badge, StatusBadge, btn, timeAgo } from "../../../_ui/ui";
 
 type Escalation = {
@@ -69,16 +70,23 @@ export default function EscalationCard({ escalation }: { escalation: Escalation 
   const isOpen = escalation.status === "open";
   const urgent = escalation.priority === "high" || escalation.priority === "urgent";
 
+  const Icon = escalation.status === "resolved" ? CircleCheck : escalation.status === "acknowledged" ? Hand : AlertTriangle;
+  const tile =
+    escalation.status === "resolved"
+      ? "bg-[#e3f6ea] text-[#1f6b40]"
+      : escalation.status === "acknowledged"
+        ? "gold-tile"
+        : "bg-alert-soft text-alert-dark";
+
   return (
-    <li
-      className={`card ${isOpen ? "border-l-[3px] border-l-alert" : ""} ${
-        escalation.status === "resolved" ? "opacity-80" : ""
-      }`}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-4 px-5 pt-4">
-        <div className="min-w-0">
+    <li className={`card flex flex-col p-5 ${isOpen ? "ring-1 ring-alert/25" : ""} ${escalation.status === "resolved" ? "opacity-85" : ""}`}>
+      <div className="flex items-start gap-3">
+        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${tile}`}>
+          <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="m-0 text-[15px] font-semibold text-ink">{REASON_LABELS[escalation.reason] || escalation.reason}</h2>
+            <h2 className="m-0 text-[15.5px] font-semibold text-ink">{REASON_LABELS[escalation.reason] || escalation.reason}</h2>
             {urgent && <Badge tone="alert">{escalation.priority === "urgent" ? "Urgent" : "High priority"}</Badge>}
             <StatusBadge kind="escalation" value={escalation.status} />
           </div>
@@ -89,31 +97,35 @@ export default function EscalationCard({ escalation }: { escalation: Escalation 
               : ""}
           </p>
         </div>
-        <a href={`/dashboard/conversations/${escalation.conversation_id}`} className={`${btn.secondary} ${btn.small}`}>
-          Open conversation
-        </a>
       </div>
 
-      <p className="m-0 max-w-3xl px-5 py-3 text-[14px] leading-relaxed text-gray-700">{escalation.context_summary}</p>
+      <p className="m-0 mt-3 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-4 py-3 text-[13.5px] leading-relaxed text-gray-800">
+        {escalation.context_summary}
+      </p>
 
       {error && (
-        <p className="m-0 px-5 pb-3 text-[13px] text-alert" role="alert">
+        <p className="m-0 mt-3 text-[13px] text-alert" role="alert">
           {error}
         </p>
       )}
 
-      {escalation.status !== "resolved" && (
-        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-5 py-3">
-          {isOpen && (
-            <button type="button" onClick={() => updateStatus("acknowledged")} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
-              Acknowledge
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <a href={`/dashboard/conversations/${escalation.conversation_id}`} className={`${btn.secondary} ${btn.small}`}>
+          Open conversation <ArrowRight size={14} aria-hidden="true" />
+        </a>
+        {escalation.status !== "resolved" && (
+          <span className="ml-auto flex flex-wrap gap-2">
+            {isOpen && (
+              <button type="button" onClick={() => updateStatus("acknowledged")} disabled={busy} className={`${btn.secondary} ${btn.small}`}>
+                I&apos;ve got it
+              </button>
+            )}
+            <button type="button" onClick={() => updateStatus("resolved")} disabled={busy} className={`${btn.primary} ${btn.small}`}>
+              Mark resolved
             </button>
-          )}
-          <button type="button" onClick={() => updateStatus("resolved")} disabled={busy} className={`${btn.primary} ${btn.small}`}>
-            Mark resolved
-          </button>
-        </div>
-      )}
+          </span>
+        )}
+      </div>
     </li>
   );
 }

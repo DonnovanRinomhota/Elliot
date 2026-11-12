@@ -152,12 +152,12 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
 
   const table = (title: string, rows: Appointment[], total: number) =>
     rows.length > 0 && (
-      <section className="mb-6">
-        <h2 className="m-0 mb-2 text-[14px] font-semibold text-ink">
-          {title} <span className="tabular font-normal text-gray-400">{total}</span>
+      <section className="card mb-5 p-3 md:p-4">
+        <h2 className="m-0 mb-2 flex items-center gap-2 px-1.5 pt-1 text-[17px] font-semibold tracking-[-0.01em] text-ink">
+          {title} <span className="tabular rounded-full bg-gray-100 px-2 py-0.5 text-[12px] font-bold text-gray-600">{total}</span>
         </h2>
-        <div className="overflow-hidden card">
-          <div className={`hidden border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-[12px] font-medium text-gray-500 ${APPOINTMENT_GRID}`}>
+        <div>
+          <div className={`hidden px-3.5 pb-2 pt-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-gray-500 ${APPOINTMENT_GRID}`}>
             <span>#</span>
             <span>When</span>
             <span>Client</span>
@@ -166,7 +166,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
             <span>Status</span>
             <span className="sr-only">Actions</span>
           </div>
-          <ul className="m-0 list-none p-0">
+          <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-2 p-0">
             {rows.map((appointment) => (
               <AppointmentCard key={appointment.id} number={numberOf.get(appointment.id)} appointment={appointment} />
             ))}

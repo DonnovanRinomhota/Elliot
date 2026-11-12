@@ -136,10 +136,10 @@ export default async function ListingsPage({
           </EmptyState>
         )
       ) : (
-        <div className="overflow-x-auto card">
-          <table className="w-full min-w-[900px] border-collapse text-left text-[13px]">
+        <div className="overflow-x-auto card px-3 pb-2 pt-1 md:px-4">
+          <table className="w-full min-w-[900px] border-separate border-spacing-y-2 text-left text-[13px]">
             <thead>
-              <tr className="border-b border-gray-200 text-[12px] text-gray-500">
+              <tr className="text-[11.5px] font-semibold uppercase tracking-[0.06em] text-gray-500">
                 <th className="w-10 px-4 py-2.5 font-medium">#</th>
                 <th className="w-[112px] py-2.5 font-medium">
                   <span className="sr-only">Photo</span>
@@ -158,11 +158,11 @@ export default async function ListingsPage({
               {(listings ?? []).map((l: any, i: number) => {
                 const photos = listingPhotos(l);
                 return (
-                <tr key={l.id} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+                <tr key={l.id} className="[&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl [&>td]:bg-[#f3f6fb] hover:[&>td]:bg-white">
                   <td className="tabular px-4 py-3 text-[12.5px] text-gray-400">{offset + i + 1}</td>
                   <td className="py-2.5">
                     {photos.length ? (
-                      <a href={`/dashboard/listings/${l.id}`} className="relative block h-[72px] w-[96px] overflow-hidden rounded-md bg-gray-100">
+                      <a href={`/dashboard/listings/${l.id}`} className="relative block h-[72px] w-[96px] overflow-hidden rounded-xl bg-gray-100 shadow-[0_8px_18px_-12px_rgba(15,40,80,0.6)]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={resizedPhotoUrl(photos[0], 320)} alt="" loading="lazy" className="h-full w-full object-cover" />
                         {photos.length > 1 && (
@@ -176,7 +176,7 @@ export default async function ListingsPage({
                         href={l.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex h-[72px] w-[96px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 text-[11.5px] text-gray-500 no-underline hover:border-ink-400 hover:text-ink"
+                        className="flex h-[72px] w-[96px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-gray-300 bg-white text-[11.5px] text-gray-500 no-underline hover:border-ink-400 hover:text-ink"
                         title="Photos are in a shared folder. Open the listing to add them here."
                       >
                         <ImageIcon size={16} strokeWidth={1.75} aria-hidden="true" />
@@ -185,7 +185,7 @@ export default async function ListingsPage({
                     ) : (
                       <a
                         href={`/dashboard/listings/${l.id}`}
-                        className="flex h-[72px] w-[96px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 text-[11.5px] text-gray-400 no-underline hover:border-ink-400 hover:text-ink"
+                        className="flex h-[72px] w-[96px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-gray-300 bg-white text-[11.5px] text-gray-400 no-underline hover:border-ink-400 hover:text-ink"
                       >
                         <ImageIcon size={16} strokeWidth={1.75} aria-hidden="true" />
                         Add photos
@@ -193,7 +193,7 @@ export default async function ListingsPage({
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <a href={`/dashboard/listings/${l.id}`} className="font-medium text-ink no-underline hover:underline">
+                    <a href={`/dashboard/listings/${l.id}`} className="text-[14px] font-semibold text-ink no-underline hover:underline">
                       {l.title}
                     </a>
                     <div className="text-[12px] text-gray-500">
@@ -202,7 +202,7 @@ export default async function ListingsPage({
                         .join(" · ")}
                     </div>
                   </td>
-                  <td className="tabular whitespace-nowrap px-4 py-3 text-ink">{formatPrice(l.price, l.currency, l.transaction_type)}</td>
+                  <td className="tabular whitespace-nowrap px-4 py-3 text-[14px] font-bold text-ink">{formatPrice(l.price, l.currency, l.transaction_type)}</td>
                   <td className="px-4 py-3 text-gray-700">{[l.district, l.city].filter(Boolean).join(", ") || "–"}</td>
                   <td className="tabular whitespace-nowrap px-4 py-3 text-gray-700">
                     {[l.area_m2 && `${Number(l.area_m2)} m²`, l.rooms && `${l.rooms} room${l.rooms === 1 ? "" : "s"}`].filter(Boolean).join(", ") || "–"}

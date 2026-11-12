@@ -75,6 +75,7 @@ set supabase_url = …`); the feature doc for each migration lists its set-up.
 | 0049 | Migration record: `migration_status()`, `schema_migrations`, `begin_migration()` ([releasing](../../RELEASING.md)) |
 | 0050 | Trials that pause, go-live checklist, failures per agency in the control panel ([onboarding](../../docs/onboarding.md)) |
 | 0051 | Data protection: a client's copy and deletion, retention period, deleting a cancelled agency ([data protection](../../docs/data-protection.md)) |
+| 0052 | Archived conversations: closed ones go to Archived, come back when the client or the agency writes again; Archive / Move back in the dashboard |
 
 ## Tests
 

@@ -9,8 +9,9 @@ import AutoRefresh from "../../auto-refresh";
 import ContactPanel from "./contact-panel";
 import ClientData from "./client-data";
 import { attachmentNote, fileKind, placeAttachments, withoutAttachedNote, type Attachment } from "@/lib/attachments";
-import { PageHeader, Panel, StatusBadge, formatDate, humanize } from "../../../../_ui/ui";
+import { Badge, PageHeader, Panel, StatusBadge, formatDate, humanize } from "../../../../_ui/ui";
 import BackButton from "@/app/_ui/back-button";
+import ArchiveButton from "../archive-button";
 
 export default async function ConversationDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -22,11 +23,16 @@ export default async function ConversationDetailPage({ params }: { params: { id:
   // Exporting or deleting a client's data: agency admins (or you, viewing the agency).
   const canManageData = me?.role === "admin" || Boolean(tenantId && adminView === tenantId && isAdminEmail(user.email));
 
-  const { data: conversation, error: convError } = await supabase
+  const CONVERSATION = "id, channel, status, created_at, assigned_human, handler:tenant_users!conversations_assigned_human_fkey(full_name, email), contact:contacts(id, name, email, phone)";
+  let { data: conversation, error: convError } = (await supabase
     .from("conversations")
-    .select("id, channel, status, created_at, assigned_human, handler:tenant_users!conversations_assigned_human_fkey(full_name, email), contact:contacts(id, name, email, phone)")
+    .select(`${CONVERSATION}, archived_at`)
     .eq("id", params.id)
-    .maybeSingle();
+    .maybeSingle()) as { data: any; error: { message: string } | null };
+  // Before database update 0052 there's no archived_at: read without it.
+  if (convError && /archived_at/.test(convError.message)) {
+    ({ data: conversation, error: convError } = (await supabase.from("conversations").select(CONVERSATION).eq("id", params.id).maybeSingle()) as { data: any; error: { message: string } | null });
+  }
 
   const { data: messages, error: msgError } = await supabase
     .from("messages")
@@ -103,9 +109,11 @@ export default async function ConversationDetailPage({ params }: { params: { id:
     <div>
       <PageHeader back={<BackButton fallback="/dashboard/conversations" onDark />}
         title={contactName}
+        actions={<ArchiveButton conversationId={conversation.id} archived={!!conversation.archived_at} onDark />}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
             <StatusBadge kind="conversation" value={conversation.status} />
+            {conversation.archived_at && <Badge tone="neutral">Archived</Badge>}
             <span>{humanize(conversation.channel)}</span>
           </span>
         }
@@ -119,8 +127,10 @@ export default async function ConversationDetailPage({ params }: { params: { id:
               {shown.map((m) => {
                 if (m.role === "system") {
                   return (
-                    <li key={m.id} className="text-center text-[12px] text-gray-500">
-                      {m.content} · {messageTime(m.created_at)}
+                    <li key={m.id} className="text-center">
+                      <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-[12px] text-gray-600">
+                        {m.content} · {messageTime(m.created_at)}
+                      </span>
                     </li>
                   );
                 }
@@ -133,12 +143,12 @@ export default async function ConversationDetailPage({ params }: { params: { id:
                       {messageTime(m.created_at)}
                     </div>
                     <div
-                      className={`max-w-[78%] whitespace-pre-wrap [overflow-wrap:anywhere] rounded-lg px-4 py-2.5 text-[14px] leading-relaxed ${
+                      className={`max-w-[78%] whitespace-pre-wrap [overflow-wrap:anywhere] px-4 py-2.5 text-[14px] leading-relaxed ${
                         isHuman
-                          ? "bg-ink text-white"
+                          ? "gold-fill rounded-[18px_18px_6px_18px] text-ink"
                           : isOutbound
-                            ? "bg-ink-soft text-ink"
-                            : "border border-gray-200 bg-white text-gray-800"
+                            ? "rounded-[18px_18px_6px_18px] bg-[linear-gradient(135deg,#071631,#14325c)] text-white"
+                            : "rounded-[18px_18px_18px_6px] border border-[rgba(15,31,56,0.07)] bg-[#f3f6fb] text-gray-800"
                       }`}
                     >
                       {m.role === "user" ? withoutAttachedNote(m.content) : m.content}
