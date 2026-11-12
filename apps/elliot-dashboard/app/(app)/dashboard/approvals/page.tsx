@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { draftTimeline, inboundFor, stamp, type InboundMessage } from "@/lib/approvals";
 import { DEFAULT_TZ } from "@/lib/appointments";
 import ApprovalCard from "./approval-card";
+import RejectSpamButton from "./reject-spam-button";
+import { ElliotMark } from "../../../_ui/elliot-logo";
 import FolderTabs, { FolderTab } from "../folder-tabs";
 import { EmptyState, FilterDescription, PageHeader, Pagination, paginate } from "../../../_ui/ui";
 
@@ -22,7 +24,7 @@ const STATUS_TABS: FolderTab[] = [
 export default async function ApprovalsPage({
   searchParams,
 }: {
-  searchParams: { status?: string; days?: string; page?: string };
+  searchParams: { status?: string; days?: string; page?: string; show?: string };
 }) {
   const supabase = createClient();
 
@@ -70,7 +72,16 @@ export default async function ApprovalsPage({
   // Defaults to "pending" (not "all") so a plain sidebar click still lands
   // on the actionable queue, same as this page always behaved before.
   const activeStatus = tabs.some((t) => t.key === searchParams.status) ? (searchParams.status as string) : "pending";
-  const visible = activeStatus === "all" ? scoped : scoped.filter((d: any) => d.status === activeStatus);
+  const inTab = activeStatus === "all" ? scoped : scoped.filter((d: any) => d.status === activeStatus);
+
+  // Elliot classes replies to automatic emails (notifications, newsletters) as
+  // spam. Clients come first; "show=spam" lists only the spam ones.
+  const isSpam = (d: any) => d.category === "spam";
+  const spamWaiting = scoped.filter((d: any) => d.status === "pending" && isSpam(d)).length;
+  const clientCount = inTab.filter((d: any) => !isSpam(d)).length;
+  const spamCount = inTab.length - clientCount;
+  const onlySpam = searchParams.show === "spam";
+  const visible = onlySpam ? inTab.filter(isSpam) : [...inTab.filter((d: any) => !isSpam(d)), ...inTab.filter(isSpam)];
   const pg = paginate(visible, searchParams.page);
 
   // The client's message each draft on this page answers, and the dates.
@@ -114,12 +125,55 @@ export default async function ApprovalsPage({
         }
       />
 
+      {activeStatus === "pending" && spamWaiting > 0 && (
+        <section className="mb-5 flex flex-wrap items-center gap-4 rounded-[22px] bg-[linear-gradient(135deg,#071631,#14325c_60%,#2b5590)] px-5 py-4 text-white shadow-lift">
+          <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#0b1426] shadow-[0_0_0_1px_rgba(217,165,108,0.6),0_0_18px_rgba(217,165,108,0.35)]">
+            <ElliotMark size={21} />
+          </span>
+          <div className="min-w-0 flex-1 basis-[240px]">
+            <p className="m-0 text-[16px] font-semibold">
+              {spamWaiting === scoped.filter((d: any) => d.status === "pending").length
+                ? `All ${spamWaiting} waiting drafts are replies to spam and automatic emails.`
+                : `${spamWaiting} of the ${scoped.filter((d: any) => d.status === "pending").length} waiting drafts are replies to spam and automatic emails.`}
+            </p>
+            <p className="m-0 mt-0.5 text-[13.5px] text-white/75">
+              Notifications, newsletters and the like, not clients. Reject them in one go; nothing is sent.{" "}
+              <a href={onlySpam ? "/dashboard/approvals" : "/dashboard/approvals?show=spam"} className="text-white underline">
+                {onlySpam ? "Show clients first" : "See them first"}
+              </a>
+            </p>
+          </div>
+          <RejectSpamButton count={spamWaiting} />
+        </section>
+      )}
+
+      {inTab.length > 0 && spamCount > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-[13px]">
+          {[
+            ["Clients first", !onlySpam, `/dashboard/approvals${activeStatus !== "pending" ? `?status=${activeStatus}` : ""}`],
+            ["Only spam and automatic", onlySpam, `/dashboard/approvals?show=spam${activeStatus !== "pending" ? `&status=${activeStatus}` : ""}`],
+          ].map(([label, on, href]) => (
+            <a
+              key={label as string}
+              href={href as string}
+              aria-current={on ? "page" : undefined}
+              className={`inline-flex h-9 items-center rounded-full border px-4 no-underline ${on ? "border-ink bg-ink font-medium text-white" : "border-gray-200 bg-white text-ink hover:bg-gray-50"}`}
+            >
+              {label as string}
+            </a>
+          ))}
+          <span className="ml-auto text-gray-500">
+            {clientCount} from clients · {spamCount} spam or automatic
+          </span>
+        </div>
+      )}
+
       {visible.length === 0 ? (
         <EmptyState title={activeStatus === "pending" ? "You're all caught up" : "Nothing here"}>
           {activeStatus === "pending" ? "New drafts appear here when Elliot needs your approval to send." : null}
         </EmptyState>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
           {cards.map((draft: any) => (
             <ApprovalCard key={draft.id} draft={draft} />
           ))}
@@ -129,7 +183,7 @@ export default async function ApprovalsPage({
         {...pg}
         shown={pg.items.length}
         basePath="/dashboard/approvals"
-        params={{ days: days ? String(days) : undefined, status: activeStatus }}
+        params={{ days: days ? String(days) : undefined, status: activeStatus, show: onlySpam ? "spam" : undefined }}
         noun="drafts"
       />
     </div>
