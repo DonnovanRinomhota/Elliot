@@ -1,0 +1,11 @@
+{
+  "name": "elliot-n8n-workflow-tests",
+  "private": true,
+  "description": "Runs the Code-node logic of the n8n workflows straight out of the exported JSON.",
+  "scripts": {
+    "test": "node run-all.js"
+  },
+  "devDependencies": {
+    "luxon": "3.7.2"
+  }
+}
