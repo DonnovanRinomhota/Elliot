@@ -82,6 +82,19 @@ test('11: a time is free when at least one agent is; unreadable calendars are le
   assert.deepStrictEqual(slots({ 'ola@a.pl': { errors: [{ reason: 'notFound' }] }, 'jan@a.pl': { errors: [{ reason: 'notFound' }] } }), ['10:00', '11:00', '12:00']);
 });
 
+test('11: opening hours stored as text still work; a malformed day counts as closed', () => {
+  if (!DateTime) { console.log('    (skipped: luxon not installed)'); return; }
+  const day = DateTime.now().setZone('Europe/Warsaw').plus({ days: 3 }).toISODate();
+  const dn = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][DateTime.fromISO(day).weekday % 7];
+  const base = { date_range_start: day, date_range_end: day, timezone: 'Europe/Warsaw', duration_minutes: 60, buffer_minutes: 0, calendar_ids: ['primary'] };
+  const slots = (business_hours) => run(nodeOf(wf11, 'Compute Available Slots').parameters.jsCode,
+    { json: { calendars: { primary: { busy: [] } } }, nodes: { 'Merge Config': { ...base, business_hours } }, globals: { DateTime } })[0].json.available_slots.length;
+  assert.strictEqual(slots(JSON.stringify({ [dn]: { open: '10:00', close: '12:00' } })), 2);
+  assert.strictEqual(slots({ [dn]: { closed: true } }), 0);
+  assert.strictEqual(slots({ [dn]: { open: '', close: '17:00' } }), 0);
+  assert.strictEqual(slots('not json'), 0);
+});
+
 // ── 12 ──
 const req = { tenant_id: 't', contact_id: 'c', starts_at: '2026-12-01T10:00:00.000Z', ends_at: '2026-12-01T11:00:00.000Z' };
 const OLA = { calendar_id: 'ola@a.pl', agent_id: 'u-ola', agent_email: 'ola@a.pl', agent_name: 'Ola', mode: 'agents', is_owner: false, db_busy: false, upcoming: 3 };
