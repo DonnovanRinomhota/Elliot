@@ -9,6 +9,10 @@ Two webhooks into the same flow (0047, [`../security.md`](../security.md)):
   Secret"; called by 16, 40 (email) and 25 (WhatsApp). Only here may the body
   set `channel` and `attachments`, and the client counts as verified.
 
+Trial ended (0050): when the agency's trial has ended, "Trial Ended?" sends
+the message down a short path that never calls Claude: the message is saved
+and the client gets a holding reply at most once a day (`paused_reply()`).
+
 Bookings: when the agency's Settings say bookings need approval, "Extract
 Tool Call" turns `book_appointment` into a high-priority hand-over to the
 team and tells Claude nothing was booked.

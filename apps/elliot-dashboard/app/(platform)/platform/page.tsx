@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { accountState, monthlyRevenue, type AccountState, type TenantOverviewRow } from "@/lib/platform";
+import { accountState, monthlyRevenue, totalAiCostUsd, type AccountState, type TenantOverviewRow } from "@/lib/platform";
 import { PageHeader } from "../../_ui/ui";
 import AgenciesTable from "./agencies-table";
 import SupportSwitch from "./support-switch";
@@ -18,19 +18,22 @@ export default async function PlatformPage() {
 
   const now = new Date();
   const counts: Record<AccountState, number> = {
-    trial: 0, trial_ended: 0, active: 0, past_due: 0, complimentary: 0, suspended: 0, cancelled: 0,
+    setup: 0, trial: 0, trial_ended: 0, active: 0, past_due: 0, complimentary: 0, suspended: 0, cancelled: 0,
   };
   rows.forEach((r) => counts[accountState(r, now)]++);
   const mrr = monthlyRevenue(rows, now);
+  const aiCost = totalAiCostUsd(rows);
+  const failing = rows.filter((r) => Number(r.failures_7d || 0) > 0).length;
 
   const tiles: { label: string; value: string | number; tone?: "alert" | "brass"; filter?: string }[] = [
     { label: "Agencies", value: rows.length, filter: "" },
+    { label: "Setting up", value: counts.setup, filter: "setup" },
     { label: "Free trial", value: counts.trial, filter: "trial" },
+    { label: "Trial ended, paused", value: counts.trial_ended, tone: counts.trial_ended ? "brass" : undefined, filter: "trial_ended" },
     { label: "Active", value: counts.active, filter: "active" },
     { label: "Past due", value: counts.past_due, tone: counts.past_due ? "alert" : undefined, filter: "past_due" },
-    { label: "Trial ended", value: counts.trial_ended, tone: counts.trial_ended ? "brass" : undefined, filter: "trial_ended" },
-    { label: "Complimentary", value: counts.complimentary, filter: "complimentary" },
     { label: "Monthly revenue", value: `€${mrr.toLocaleString("en-GB", { maximumFractionDigits: 0 })}` },
+    { label: "AI cost, 30 days", value: `$${aiCost.toLocaleString("en-GB", { maximumFractionDigits: 0 })}` },
   ];
 
   return (
@@ -46,9 +49,9 @@ export default async function PlatformPage() {
         </p>
       )}
 
-      <section aria-label="Summary" className="mb-6 grid grid-cols-2 overflow-hidden card sm:grid-cols-4 lg:grid-cols-7">
+      <section aria-label="Summary" className="mb-6 grid grid-cols-2 overflow-hidden card sm:grid-cols-4 lg:grid-cols-8">
         {tiles.map((t, i) => (
-          <div key={t.label} className={`px-4 py-4 ${i > 0 ? "border-l border-gray-200" : ""} max-lg:[&:nth-child(n+5)]:border-t max-sm:[&:nth-child(n+3)]:border-t max-sm:[&:nth-child(odd)]:border-l-0`}>
+          <div key={t.label} className={`px-4 py-4 ${i > 0 ? "border-l border-gray-200" : ""} max-lg:[&:nth-child(n+5)]:border-t max-lg:[&:nth-child(5)]:border-l-0 max-sm:[&:nth-child(n+3)]:border-t max-sm:[&:nth-child(odd)]:border-l-0`}>
             <div
               className={`tabular text-[26px] font-semibold leading-none tracking-[-0.02em] ${
                 t.tone === "alert" ? "text-alert" : t.tone === "brass" ? "text-brass-dark" : "text-ink"
@@ -60,6 +63,12 @@ export default async function PlatformPage() {
           </div>
         ))}
       </section>
+
+      {failing > 0 && (
+        <p className="mb-4 text-[13px] text-alert">
+          {failing} agenc{failing === 1 ? "y has" : "ies have"} failures this week. <a href="/platform/problems">See problems</a>
+        </p>
+      )}
 
       <SupportSwitch required={settings?.support_permission_required ?? true} />
 

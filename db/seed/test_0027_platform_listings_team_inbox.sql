@@ -27,8 +27,10 @@ insert into tenant_users (id, tenant_id, auth_user_id, email, role) values
 
 do $$
 begin
-  if (select trial_ends_at from tenants where slug = 'agency-a-test') is null then
-    raise exception 'new tenants should get a trial end date by default';
+  -- 0050 changed this: a new agency has no trial date until a trial is
+  -- started from the control panel at go-live.
+  if (select trial_ends_at from tenants where slug = 'agency-a-test') is not null then
+    raise exception 'new tenants should not get a trial end date until a trial is started (0050)';
   end if;
 end $$;
 

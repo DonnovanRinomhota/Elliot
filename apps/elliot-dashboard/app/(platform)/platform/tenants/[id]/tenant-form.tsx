@@ -124,6 +124,7 @@ export default function TenantForm({ tenant }: { tenant: Tenant }) {
           <div>
             <label className={label} htmlFor="t-trial">Trial ends</label>
             <input id="t-trial" type="date" value={form.trial_ends_at} onChange={set("trial_ends_at")} className="h-9 w-full px-3" />
+            <p className="m-0 mt-1 text-[12px] text-gray-500">Start the trial from the go-live checklist; this date can then extend or shorten it.</p>
           </div>
         ) : form.plan !== "complimentary" ? (
           <div>
