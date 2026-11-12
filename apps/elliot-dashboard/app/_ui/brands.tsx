@@ -23,3 +23,30 @@ export function BrandTile({ name, size = 32 }: { name: BrandName; size?: number 
     </span>
   );
 }
+
+/**
+ * Where a conversation or lead came from, as a small tile: the WhatsApp and
+ * Gmail logos, a navy chat bubble for the website chat, a phone for SMS.
+ */
+export function ChannelTile({ channel, size = 32 }: { channel: string | null | undefined; size?: number }) {
+  if (channel === "whatsapp") return <BrandTile name="whatsapp" size={size} />;
+  if (channel === "email") return <BrandTile name="gmail" size={size} />;
+  const label = channel === "sms" ? "SMS" : "Website chat";
+  const icon = Math.round(size * 0.47);
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className="inline-flex flex-shrink-0 items-center justify-center rounded-[10px] bg-[#0b1426] text-[#f3d4a4]"
+      style={{ width: size, height: size }}
+    >
+      <svg viewBox="0 0 24 24" width={icon} height={icon} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {channel === "sms" ? (
+          <path d="M7 4h3l1.5 4-2 1.5a10 10 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A15 15 0 0 1 5 6a2 2 0 0 1 2-2Z" />
+        ) : (
+          <path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V15h0a2 2 0 0 1-2-2Z" />
+        )}
+      </svg>
+    </span>
+  );
+}

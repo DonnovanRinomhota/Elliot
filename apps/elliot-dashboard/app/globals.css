@@ -44,7 +44,7 @@
 
   /* Form controls share one look, so every page's inputs match without each
      file restating it. Component classes can still override. */
-  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
     font: inherit;
     font-size: 14px;
     color: #0f1f38;
@@ -120,4 +120,38 @@
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Text inside a page's navy band (see sticky-header.tsx): the greys and navy
+   that pages use on white turn light, except on things with their own
+   background (badges, white buttons, form fields). Unlayered on purpose, so
+   it wins over the text colour utilities. */
+[data-band] :is(.text-ink, .text-ink-600, .text-gray-700, .text-gray-600):not([class*="bg-"], [class*="gold-fill"], select, input, option, [class*="bg-"] *, [class*="gold-fill"] *) {
+  color: rgba(255, 255, 255, 0.92);
+}
+[data-band] :is(.text-gray-500, .text-gray-400):not([class*="bg-"], [class*="gold-fill"], select, input, option, [class*="bg-"] *, [class*="gold-fill"] *) {
+  color: rgba(255, 255, 255, 0.72);
+}
+[data-band] .band-actions :is(a, button):not([class*="bg-"], [class*="gold-fill"], [class*="bg-"] *) {
+  color: #fff;
+}
+[data-band] :is(select, input) {
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+/* The navy sidebar's scrollbar: slim and dark instead of the system's white one. */
+.navy,
+.navy * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.navy ::-webkit-scrollbar {
+  width: 8px;
+}
+.navy ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.navy ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
 }

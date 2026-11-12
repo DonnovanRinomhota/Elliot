@@ -101,8 +101,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
 
   return (
     <div>
-      <BackButton fallback="/dashboard/conversations" />
-      <PageHeader
+      <PageHeader back={<BackButton fallback="/dashboard/conversations" onDark />}
         title={contactName}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
