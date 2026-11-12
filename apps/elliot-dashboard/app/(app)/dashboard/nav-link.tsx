@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+// A link in the navy sidebar. The page you're on is marked in gold, as on
+// the website.
 export default function NavLink({
   href,
   icon,
@@ -20,26 +22,26 @@ export default function NavLink({
   const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
 
   const badgeClass = {
-    neutral: "bg-gray-100 text-gray-600",
-    // Counts are plain black: the number matters, not the colour.
-    danger: "bg-gray-100 text-ink",
-    warning: "bg-gray-100 text-ink",
+    neutral: "bg-white/15 text-white",
+    danger: "bg-alert text-white",
+    warning: "gold-fill text-ink",
   }[badgeTone];
 
   return (
     <a
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`relative flex h-9 items-center gap-2.5 rounded-xl px-3 text-[13.5px] no-underline transition-colors ${
-        active ? "bg-accent-soft font-medium text-accent-dark" : "text-gray-600 hover:bg-gray-50 hover:text-ink"
+      className={`relative flex h-10 items-center gap-3 rounded-xl px-3 text-[13.5px] no-underline transition-colors ${
+        active
+          ? "bg-[linear-gradient(90deg,rgba(217,165,108,0.22),rgba(217,165,108,0.06))] font-semibold text-gold-light shadow-[inset_0_0_0_1px_rgba(217,165,108,0.28)]"
+          : "text-white/75 hover:bg-white/[0.07] hover:text-white"
       }`}
     >
-      {icon && <span className={active ? "text-accent" : "text-gray-400"}>{icon}</span>}
+      {active && <span aria-hidden="true" className="absolute -left-3 top-2 bottom-2 w-[3px] rounded-r bg-gold shadow-[0_0_12px_#d9a56c]" />}
+      {icon && <span className={active ? "text-gold-light" : "text-white/60"}>{icon}</span>}
       <span className="truncate">{label}</span>
       {badge != null && badge > 0 && (
-        <span className={`tabular ml-auto min-w-[22px] rounded-full px-1.5 text-center text-[11.5px] font-semibold leading-5 ${badgeClass}`}>
-          {badge}
-        </span>
+        <span className={`tabular ml-auto min-w-[22px] rounded-full px-1.5 text-center text-[11.5px] font-bold leading-5 ${badgeClass}`}>{badge}</span>
       )}
     </a>
   );

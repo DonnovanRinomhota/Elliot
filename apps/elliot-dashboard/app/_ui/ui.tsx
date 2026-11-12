@@ -2,8 +2,9 @@
 // hooks (the sticky page header is its own small client component), so both
 // server and client components can use them.
 //
-// Colour rules (see tailwind.config.ts): ink for normal emphasis, brass for
-// "waiting on you", alert for urgent/destructive, greys for everything else.
+// Colour rules (see tailwind.config.ts): gold for the main action, ink for
+// normal emphasis, brass for "waiting on you", alert for urgent/destructive,
+// greys for everything else.
 import type { ReactNode } from "react";
 import StickyHeader from "./sticky-header";
 
@@ -11,10 +12,13 @@ import StickyHeader from "./sticky-header";
 
 const BTN = "inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-medium no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 export const btn = {
-  primary: `${BTN} h-9 bg-ink px-4 text-white shadow-sm hover:bg-ink-800`,
+  /** Gold, like the website's "Request a demo". */
+  primary: `${BTN} gold-fill h-9 px-4 font-semibold text-ink shadow-gold hover:brightness-[1.04]`,
+  /** Navy, for a second strong action next to a gold one. */
+  dark: `${BTN} h-9 bg-ink px-4 text-white shadow-sm hover:bg-ink-800`,
   secondary: `${BTN} h-9 border border-gray-200 bg-white px-4 text-ink shadow-sm hover:border-gray-300 hover:bg-gray-50`,
   danger: `${BTN} h-9 border border-alert/30 bg-white px-4 text-alert hover:bg-alert-soft`,
-  ghost: `${BTN} h-9 px-3 text-ink-600 hover:bg-gray-100 hover:text-ink`,
+  ghost: `${BTN} h-9 px-3 text-ink-600 hover:bg-white hover:text-ink`,
   /** Low-emphasis destructive action (e.g. Reject next to a primary button). */
   dangerGhost: `${BTN} h-9 px-3 text-alert hover:bg-alert-soft`,
   small: "!h-8 !px-3 !text-[12.5px]",
@@ -84,8 +88,8 @@ export function Panel({
   return (
     <section className={`card ${className}`}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
-          {title && <h2 className="m-0 text-[15px] font-semibold tracking-[-0.01em] text-ink">{title}</h2>}
+        <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-5">
+          {title && <h2 className="m-0 text-[16px] font-semibold tracking-[-0.01em] text-ink">{title}</h2>}
           {action}
         </div>
       )}
@@ -145,7 +149,7 @@ export function StatusBadge({ kind, value }: { kind: keyof typeof STATUS_TONES; 
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-[18px] border border-dashed border-gray-300 bg-white px-6 py-10 text-center">
+    <div className="rounded-[22px] border border-dashed border-gray-300 bg-white/80 px-6 py-10 text-center">
       <p className="m-0 text-[14px] font-medium text-ink">{title}</p>
       {children && <div className="mx-auto mt-1 max-w-md text-[13px] text-gray-500">{children}</div>}
     </div>
@@ -158,7 +162,7 @@ export function Notice({ tone = "neutral", children }: { tone?: "neutral" | "bra
     brass: "border-brass/25 bg-brass-soft text-brass-dark",
     alert: "border-alert/25 bg-alert-soft text-alert-dark",
   }[tone];
-  return <div className={`rounded-md border px-3.5 py-2.5 text-[13px] ${styles}`}>{children}</div>;
+  return <div className={`rounded-xl border px-3.5 py-2.5 text-[13px] ${styles}`}>{children}</div>;
 }
 
 export function ErrorText({ children }: { children: ReactNode }) {
@@ -264,7 +268,7 @@ export function Pagination({
               Previous
             </a>
           ) : (
-            <span className={`${cell} border border-gray-200 text-gray-300`}>Previous</span>
+            <span className={`${cell} border border-gray-200 text-gray-400`}>Previous</span>
           )}
           {pageWindow(page, pages).map((p, i) =>
             p === "…" ? (
@@ -276,7 +280,7 @@ export function Pagination({
                 key={p}
                 href={href(p)}
                 aria-current={p === page ? "page" : undefined}
-                className={`${cell} tabular ${p === page ? "bg-accent font-medium text-white" : "text-gray-600 hover:bg-ink-soft hover:text-ink"}`}
+                className={`${cell} tabular ${p === page ? "bg-ink font-semibold text-white" : "text-gray-600 hover:bg-white hover:text-ink"}`}
               >
                 {p}
               </a>
@@ -287,7 +291,7 @@ export function Pagination({
               Next
             </a>
           ) : (
-            <span className={`${cell} border border-gray-200 text-gray-300`}>Next</span>
+            <span className={`${cell} border border-gray-200 text-gray-400`}>Next</span>
           )}
         </div>
       )}

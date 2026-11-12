@@ -1,6 +1,6 @@
-/* Inter (variable), bundled with the app (no Google Fonts request). Includes
-   Latin Extended, so Polish names render correctly. */
-@import "@fontsource-variable/inter";
+/* Plus Jakarta Sans (variable), the website's font, bundled with the app (no
+   Google Fonts request). Includes Latin Extended, so Polish names render. */
+@import "@fontsource-variable/plus-jakarta-sans";
 @import "tailwindcss";
 @config "../tailwind.config.ts";
 
@@ -14,10 +14,13 @@
   html,
   body {
     margin: 0;
-    background: #eef1f6;
-    color: #0f172a;
-    font-family: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-feature-settings: "cv11", "ss01";
+    /* Pale sky, like the light sections of getelliot.eu. */
+    background:
+      radial-gradient(1100px 520px at 85% -10%, rgba(196, 218, 250, 0.55), transparent 65%),
+      #eef2f8;
+    background-attachment: fixed;
+    color: #0f1f38;
+    font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -34,7 +37,7 @@
 
   /* One visible focus style everywhere, for keyboard users. */
   :where(a, button, input, select, textarea, summary):focus-visible {
-    outline: 2px solid #2563eb;
+    outline: 2px solid #2b5590;
     outline-offset: 2px;
     border-radius: 6px;
   }
@@ -44,32 +47,69 @@
   :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
     font: inherit;
     font-size: 14px;
-    color: #0f172a;
+    color: #0f1f38;
     background: #fff;
-    border: 1px solid #dfe3ea;
-    border-radius: 10px;
+    border: 1px solid #d9e1ec;
+    border-radius: 12px;
   }
   :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus {
-    border-color: #2563eb;
+    border-color: #2b5590;
     outline: none;
-    box-shadow: 0 0 0 3px #dce7fd;
+    box-shadow: 0 0 0 3px #d5e1f2;
   }
   :where(input, select, textarea):disabled {
-    background: #f1f3f7;
-    color: #98a2b3;
+    background: #f1f4f9;
+    color: #97a6bc;
   }
   :where(input[type="checkbox"], input[type="radio"]) {
-    accent-color: #2563eb;
+    accent-color: #2b5590;
   }
 }
 
-/* A white card on the grey page: the building block of every page. */
+/* A white card on the pale page: the building block of every page. */
 @layer components {
   .card {
-    background: #fff;
-    border: 1px solid #e8ebf1;
-    border-radius: 18px;
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.03);
+    background: linear-gradient(180deg, #fff, rgba(255, 255, 255, 0.92));
+    border: 1px solid rgba(15, 31, 56, 0.07);
+    border-radius: 22px;
+    box-shadow: 0 1px 2px rgba(15, 31, 56, 0.04), 0 22px 44px -34px rgba(15, 40, 80, 0.35);
+  }
+
+  /* The website's sky: deep navy at the top, lighter blue below. */
+  .sky {
+    background:
+      radial-gradient(900px 420px at 88% 0%, rgba(180, 206, 240, 0.45), transparent 62%),
+      radial-gradient(700px 400px at 0% 0%, rgba(2, 16, 40, 0.85), transparent 65%),
+      linear-gradient(180deg, #03183a 0%, #0b2851 45%, #2f5a92 100%);
+  }
+
+  /* Navy panel (the sidebar, dark cards). */
+  .navy {
+    background:
+      radial-gradient(420px 300px at 0% 0%, rgba(110, 155, 255, 0.16), transparent 70%),
+      linear-gradient(180deg, #03183a 0%, #061632 55%, #050f24 100%);
+  }
+
+  /* Gold, as on the website's buttons and headline. */
+  .gold-fill {
+    background: linear-gradient(135deg, #f3d4a4 0%, #d9a56c 55%, #b97e47 100%);
+  }
+  .gold-text {
+    background: linear-gradient(90deg, #f3d4a4, #d9a56c 60%, #e2b47e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* An icon on a soft gold tile. */
+  .gold-tile {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    color: #a06a33;
+    background: rgba(217, 165, 108, 0.16);
+    border: 1px solid rgba(176, 122, 66, 0.28);
   }
 }
 
