@@ -32,13 +32,16 @@ export function PageHeader({
   description,
   actions,
   tabs,
+  back,
 }: {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
   tabs?: ReactNode;
+  /** A Back button, shown above the title. */
+  back?: ReactNode;
 }) {
-  return <StickyHeader title={title} description={description} actions={actions} tabs={tabs} />;
+  return <StickyHeader title={title} description={description} actions={actions} tabs={tabs} back={back} />;
 }
 
 /**
@@ -140,6 +143,23 @@ const STATUS_TONES: Record<string, Record<string, Tone>> = {
   draft: { pending: "brass", approved: "ink", sent: "neutral", auto_sent: "neutral", rejected: "muted", blocked_needs_template: "alert" },
   conversation: { open: "ink", escalated: "alert", closed: "muted" },
 };
+
+// Lead stages as coloured pills (the same colours as the Overview's pipeline).
+const STAGE_PILL: Record<string, string> = {
+  NEW: "bg-gray-100 text-gray-700",
+  QUALIFYING: "bg-accent-soft text-accent-dark",
+  WARM: "bg-brass-soft text-brass-dark",
+  HOT: "bg-alert-soft text-alert-dark",
+  COLD: "bg-gray-100 text-gray-600",
+  CONVERTED: "bg-[#e3f6ea] text-[#1f6b40]",
+  LOST: "bg-gray-100 text-gray-500",
+};
+
+export function StagePill({ stage }: { stage: string }) {
+  return (
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${STAGE_PILL[stage] ?? STAGE_PILL.NEW}`}>{humanize(stage)}</span>
+  );
+}
 
 export function StatusBadge({ kind, value }: { kind: keyof typeof STATUS_TONES; value: string }) {
   return <Badge tone={STATUS_TONES[kind]?.[value] ?? "neutral"}>{humanize(value)}</Badge>;

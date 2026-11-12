@@ -14,8 +14,7 @@ export default async function EditListingPage({ params }: { params: { id: string
   if (!listing || !tenantId) notFound();
   return (
     <div>
-      <BackButton fallback="/dashboard/listings" />
-      <PageHeader
+      <PageHeader back={<BackButton fallback="/dashboard/listings" onDark />}
         title={listing.title}
         description={
           listing.times_suggested

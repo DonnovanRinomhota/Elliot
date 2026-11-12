@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Pencil, Sparkles } from "lucide-react";
+import { ChannelTile } from "../../../_ui/brands";
 import { StatusBadge, btn, humanize } from "../../../_ui/ui";
 
 // channel decides which table/RPC/send workflow this card talks to --
@@ -122,23 +124,22 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
   }
 
   const confidence = Number(draft.confidence);
-  const confidenceText = Number.isFinite(confidence) ? `${Math.round(confidence <= 1 ? confidence * 100 : confidence)}% confident` : null;
+  const pct = Number.isFinite(confidence) ? Math.round(confidence <= 1 ? confidence * 100 : confidence) : null;
   const recipient = isWhatsapp ? draft.to_wa_id : draft.to_email;
   const isPending = draft.status === "pending";
+  const isSpam = draft.category === "spam";
 
   return (
-    <article className={`card ${isPending ? "" : "opacity-90"}`}>
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
-        <div className="min-w-0">
-          <div className="text-[12.5px] text-gray-500">
-            {isWhatsapp ? "WhatsApp to" : "Email to"} <span className="text-ink">{recipient}</span>
-          </div>
-          {!isWhatsapp && <h2 className="m-0 mt-0.5 text-[15px] font-semibold text-ink">{draft.subject}</h2>}
-          <div className="mt-1 text-[12.5px] text-gray-500">
-            {[humanize(draft.category), confidenceText].filter(Boolean).join(", ")}
-          </div>
+    <article className={`card flex flex-col p-5 ${isPending ? "" : "opacity-90"}`}>
+      <header className="flex items-start gap-3">
+        <ChannelTile channel={draft.channel} size={38} />
+        <div className="min-w-0 flex-1">
+          <h2 className="m-0 truncate text-[15px] font-semibold text-ink">{isWhatsapp ? "WhatsApp reply" : draft.subject || "(no subject)"}</h2>
+          <p className="m-0 mt-0.5 truncate text-[12.5px] text-gray-500">
+            To <span className="text-ink">{recipient}</span>
+          </p>
           {draft.timeline && draft.timeline.length > 0 && (
-            <dl className="m-0 mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px]">
+            <dl className="m-0 mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px]">
               {draft.timeline.map(([label, at]) => (
                 <div key={label} className="flex gap-1.5">
                   <dt className="text-gray-500">{label}</dt>
@@ -148,80 +149,115 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
             </dl>
           )}
         </div>
-        <StatusBadge kind="draft" value={draft.status} />
+        <span className="flex flex-shrink-0 flex-col items-end gap-1.5">
+          <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${isSpam ? "bg-gray-100 text-gray-600" : "bg-brass-soft text-brass-dark"}`}>
+            {isSpam ? "Spam or automatic" : humanize(draft.category)}
+          </span>
+          {!isPending && <StatusBadge kind="draft" value={draft.status} />}
+        </span>
       </header>
 
-      <div className="px-5 py-4">
-        {draft.inbound && (
-          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+      <div className={`mt-4 grid gap-3 ${draft.inbound && !isEditing ? "md:grid-cols-2" : ""}`}>
+        {draft.inbound && !isEditing && (
+          <div className="min-w-0 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-4 py-3">
             <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-[12px] text-gray-500">
-              <span className="font-medium text-gray-600">Client&apos;s message · {draft.inbound.at}</span>
+              <span className="font-semibold text-gray-700">Client wrote · {draft.inbound.at}</span>
               {draft.conversation_id && (
                 <a href={`/dashboard/conversations/${draft.conversation_id}`} className="text-ink-600 underline">
                   Open conversation
                 </a>
               )}
             </div>
-            <p className="m-0 line-clamp-4 whitespace-pre-wrap text-[13.5px] leading-relaxed text-gray-700">{draft.inbound.content}</p>
+            <p className="m-0 line-clamp-6 whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-gray-700">{draft.inbound.content.trim() || "(empty message)"}</p>
           </div>
         )}
-        <div className="mb-1.5 text-[12px] font-medium text-gray-500">{isPending ? "Elliot's draft reply" : "Reply"}</div>
-        {isEditing ? (
-          <>
-            <label htmlFor={`body-${draft.id}`} className="mb-1.5 block text-[12.5px] font-medium text-gray-600">
-              Edit the message before sending
-            </label>
-            <textarea
-              id={`body-${draft.id}`}
-              value={editedBody}
-              onChange={(e) => setEditedBody(e.target.value)}
-              rows={9}
-              className="w-full p-3 leading-relaxed"
-            />
-          </>
-        ) : (
-          <p className="m-0 max-w-[72ch] whitespace-pre-wrap text-[14px] leading-relaxed text-gray-800">{draft.body}</p>
-        )}
-
-        {error && (
-          <p className="mb-0 mt-3 text-[13px] text-alert" role="alert">
-            {error}
-          </p>
-        )}
-
-        {draft.status === "blocked_needs_template" && (
-          <p className="mb-0 mt-3 rounded-md bg-alert-soft px-3 py-2 text-[13px] text-alert-dark">
-            {draft.send_error ? (
-              <>Not sent: WhatsApp refused it. {draft.send_error}</>
-            ) : (
-              <>
-                Not sent: more than 24 hours have passed since this contact last wrote on WhatsApp, and WhatsApp only
-                allows a free-form reply within 24 hours. Reply from the conversation once they write again, or by email.
-              </>
-            )}
-          </p>
-        )}
+        <div className="min-w-0 rounded-2xl border border-gold/45 bg-white px-4 py-3 shadow-[0_12px_26px_-20px_rgba(185,126,71,0.8)]">
+          <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-brass-dark">
+            <Sparkles size={12} aria-hidden="true" />
+            {isPending ? "Elliot's reply" : "Reply"}
+          </div>
+          {isEditing ? (
+            <>
+              <label htmlFor={`body-${draft.id}`} className="sr-only">
+                Edit the message before sending
+              </label>
+              <textarea
+                id={`body-${draft.id}`}
+                value={editedBody}
+                onChange={(e) => setEditedBody(e.target.value)}
+                rows={9}
+                className="w-full p-3 leading-relaxed"
+              />
+            </>
+          ) : (
+            <p className="m-0 whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-gray-800">{draft.body}</p>
+          )}
+        </div>
       </div>
 
-      {isPending ? (
-        <footer className="flex flex-wrap items-center gap-2 border-t border-gray-100 px-5 py-3">
-          <button type="button" onClick={handleApprove} disabled={busy} className={btn.primary}>
-            {isEditing ? "Save and send" : "Approve and send"}
-          </button>
-          <button type="button" onClick={() => setIsEditing((v) => !v)} disabled={busy} className={btn.secondary}>
-            {isEditing ? "Discard edits" : "Edit"}
-          </button>
-          <button type="button" onClick={handleReject} disabled={busy} className={`${btn.dangerGhost} ml-auto`}>
-            Reject
-          </button>
-        </footer>
-      ) : (
-        draft.status !== "blocked_needs_template" && (
-          <footer className="border-t border-gray-100 px-5 py-3 text-[12.5px] text-gray-500">
-            {draft.status === "auto_sent" ? "Sent automatically, no review needed." : `${humanize(draft.status)}. Nothing more to do.`}
-          </footer>
-        )
+      {error && (
+        <p className="mb-0 mt-3 text-[13px] text-alert" role="alert">
+          {error}
+        </p>
       )}
+
+      {draft.status === "blocked_needs_template" && (
+        <p className="mb-0 mt-3 rounded-xl bg-alert-soft px-3 py-2 text-[13px] text-alert-dark">
+          {draft.send_error ? (
+            <>Not sent: WhatsApp refused it. {draft.send_error}</>
+          ) : (
+            <>
+              Not sent: more than 24 hours have passed since this contact last wrote on WhatsApp, and WhatsApp only
+              allows a free-form reply within 24 hours. Reply from the conversation once they write again, or by email.
+            </>
+          )}
+        </p>
+      )}
+
+      <footer className="mt-4 flex flex-wrap items-center gap-2">
+        {pct != null && (
+          <span className="mr-auto flex items-center gap-2 text-[12.5px] text-gray-500">
+            <span className="h-1.5 w-20 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
+              <span className="gold-fill block h-full rounded-full" style={{ width: `${pct}%` }} />
+            </span>
+            {pct}% sure
+          </span>
+        )}
+        {isPending ? (
+          isSpam && !isEditing ? (
+            <>
+              <button type="button" onClick={handleApprove} disabled={busy} className={btn.secondary}>
+                Send anyway
+              </button>
+              <button type="button" onClick={handleReject} disabled={busy} className={btn.primary}>
+                Reject
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => setIsEditing((v) => !v)} disabled={busy} className={btn.secondary}>
+                {isEditing ? "Discard edits" : (
+                  <>
+                    <Pencil size={14} aria-hidden="true" /> Edit
+                  </>
+                )}
+              </button>
+              <button type="button" onClick={handleReject} disabled={busy} className={btn.danger}>
+                Reject
+              </button>
+              <button type="button" onClick={handleApprove} disabled={busy} className={btn.primary}>
+                {isEditing ? "Save and send" : "Approve and send"}
+              </button>
+            </>
+          )
+        ) : (
+          draft.status !== "blocked_needs_template" && (
+            <span className="text-[12.5px] text-gray-500">
+              {draft.status === "auto_sent" ? "Sent automatically, no review needed." : `${humanize(draft.status)}. Nothing more to do.`}
+            </span>
+          )
+        )}
+      </footer>
     </article>
   );
 }

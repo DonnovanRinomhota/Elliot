@@ -154,7 +154,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
         title="Inbox"
         description="Chats that need a person, and website chats happening right now. Open one to take over from Elliot. Updates by itself."
         actions={
-          <div className="flex rounded-md border border-gray-300 bg-white p-0.5 text-[13px]">
+          <div className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 text-[13px] shadow-sm">
             {[
               ["all", "Everyone"],
               ["mine", "Mine"],
@@ -163,7 +163,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
                 key={k}
                 href={k === "all" ? "/dashboard/inbox" : "/dashboard/inbox?view=mine"}
                 aria-current={view === k ? "page" : undefined}
-                className={`rounded px-3 py-1 no-underline ${view === k ? "bg-ink text-white" : "text-gray-600 hover:text-ink"}`}
+                className={`rounded-full px-3.5 py-1.5 font-medium no-underline ${view === k ? "bg-ink text-white" : "text-gray-600 hover:text-ink"}`}
               >
                 {l}
               </a>

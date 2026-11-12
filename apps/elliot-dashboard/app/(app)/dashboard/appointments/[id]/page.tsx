@@ -63,8 +63,7 @@ export default async function AppointmentPage({ params }: { params: { id: string
 
   return (
     <div>
-      <BackButton fallback="/dashboard/appointments" />
-      <PageHeader
+      <PageHeader back={<BackButton fallback="/dashboard/appointments" onDark />}
         title={`${a.kind === "valuation" ? "Valuation visit" : a.kind === "call" ? "Call" : "Viewing"} with ${client}`}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
