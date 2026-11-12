@@ -9,6 +9,7 @@ import ExitViewAs from "./dashboard/exit-view-as";
 import AskElliot, { AskElliotButton } from "./dashboard/ask-elliot";
 import { DEFAULT_TZ, dayKey, timeOf } from "@/lib/appointments";
 import { untilLabel } from "@/lib/support-access";
+import { trialBanner, type TrialFields } from "@/lib/trial";
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -44,7 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // or the one a platform admin chose with "Open their dashboard".
   const [{ data: tenantUser }, { data: tenant }, adminView, me, { data: supportGrant }] = await Promise.all([
     supabase.from("tenant_users").select("tenant_id, email, role, full_name").eq("auth_user_id", user.id).maybeSingle(),
-    supabase.from("tenants").select("id, name, timezone, assistant_mode").maybeSingle(),
+    supabase.from("tenants").select("id, name, timezone, assistant_mode, plan, status, trial_started_at, trial_ends_at").maybeSingle(),
     getAdminView(supabase),
     getMembership(supabase, user.id),
     // 0040: how long the agency's permission lasts, for the "viewing" banner.
@@ -58,10 +59,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .select("id", { count: "exact", head: true })
     .neq("status", "resolved");
 
-  const { count: pendingApprovals } = await supabase
-    .from("email_drafts")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending");
+  // Emails and WhatsApp messages waiting for approval (the Approvals page shows both).
+  const [{ count: pendingEmails }, { count: pendingWhatsapp }] = await Promise.all([
+    supabase.from("email_drafts").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("whatsapp_drafts").select("id", { count: "exact", head: true }).eq("status", "pending"),
+  ]);
+  const pendingApprovals = (pendingEmails ?? 0) + (pendingWhatsapp ?? 0);
+  // 0050: the agency's trial, if one is running or has ended.
+  const trial = trialBanner(tenant as TrialFields | null);
 
   // "Your day": today's viewings for the signed-in agent (the whole agency
   // when a platform admin is looking), done so far and what's next.
@@ -242,6 +247,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               . What you change here changes for them, and they see each part you open in Settings.
             </span>
             <ExitViewAs />
+          </div>
+        )}
+        {trial && (
+          <div
+            role={trial.tone === "alert" ? "alert" : "status"}
+            className={`mx-3 mt-3 rounded-2xl border px-4 py-2.5 text-[13px] md:ml-6 md:mr-6 ${
+              trial.tone === "alert"
+                ? "border-alert/25 bg-alert-soft text-alert-dark"
+                : trial.tone === "warning"
+                  ? "border-brass/25 bg-brass-soft text-brass-dark"
+                  : "border-gray-200 bg-white text-gray-600"
+            }`}
+          >
+            {trial.text}
           </div>
         )}
         <div className="w-full max-w-[1760px] px-4 py-6 md:px-6 md:py-7 lg:px-7">{children}</div>

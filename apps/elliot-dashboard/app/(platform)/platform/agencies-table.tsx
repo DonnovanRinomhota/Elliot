@@ -13,6 +13,7 @@ import {
 import { Badge, EmptyState, PER_PAGE, btn, pageWindow, timeAgo, type Tone } from "../../_ui/ui";
 
 const STATE_TONE: Record<AccountState, Tone> = {
+  setup: "neutral",
   trial: "brass",
   trial_ended: "alert",
   active: "ink",
@@ -112,7 +113,8 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
             </thead>
             <tbody>
               {pageRows.map(({ r, s, issues, cost }, i) => {
-                const dateIso = r.plan === "trial" ? r.trial_ends_at : r.paid_until;
+                // 0050: a trial date only means something once the trial was started.
+                const dateIso = r.plan === "trial" ? (r.trial_started_at ? r.trial_ends_at : null) : r.paid_until;
                 return (
                   <tr key={r.tenant_id} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
                     <td className="tabular px-4 py-3 text-gray-400">{offset + i + 1}</td>

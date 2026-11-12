@@ -27,9 +27,17 @@ export type TenantOverviewRow = {
   output_tokens: number | string;
   ai_replies: number | string;
   last_activity_at: string | null;
+  // 0050
+  trial_started_at?: string | null;
+  service_state?: string | null;
+  failures_7d?: number | string;
+  failure_kinds?: string | null;
+  calendar_problems?: number | string;
+  whatsapp_connected?: boolean | null;
 };
 
 export type AccountState =
+  | "setup"
   | "trial"
   | "trial_ended"
   | "active"
@@ -39,8 +47,9 @@ export type AccountState =
   | "cancelled";
 
 export const ACCOUNT_STATE_LABEL: Record<AccountState, string> = {
+  setup: "Setting up",
   trial: "Free trial",
-  trial_ended: "Trial ended",
+  trial_ended: "Trial ended, paused",
   active: "Active",
   past_due: "Past due",
   complimentary: "Complimentary",
@@ -50,19 +59,23 @@ export const ACCOUNT_STATE_LABEL: Record<AccountState, string> = {
 
 /**
  * One label per agency, from plan + status + dates.
- * Suspended/cancelled win; then trial (by end date); complimentary never
+ * Suspended/cancelled win; then trial: "setting up" until a trial is started
+ * from the control panel (0050), then by end date; complimentary never
  * expires; paid plans are past due once paid_until has passed. A paid plan
  * with no paid_until yet counts as active (you haven't recorded a payment
  * date, not "they haven't paid").
  */
 export function accountState(
-  t: Pick<TenantOverviewRow, "plan" | "status" | "trial_ends_at" | "paid_until">,
+  t: Pick<TenantOverviewRow, "plan" | "status" | "trial_ends_at" | "paid_until" | "trial_started_at">,
   now: Date = new Date()
 ): AccountState {
   if (t.status === "cancelled") return "cancelled";
   if (t.status === "suspended") return "suspended";
   if (t.plan === "complimentary") return "complimentary";
   if (t.plan === "trial") {
+    // Only trials started from the control panel run a clock (and pause
+    // Elliot when they end). Older agencies' default dates mean nothing.
+    if (!t.trial_started_at) return "setup";
     return t.trial_ends_at && new Date(t.trial_ends_at) < now ? "trial_ended" : "trial";
   }
   if (t.paid_until && new Date(t.paid_until) < now) return "past_due";
@@ -103,17 +116,31 @@ export function aiCostUsd(inputTokens: number, outputTokens: number, prices = ai
 /** Problems worth a look, in plain words. Empty = healthy. */
 export function healthIssues(t: TenantOverviewRow, state: AccountState, now: Date = new Date()): string[] {
   const issues: string[] = [];
-  const n = (v: number | string) => Number(v || 0);
+  const n = (v: number | string | null | undefined) => Number(v || 0);
+  if (state === "trial_ended") issues.push("Elliot paused: trial ended");
+  if (n(t.failures_7d) > 0) issues.push(`${n(t.failures_7d)} failure${n(t.failures_7d) === 1 ? "" : "s"} this week`);
+  if (n(t.calendar_problems) > 0) issues.push(`${n(t.calendar_problems)} calendar${n(t.calendar_problems) === 1 ? "" : "s"} Elliot can't book into`);
   if (n(t.failed_crm_syncs) > 0) issues.push(`${n(t.failed_crm_syncs)} CRM sync failed`);
   if (n(t.tool_errors) > 0) issues.push(`${n(t.tool_errors)} tool error${n(t.tool_errors) === 1 ? "" : "s"}`);
   if (n(t.open_escalations) >= 5) issues.push(`${n(t.open_escalations)} open escalations`);
   if (n(t.listings_count) === 0 && (t.industry || "").includes("real")) issues.push("No listings");
-  const live = state === "active" || state === "trial" || state === "complimentary";
+  // AI cost (USD) against what they pay (EUR, close enough for a warning).
+  const price = n(t.monthly_price);
+  if (price > 0 && (state === "active" || state === "past_due")) {
+    const share = aiCostUsd(n(t.input_tokens), n(t.output_tokens)) / price;
+    if (share >= 0.3) issues.push(`AI cost ${Math.round(share * 100)}% of their price`);
+  }
+  const live = state === "active" || state === "trial" || state === "complimentary" || state === "setup";
   if (live) {
     if (!t.last_activity_at) issues.push("No conversations yet");
     else if (daysUntil(t.last_activity_at, now) <= -7) issues.push("Quiet for 7+ days");
   }
   return issues;
+}
+
+/** AI cost in USD for every agency together, over the overview's period. */
+export function totalAiCostUsd(rows: TenantOverviewRow[]): number {
+  return rows.reduce((sum, r) => sum + aiCostUsd(Number(r.input_tokens || 0), Number(r.output_tokens || 0)), 0);
 }
 
 /** Monthly recurring revenue: paying agencies that are active (not past due). */

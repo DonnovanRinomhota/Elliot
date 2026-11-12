@@ -10,6 +10,8 @@ import {
 import { Badge, Panel, formatDate, humanize, timeAgo } from "../../../../_ui/ui";
 import TenantForm from "./tenant-form";
 import ViewAsButton from "./view-as-button";
+import StartTrial from "./start-trial";
+import { PROBLEM_FILTER, describeProblem, problemDetail } from "@/lib/problems";
 import { describeEvent } from "@/lib/platform-events";
 import BackButton from "@/app/_ui/back-button";
 import { supportAccessState, untilLabel } from "@/lib/support-access";
@@ -21,12 +23,12 @@ const n = (v: number | string | null | undefined) => Number(v || 0);
 export default async function TenantDetailPage({ params }: { params: { id: string } }) {
   const admin = createAdminClient();
 
-  const [{ data: overview }, { data: tenant }, { data: users }, { data: errors }, { data: crmFailures }, { data: events }, { data: grant }, { data: visits }, { data: settings }] =
+  const [{ data: overview }, { data: tenant }, { data: users }, { data: errors }, { data: crmFailures }, { data: events }, { data: grant }, { data: visits }, { data: settings }, { data: checklist }, { data: failures }] =
     await Promise.all([
       admin.rpc("platform_tenant_overview", { p_days: 30 }),
       admin
         .from("tenants")
-        .select("id, name, slug, industry, plan, status, timezone, created_at, trial_ends_at, paid_until, monthly_price, contact_email, notes, assistant_mode")
+        .select("id, name, slug, industry, plan, status, timezone, created_at, trial_ends_at, trial_started_at, paid_until, monthly_price, contact_email, notes, assistant_mode")
         .eq("id", params.id)
         .maybeSingle(),
       admin
@@ -63,11 +65,26 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
         .order("viewed_at", { ascending: false })
         .limit(8),
       admin.from("platform_settings").select("support_permission_required").maybeSingle(),
+      // 0050: what is set up, read from their own data.
+      admin.rpc("onboarding_checklist", { p_tenant_id: params.id }),
+      // 0050: failures Elliot recorded for this agency this week.
+      admin
+        .from("audit_log")
+        .select("id, event_type, details, created_at")
+        .eq("tenant_id", params.id)
+        .or(PROBLEM_FILTER)
+        .gte("created_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(8),
     ]);
 
   if (!tenant) notFound();
   const row = ((overview ?? []) as TenantOverviewRow[]).find((r) => r.tenant_id === params.id);
   const state = row ? accountState(row) : accountState(tenant as any);
+  type Step = { step: number; item: string; required: boolean; done: boolean; detail: string | null; where_to: string };
+  const steps = (checklist ?? []) as Step[];
+  const missing = steps.filter((s) => s.required && !s.done && s.step !== 13);
+  const trialRunning = (tenant as any).plan === "trial" && !!(tenant as any).trial_started_at;
   const issues = row ? healthIssues(row, state) : [];
   const access = supportAccessState(grant, (tenant as any).assistant_mode, new Date(), settings?.support_permission_required ?? true);
 
@@ -78,7 +95,7 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
         ["Hot leads now", n(row.hot_leads_count)],
         ["Viewings booked", n(row.appointments_count)],
         ["Open escalations", n(row.open_escalations)],
-        ["Emails awaiting approval", n(row.pending_approvals)],
+        ["Messages awaiting approval", n(row.pending_approvals)],
         ["AI replies", n(row.ai_replies)],
         ["AI cost", `$${aiCostUsd(n(row.input_tokens), n(row.output_tokens)).toFixed(2)}`],
       ]
@@ -99,6 +116,56 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="grid min-w-0 content-start gap-6">
+          <Panel
+            title="Go-live checklist"
+            action={
+              steps.length ? (
+                <span className={`text-[12.5px] ${missing.length ? "text-brass-dark" : "text-ink"}`}>
+                  {missing.length ? `${missing.length} required step${missing.length === 1 ? "" : "s"} left` : "Ready to go live"}
+                </span>
+              ) : undefined
+            }
+            flush
+          >
+            {!steps.length ? (
+              <p className="m-0 px-5 py-4 text-[13px] text-gray-500">Run migration 0050 in Supabase to see this agency&apos;s checklist.</p>
+            ) : (
+              <>
+                <ol className="m-0 list-none p-0 text-[13px]">
+                  {steps.map((s) => (
+                    <li key={s.step} className="flex gap-3 border-t border-gray-100 px-5 py-2.5 first:border-t-0">
+                      <span
+                        aria-label={s.done ? "Done" : "Not done"}
+                        className={`mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                          s.done ? "bg-ink text-white" : s.required ? "border border-brass text-brass-dark" : "border border-gray-300 text-gray-400"
+                        }`}
+                      >
+                        {s.done ? "✓" : ""}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block ${s.done ? "text-ink" : "text-ink"}`}>
+                          {s.item}
+                          {!s.required && <span className="ml-1.5 text-[12px] text-gray-400">if they use it</span>}
+                        </span>
+                        <span className="block break-words text-[12.5px] text-gray-500">
+                          {s.detail}
+                          {!s.done && <span className="text-gray-400"> · {s.where_to}</span>}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-5 py-3">
+                  <p className="m-0 max-w-md text-[12.5px] text-gray-500">
+                    Start the trial when Elliot goes live for them. When it ends, Elliot pauses: clients get a short holding reply and
+                    their messages wait in the dashboard, until you change the plan.
+                  </p>
+                  <StartTrial tenantId={tenant.id} running={trialRunning} endsAt={trialRunning ? (tenant as any).trial_ends_at : null} />
+                </div>
+              </>
+            )}
+          </Panel>
+
           <Panel title="Account and billing">
             <TenantForm tenant={tenant as any} />
           </Panel>
@@ -115,13 +182,20 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
           </Panel>
 
           <Panel title="Recent problems" flush>
-            {issues.length === 0 && !errors?.length && !crmFailures?.length ? (
+            {issues.length === 0 && !errors?.length && !crmFailures?.length && !failures?.length ? (
               <p className="m-0 px-5 py-4 text-[13px] text-gray-500">Nothing wrong that Elliot can see.</p>
             ) : (
               <ul className="m-0 list-none p-0 text-[13px]">
                 {issues.map((i) => (
                   <li key={i} className="border-t border-gray-100 px-5 py-3 first:border-t-0 text-alert">
                     {i}
+                  </li>
+                ))}
+                {(failures ?? []).map((f: any) => (
+                  <li key={f.id} className="border-t border-gray-100 px-5 py-3 first:border-t-0">
+                    <span className="font-medium text-ink">{describeProblem(f.event_type).what}</span>{" "}
+                    <span className="text-gray-500">{timeAgo(f.created_at)}</span>
+                    {problemDetail(f.details) && <div className="break-words text-gray-600">{problemDetail(f.details)}</div>}
                   </li>
                 ))}
                 {(errors ?? []).map((e: any) => (
