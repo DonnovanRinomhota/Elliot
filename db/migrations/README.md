@@ -74,6 +74,7 @@ set supabase_url = …`); the feature doc for each migration lists its set-up.
 | 0048 | Reliability: follow-up steps claimed once, STOP for follow-ups, escalation when Elliot can't answer, failed tools and WhatsApp deliveries logged, spaced-out CRM retries ([reliability](../../docs/reliability.md)) |
 | 0049 | Migration record: `migration_status()`, `schema_migrations`, `begin_migration()` ([releasing](../../RELEASING.md)) |
 | 0050 | Trials that pause, go-live checklist, failures per agency in the control panel ([onboarding](../../docs/onboarding.md)) |
+| 0051 | Data protection: a client's copy and deletion, retention period, deleting a cancelled agency ([data protection](../../docs/data-protection.md)) |
 
 ## Tests
 
