@@ -803,7 +803,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- 0048: Meta sent several messages in one delivery and only the first is\n-- answered. Logged so it appears in the alerts and someone reads the chat.\ninsert into audit_log (tenant_id, actor_type, actor_id, event_type, details)\nselect ac.tenant_id, 'system', 'workflow_25', 'whatsapp_unanswered_failed',\n       jsonb_build_object('messages_not_answered', $2::int, 'from_wa_id', $3)\nfrom ai_config ac where ac.whatsapp_phone_number_id = nullif($1, '') limit 1;",
+        "query": "-- 0048: Meta sent several messages in one delivery and only the first is\n-- answered. Logged so it appears in the alerts and someone reads the chat.\ninsert into audit_log (tenant_id, actor_type, actor_id, event_type, details)\nselect ac.tenant_id, 'system', 'workflow_25', 'whatsapp_unanswered_failed',\n       jsonb_build_object('messages_not_answered', $2::int, 'from_wa_id', $3::text)\nfrom ai_config ac where ac.whatsapp_phone_number_id = nullif($1, '') limit 1;",
         "options": {
           "queryReplacement": "={{ [ $json.extra_phone_number_id, Number($json.extra_messages) || 0, $json.from_wa_id || '' ] }}"
         }

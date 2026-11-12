@@ -1,9 +1,17 @@
 # Database migrations
 
 Postgres schema, row-level security and functions for Supabase. Run every file
-in number order in **Supabase → SQL Editor** (paste the whole file, Run). Each
-file is one transaction and safe to run again. Nothing runs them for you: a
-merged migration isn't live until you run it.
+in number order in **Supabase → SQL Editor** (paste the whole file, Run).
+Nothing runs them for you: a merged migration isn't live until you run it. The
+release steps, backups and what to do if something goes wrong are in
+[`RELEASING.md`](../../RELEASING.md).
+
+**Which ones has the database got?** `select * from migration_status();`
+(from 0049 on). **Never run one again**: thirteen of the older files fail on
+a second run, and others silently replace newer function definitions with
+older ones (re-running 0009 would undo part of 0047). From 0049 on, a
+migration refuses to run twice or before the one it needs, and changes
+nothing when it refuses.
 
 Some files end with a one-off step (for example 0046's `update platform_settings
 set supabase_url = …`); the feature doc for each migration lists its set-up.
@@ -64,6 +72,7 @@ set supabase_url = …`); the feature doc for each migration lists its set-up.
 | 0046 | Email attachments (private Storage bucket) |
 | 0047 | Security: agency isolation, roles, public key locked down ([security](../../docs/security.md)) |
 | 0048 | Reliability: follow-up steps claimed once, STOP for follow-ups, escalation when Elliot can't answer, failed tools and WhatsApp deliveries logged, spaced-out CRM retries ([reliability](../../docs/reliability.md)) |
+| 0049 | Migration record: `migration_status()`, `schema_migrations`, `begin_migration()` ([releasing](../../RELEASING.md)) |
 
 ## Tests
 
@@ -73,12 +82,22 @@ wraps itself in a transaction, rolls back, and ends with "00NN checks
 passed". Some need Supabase's `storage` and `auth` schemas (present in every
 Supabase project; the tests create small stand-ins if missing).
 `db/seed/dev_seed.sql` adds example agencies for local development.
+`test_follow_up_engine.sql` and `test_rls_isolation.sql` are older manual
+walk-throughs, not automatic tests (0047 and 0048 cover what they checked).
 
-**After every new migration run `test_0047_tenant_isolation.sql`.** It fails
-if a table has no RLS, if the public key (`anon`) gains access to anything,
-or if a signed-in user can run a function that takes an agency ID.
+**GitHub runs all of them on every pull request** (`db/test/run.sh`): it
+builds a new database from `db/test/bootstrap.sql` (a stand-in for a fresh
+Supabase project, including Supabase's default grants), runs every migration
+in order, then every `test_0*.sql`. `test_0047_tenant_isolation.sql` is the
+guard for new migrations: it fails if a table has no RLS, if the public key
+(`anon`) gains access to anything, or if a signed-in user can run a function
+that takes an agency ID.
 
 ## Rules for new migrations
+
+- Start with `begin;` and `select begin_migration('NNNN', 'short_name',
+  'previous');`, end with `commit;`. The header says how to undo it. Template
+  in [`RELEASING.md`](../../RELEASING.md#writing-a-new-migration).
 
 - New table with agency data: `tenant_id`, `enable row level security`, a
   policy on `current_tenant_id()`. Nothing for `anon`.

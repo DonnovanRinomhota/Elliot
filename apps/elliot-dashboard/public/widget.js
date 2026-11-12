@@ -130,6 +130,7 @@
     ".panel{position:fixed;bottom:88px;right:20px;width:340px;max-width:calc(100vw - 40px);height:480px;max-height:calc(100vh - 120px);background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);display:none;flex-direction:column;overflow:hidden;z-index:2147483000}" +
     ".panel.open{display:flex}" +
     ".header{background:" + ACCENT + ";color:#fff;padding:14px 16px;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}" +
+    ".header .title{display:block}.header .ai{display:block;font-size:11.5px;font-weight:400;opacity:.8;margin-top:2px}" +
     ".header button{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;padding:2px 6px}" +
     ".messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#f7f7f8}" +
     ".msg{max-width:80%;padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}" +
@@ -166,7 +167,7 @@
   var panel = document.createElement("div");
   panel.className = "panel";
   panel.innerHTML =
-    '<div class="header"><span></span><button aria-label="Close chat">\u00d7</button></div>' +
+    '<div class="header"><div><span class="title"></span><small class="ai"></small></div><button aria-label="Close chat">\u00d7</button></div>' +
     '<div class="messages"></div>' +
     '<div class="inputRow">' +
     '<textarea rows="1" placeholder="Type a message..."></textarea>' +
@@ -174,7 +175,12 @@
     "</div>";
   root.appendChild(panel);
 
-  panel.querySelector(".header span").textContent = TITLE;
+  panel.querySelector(".header .title").textContent = TITLE;
+  // EU AI Act Art. 50(1): visitors see they're talking to an AI before they write.
+  var PAGE_PL = /^pl\b/i.test(document.documentElement.lang || navigator.language || "");
+  panel.querySelector(".header .ai").textContent = PAGE_PL
+    ? "Asystent AI \u00b7 w ka\u017cdej chwili mo\u017cna poprosi\u0107 o cz\u0142owieka"
+    : "AI assistant \u00b7 ask for a person any time";
   var messagesEl = panel.querySelector(".messages");
   var textareaEl = panel.querySelector("textarea");
   var sendBtn = panel.querySelector(".inputRow button");

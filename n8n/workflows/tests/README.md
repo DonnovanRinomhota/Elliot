@@ -1,6 +1,8 @@
 # Workflow Logic Tests
 
-n8n Code node logic extracted and tested standalone with plain `node`, since n8n workflows can't be unit tested in place. Run any file directly: `node <filename>.js`.
+n8n Code node logic extracted and tested standalone with plain `node`, since n8n workflows can't be unit tested in place. Run them all with `npm ci && npm test` in this folder (GitHub runs this on every pull request), or one file with `node <filename>.js`.
+
+The SQL inside the workflows is checked separately, against the database the migrations build: `db/test/check_workflow_sql.py` plans every query, and `db/test/journeys.py` runs the real queries through the seven customer journeys (both run by `db/test/run.sh`).
 
 - `chunking_logic.test.js` — tests the paragraph-based chunking algorithm used in `08-knowledge-ingestion.json`'s "Chunk Text" node. Covers: normal multi-paragraph text, empty input, a single short paragraph, and a known limitation (a single long paragraph with no blank-line breaks doesn't get split and produces an oversized chunk — see `docs/workflow-specs/08-knowledge-ingestion.md` for the fix path if this becomes a real problem).
 

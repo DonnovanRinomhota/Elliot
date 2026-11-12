@@ -1,6 +1,7 @@
 # secrets
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 
@@ -21,3 +22,6 @@ Thumbs.db
 # logs
 *.log
 npm-debug.log*
+
+# TypeScript build cache
+tsconfig.tsbuildinfo

@@ -1,0 +1,106 @@
+# Runs on every pull request (and on main after a merge). A red cross on the
+# pull request means: don't merge until it's fixed.
+#
+# Nothing here can reach production: no secrets are configured, the database
+# is a throw-away Postgres inside the job, and nothing is deployed. Merging
+# still does NOT run migrations on Supabase or import workflows into n8n; see
+# RELEASING.md.
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    name: No keys; every setting documented
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: No keys in the repository (it is public)
+        run: python3 scripts/check-secrets.py
+      - name: Every environment variable the dashboard reads is in .env.example
+        run: python3 scripts/check-env-example.py
+
+  dashboard:
+    name: Dashboard (tests, types, lint, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/elliot-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/elliot-dashboard/package-lock.json
+      - run: npm ci
+      - name: Unit tests
+        run: npm test
+      - name: TypeScript
+        run: npx tsc --noEmit -p .
+      - name: ESLint
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+        env:
+          # Placeholders: the build only needs the variables to exist. The real
+          # values live in Vercel.
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+          NEXT_TELEMETRY_DISABLED: 1
+
+  workflows:
+    name: n8n workflow tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: n8n/workflows/tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm test
+
+  database:
+    name: Migrations and database tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        # Postgres 16 with pgvector, like Supabase. Lives only for this job.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: psql
+        run: command -v psql || (sudo apt-get update -q && sudo apt-get install -y -q postgresql-client)
+      - name: Every migration on an empty database, then every database test
+        run: db/test/run.sh
