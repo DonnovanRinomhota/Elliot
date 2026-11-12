@@ -721,8 +721,8 @@
             "tenant_id": "={{ $('Merge Tenant Context').first().json.tenant_id }}",
             "date_range_start": "={{ $('Extract Tool Call').item.json.tool_input.date_range_start }}",
             "date_range_end": "={{ $('Extract Tool Call').item.json.tool_input.date_range_end }}",
-            "duration_minutes": "={{ ({ intro: 15, demo: 30 })[$('Extract Tool Call').item.json.tool_input.call_type] || '' }}",
-            "min_notice_minutes": "={{ $('Merge Tenant Context').first().json.assistant_mode === 'sales' ? 120 : '' }}"
+            "duration_minutes": "={{ String(({ intro: 15, demo: 30 })[$('Extract Tool Call').item.json.tool_input.call_type] || '') }}",
+            "min_notice_minutes": "={{ $('Merge Tenant Context').first().json.assistant_mode === 'sales' ? '120' : '' }}"
           },
           "matchingColumns": [],
           "schema": [
