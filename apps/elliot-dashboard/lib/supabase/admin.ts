@@ -10,6 +10,9 @@
 //   - team invites/removal (caller must be an agency admin; needs auth.admin),
 //   - GET /api/widget/messages (public; returns only team replies for one
 //     conversation that matches the agency slug).
+//   - removing a deleted client's stored files (POST /api/contacts/:id/erase;
+//     only the paths the database returned after it checked the caller is
+//     an admin of that agency), and deleting a cancelled agency (platform).
 //
 // Everything else in the dashboard goes through the regular anon-key client
 // (lib/supabase/client.ts or server.ts) so RLS keeps doing its job.

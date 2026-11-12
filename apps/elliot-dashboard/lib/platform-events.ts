@@ -19,6 +19,14 @@ export function describeEvent(type: string, details: any): string {
       return `Invited ${details?.email ?? "a team member"}`;
     case "team.member_removed":
       return `Removed ${details?.email ?? "a team member"}`;
+    case "privacy.client_exported":
+      return "Downloaded a client's data (access request)";
+    case "privacy.client_erased":
+      return details?.reason === "retention"
+        ? `Deleted an inactive client (retention period): ${details?.messages ?? 0} messages`
+        : `Deleted a client on request: ${details?.conversations ?? 0} conversations, ${details?.messages ?? 0} messages`;
+    case "platform.trial_started":
+      return `Started a ${details?.days ?? 7}-day trial`;
     default:
       return humanize(type.replace(/\./g, " "));
   }
