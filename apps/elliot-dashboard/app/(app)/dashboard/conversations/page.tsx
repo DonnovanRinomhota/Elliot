@@ -5,6 +5,7 @@ import { DEFAULT_TZ, dayKey, personName, timeOf } from "@/lib/appointments";
 import { conversationActivity, lookingFor } from "@/lib/conversation-summary";
 import FolderTabs, { FolderTab } from "../folder-tabs";
 import { ErasedNotice } from "./[id]/client-data";
+import ArchiveButton from "./archive-button";
 import { ChannelTile } from "../../../_ui/brands";
 import { ElliotMark } from "../../../_ui/elliot-logo";
 import { EmptyState, PageHeader, Pagination, StagePill, btn, humanize, paginate, timeAgo } from "../../../_ui/ui";
@@ -16,6 +17,8 @@ type Conv = {
   created_at: string;
   assigned_human: string | null;
   contact_id: string | null;
+  /** 0052: set when the conversation is archived. */
+  archived_at?: string | null;
   contact: { name: string | null; email: string | null; phone: string | null } | null;
 };
 
@@ -41,16 +44,19 @@ export default async function ConversationsPage({
 }) {
   const supabase = createClient();
 
-  const [{ data: conversations, error }, { data: spamRows }, { data: tenantRow }] = await Promise.all([
-    supabase
-      .from("conversations")
-      .select("id, channel, status, created_at, assigned_human, contact_id, contact:contacts(name, email, phone)")
-      .order("created_at", { ascending: false }),
+  const CONVERSATION = "id, channel, status, created_at, assigned_human, contact_id, contact:contacts(name, email, phone)";
+  const [firstTry, { data: spamRows }, { data: tenantRow }] = await Promise.all([
+    supabase.from("conversations").select(`${CONVERSATION}, archived_at`).order("created_at", { ascending: false }),
     // Emails Elliot classed as spam (automatic notifications and the like): their conversations aren't clients.
     supabase.from("email_drafts").select("conversation_id").eq("category", "spam"),
     supabase.from("tenants").select("timezone").maybeSingle(),
   ]);
 
+  // Before database update 0052 there's no archived_at (nothing is archived): read without it.
+  const { data: conversations, error } =
+    firstTry.error && /archived_at/.test(firstTry.error.message)
+      ? await supabase.from("conversations").select(CONVERSATION).order("created_at", { ascending: false })
+      : firstTry;
   if (error) {
     return <p className="text-[13px] text-alert">Couldn&apos;t load conversations: {error.message}</p>;
   }
@@ -82,7 +88,9 @@ export default async function ConversationsPage({
   }
 
   // Channels the agency actually has, with counts.
-  const channelCounts = CHANNELS.map((ch) => ({ ...ch, count: scoped.filter((c) => c.channel === ch.key).length })).filter((ch) => ch.count > 0);
+  // Counted within what the tabs show: the archive, or everything else.
+  const inView = scoped.filter((c) => (searchParams.status === "archived" ? !!c.archived_at : !c.archived_at));
+  const channelCounts = CHANNELS.map((ch) => ({ ...ch, count: inView.filter((c) => c.channel === ch.key).length })).filter((ch) => ch.count > 0);
   const channel = CHANNELS.some((ch) => ch.key === searchParams.channel) ? (searchParams.channel as string) : null;
   if (channel) scoped = scoped.filter((c) => c.channel === channel);
 
@@ -91,12 +99,19 @@ export default async function ConversationsPage({
   const distinctStatuses = Array.from(new Set(((conversations ?? []) as unknown as Conv[]).map((c) => c.status))).sort(
     (a, b) => (STATUS_ORDER.indexOf(a) + 1 || 99) - (STATUS_ORDER.indexOf(b) + 1 || 99)
   );
+  // Archived conversations (0052) only show in their own tab.
+  const archived = scoped.filter((c) => c.archived_at);
+  const current = scoped.filter((c) => !c.archived_at);
   const tabs: FolderTab[] = [
-    { key: "all", label: "All", count: scoped.length },
-    ...distinctStatuses.map((s) => ({ key: s, label: STATUS_PILL[s]?.[0] ?? humanize(s), count: scoped.filter((c) => c.status === s).length })),
+    { key: "all", label: "All", count: current.length },
+    ...distinctStatuses
+      .map((s) => ({ key: s, label: STATUS_PILL[s]?.[0] ?? humanize(s), count: current.filter((c) => c.status === s).length }))
+      // Closed ones are usually all archived: don't show an empty Closed tab.
+      .filter((t) => t.count > 0 || t.key !== "closed" || searchParams.status === "closed"),
+    ...(archived.length || searchParams.status === "archived" ? [{ key: "archived", label: "Archived", count: archived.length }] : []),
   ];
   const activeStatus = tabs.some((t) => t.key === searchParams.status) ? (searchParams.status as string) : "all";
-  const visible = activeStatus === "all" ? scoped : scoped.filter((c) => c.status === activeStatus);
+  const visible = activeStatus === "archived" ? archived : activeStatus === "all" ? current : current.filter((c) => c.status === activeStatus);
 
   const pg = paginate(visible, searchParams.page);
   const items = pg.items;
@@ -198,8 +213,10 @@ export default async function ConversationsPage({
                 Show all
               </a>
             </>
+          ) : activeStatus === "archived" ? (
+            "Finished conversations. One comes back to the main list by itself when the client writes again or someone from your team replies."
           ) : (
-            "Every chat, WhatsApp and email thread Elliot has had with your clients."
+            "Every chat, WhatsApp and email thread Elliot has had with your clients. Closed ones go to Archived."
           )
         }
         actions={
@@ -271,7 +288,7 @@ export default async function ConversationsPage({
                   lastRole: last?.role,
                   tz,
                 });
-                const [statusLabel, statusClass] = isNotClient ? ["Not a client", "bg-gray-100 text-gray-500"] : STATUS_PILL[c.status] ?? [humanize(c.status), "bg-gray-100 text-gray-600"];
+                const [statusLabel, statusClass] = c.archived_at ? ["Archived", "bg-gray-100 text-gray-500"] : isNotClient ? ["Not a client", "bg-gray-100 text-gray-500"] : STATUS_PILL[c.status] ?? [humanize(c.status), "bg-gray-100 text-gray-600"];
                 const isSel = sel?.id === c.id;
                 const body = (
                   <>
@@ -341,7 +358,7 @@ export default async function ConversationsPage({
             <div className="mt-4 grid grid-cols-3 gap-2">
               {[
                 ["Looking for", selectedLead ? lookingFor(selectedLead.qualification_answers) : null],
-                ["Status", notClient.has(sel.id) ? "Not a client" : STATUS_PILL[sel.status]?.[0] ?? humanize(sel.status)],
+                ["Status", sel.archived_at ? "Archived" : notClient.has(sel.id) ? "Not a client" : STATUS_PILL[sel.status]?.[0] ?? humanize(sel.status)],
                 ["Started", `${dayKey(sel.created_at, tz) === dayKey(new Date(), tz) ? "Today" : new Date(sel.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: tz })} ${timeOf(sel.created_at, tz)}`],
               ].map(([label, value]) => (
                 <div key={label as string} className="min-w-0 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-3 py-2.5">
@@ -385,8 +402,9 @@ export default async function ConversationsPage({
                 <ElliotMark size={15} />
               </span>
               <p className={`m-0 min-w-0 flex-1 text-[13px] ${selActivity ? TONE_TEXT[selActivity.tone] : "text-gray-600"}`}>{selActivity?.text}</p>
+              <ArchiveButton conversationId={sel.id} archived={!!sel.archived_at} />
               <a href={`/dashboard/conversations/${sel.id}`} className={`${btn.primary} !h-10`}>
-                Open conversation <ArrowRight size={15} aria-hidden="true" />
+                Open <ArrowRight size={15} aria-hidden="true" />
               </a>
             </div>
           </section>
