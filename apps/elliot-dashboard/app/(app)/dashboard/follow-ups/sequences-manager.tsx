@@ -163,7 +163,7 @@ function SequenceCard({
         ) : (
           <ol className="m-0 grid list-none gap-2 p-0">
             {steps.map((s, i) => (
-              <li key={i} className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-3 rounded-xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-3 py-2">
+              <li key={i} className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-3 rounded-xl border border-white/10 bg-glass px-3 py-2">
                 <span className="gold-tile tabular h-7 rounded-full px-2.5 text-[12px] font-semibold">Day {s.day}</span>
                 <span className="truncate text-[13.5px] text-ink">
                   {s.channel === "whatsapp" && (
@@ -184,7 +184,7 @@ function SequenceCard({
         )}
       </div>
 
-      <div className="rounded-b-[22px] border-t border-gray-100 bg-[#f3f6fb] px-5 py-3">
+      <div className="rounded-b-[22px] border-t border-gray-100 bg-glass px-5 py-3">
         {sequence.auto_enrol ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="m-0 max-w-xl text-[13px] text-gray-600">

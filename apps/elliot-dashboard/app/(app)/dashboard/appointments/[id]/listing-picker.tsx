@@ -73,7 +73,7 @@ export default function ListingPicker({
               type="button"
               onClick={() => choose(l.id)}
               disabled={busy || l.id === currentId}
-              className="flex w-full items-center gap-3 rounded-md border border-transparent px-2 py-1.5 text-left hover:border-gray-200 hover:bg-gray-50 disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-md border border-transparent px-2 py-1.5 text-left hover:border-gray-200 hover:bg-glass-hi disabled:opacity-60"
             >
               <ListingThumb listing={l} className="h-10 w-12" />
               <span className="min-w-0">

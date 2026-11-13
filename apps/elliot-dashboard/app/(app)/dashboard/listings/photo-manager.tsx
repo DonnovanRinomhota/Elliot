@@ -98,19 +98,19 @@ export default function PhotoManager({
       {photos.length > 0 ? (
         <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-4">
           {photos.map((p, i) => (
-            <li key={p} className="overflow-hidden rounded-md border border-gray-200 bg-white">
+            <li key={p} className="overflow-hidden rounded-md border border-gray-200 bg-glass">
               <div className="relative aspect-[4/3] bg-gray-100">
                 <a href={photoUrl(p)} target="_blank" rel="noreferrer" className="block h-full w-full" title="Open full size">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={resizedPhotoUrl(photoUrl(p), 480)} alt={`Photo ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
                 </a>
                 {i === 0 ? (
-                  <span className="absolute left-1.5 top-1.5 rounded bg-ink px-1.5 py-0.5 text-[11px] font-medium text-white">Cover</span>
+                  <span className="absolute left-1.5 top-1.5 rounded bg-navy px-1.5 py-0.5 text-[11px] font-medium text-white">Cover</span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => onChange(move(photos, i, 0))}
-                    className="absolute left-1.5 top-1.5 rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-ink shadow-sm hover:bg-white"
+                    className="absolute left-1.5 top-1.5 rounded bg-glass px-1.5 py-0.5 text-[11px] font-medium text-ink shadow-sm hover:bg-glass-hi"
                   >
                     Make cover
                   </button>

@@ -13,12 +13,12 @@ import StickyHeader from "./sticky-header";
 const BTN = "inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-medium no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 export const btn = {
   /** Gold, like the website's "Request a demo". */
-  primary: `${BTN} gold-fill h-9 px-4 font-semibold text-ink shadow-gold hover:brightness-[1.04]`,
+  primary: `${BTN} gold-fill h-9 px-4 font-semibold text-navy shadow-gold hover:brightness-[1.04]`,
   /** Navy, for a second strong action next to a gold one. */
-  dark: `${BTN} h-9 bg-ink px-4 text-white shadow-sm hover:bg-ink-800`,
-  secondary: `${BTN} h-9 border border-gray-200 bg-white px-4 text-ink shadow-sm hover:border-gray-300 hover:bg-gray-50`,
-  danger: `${BTN} h-9 border border-alert/30 bg-white px-4 text-alert hover:bg-alert-soft`,
-  ghost: `${BTN} h-9 px-3 text-ink-600 hover:bg-white hover:text-ink`,
+  dark: `${BTN} h-9 bg-navy px-4 text-white shadow-sm hover:bg-navy-800`,
+  secondary: `${BTN} h-9 border border-gray-200 bg-glass px-4 text-ink shadow-sm hover:border-gray-300 hover:bg-glass-hi`,
+  danger: `${BTN} h-9 border border-alert/40 bg-glass px-4 text-alert-dark hover:bg-alert-soft`,
+  ghost: `${BTN} h-9 px-3 text-ink-600 hover:bg-glass-hi hover:text-ink`,
   /** Low-emphasis destructive action (e.g. Reject next to a primary button). */
   dangerGhost: `${BTN} h-9 px-3 text-alert hover:bg-alert-soft`,
   small: "!h-8 !px-3 !text-[12.5px]",
@@ -151,7 +151,7 @@ const STAGE_PILL: Record<string, string> = {
   WARM: "bg-brass-soft text-brass-dark",
   HOT: "bg-alert-soft text-alert-dark",
   COLD: "bg-gray-100 text-gray-600",
-  CONVERTED: "bg-[#e3f6ea] text-[#1f6b40]",
+  CONVERTED: "bg-[#4ade80]/15 text-[#86efac]",
   LOST: "bg-gray-100 text-gray-500",
 };
 
@@ -169,7 +169,7 @@ export function StatusBadge({ kind, value }: { kind: keyof typeof STATUS_TONES; 
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-[22px] border border-dashed border-gray-300 bg-white/80 px-6 py-10 text-center">
+    <div className="rounded-[22px] border border-dashed border-gray-300 bg-glass px-6 py-10 text-center">
       <p className="m-0 text-[14px] font-medium text-ink">{title}</p>
       {children && <div className="mx-auto mt-1 max-w-md text-[13px] text-gray-500">{children}</div>}
     </div>
@@ -178,7 +178,7 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 
 export function Notice({ tone = "neutral", children }: { tone?: "neutral" | "brass" | "alert"; children: ReactNode }) {
   const styles = {
-    neutral: "border-gray-200 bg-white text-gray-600",
+    neutral: "border-gray-200 bg-glass text-gray-600",
     brass: "border-brass/25 bg-brass-soft text-brass-dark",
     alert: "border-alert/25 bg-alert-soft text-alert-dark",
   }[tone];
@@ -284,7 +284,7 @@ export function Pagination({
       {pages > 1 && (
         <div className="flex flex-wrap items-center gap-1">
           {page > 1 ? (
-            <a href={href(page - 1)} className={`${cell} border border-gray-200 bg-white text-ink hover:bg-gray-50`}>
+            <a href={href(page - 1)} className={`${cell} border border-gray-200 bg-glass text-ink hover:bg-glass-hi`}>
               Previous
             </a>
           ) : (
@@ -300,14 +300,14 @@ export function Pagination({
                 key={p}
                 href={href(p)}
                 aria-current={p === page ? "page" : undefined}
-                className={`${cell} tabular ${p === page ? "bg-ink font-semibold text-white" : "text-gray-600 hover:bg-white hover:text-ink"}`}
+                className={`${cell} tabular ${p === page ? "bg-[#fff] font-semibold text-navy" : "text-gray-600 hover:bg-glass-hi hover:text-ink"}`}
               >
                 {p}
               </a>
             )
           )}
           {page < pages ? (
-            <a href={href(page + 1)} className={`${cell} border border-gray-200 bg-white text-ink hover:bg-gray-50`}>
+            <a href={href(page + 1)} className={`${cell} border border-gray-200 bg-glass text-ink hover:bg-glass-hi`}>
               Next
             </a>
           ) : (

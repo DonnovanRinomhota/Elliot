@@ -253,7 +253,7 @@ function AgentWeek({ days, today, tz, byDay }: { days: string[]; today: string; 
             key={day}
             className={`card min-w-0 ${isToday ? "!border-gold ring-2 ring-gold/60" : ""} ${past ? "opacity-70" : ""}`}
           >
-            <h3 className={`m-0 rounded-t-[22px] border-b border-gray-100 px-3 py-2.5 text-[13px] font-semibold ${isToday ? "gold-fill text-ink" : "text-gray-600"}`}>
+            <h3 className={`m-0 rounded-t-[22px] border-b border-gray-100 px-3 py-2.5 text-[13px] font-semibold ${isToday ? "gold-fill text-navy" : "text-gray-600"}`}>
               {isToday ? "Today" : dayLabel(day, "weekday")} <span className={`tabular ${isToday ? "text-ink/70" : "text-gray-400"}`}>{Number(day.slice(8))}</span>
               {list.length > 0 && <span className={`tabular float-right text-[12px] ${isToday ? "text-ink" : "text-gray-400"}`}>{list.length}</span>}
             </h3>
@@ -265,7 +265,7 @@ function AgentWeek({ days, today, tz, byDay }: { days: string[]; today: string; 
                   <a
                     key={a.id}
                     href={`/dashboard/appointments/${a.id}`}
-                    className="block min-w-0 rounded-xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] p-2 no-underline hover:border-gold/40 hover:bg-white"
+                    className="block min-w-0 rounded-xl border border-white/10 bg-glass p-2 no-underline hover:border-gold/40 hover:bg-glass-hi"
                   >
                     <div className="tabular text-[12.5px] font-medium text-ink">{timeRange(a, tz)}</div>
                     <div className="mb-1.5 truncate text-[12.5px] text-gray-600">{a.contact?.name || a.contact?.email || "Client"}</div>
@@ -338,7 +338,7 @@ function TeamWeek({
         {days.map((d) => {
           const list = byDayAll.get(d) ?? [];
           return (
-            <section key={d} className={`rounded-[18px] border bg-white shadow-card ${d === today ? "border-accent" : "border-gray-200"}`}>
+            <section key={d} className={`rounded-[18px] border bg-glass shadow-card ${d === today ? "border-accent" : "border-gray-200"}`}>
               <h3 className="m-0 border-b border-gray-100 px-3 py-2 text-[13px] font-medium text-ink">
                 {d === today ? "Today, " : ""}
                 {dayLabel(d)}
@@ -372,7 +372,7 @@ function TeamWeek({
         <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-[12px] text-gray-500">
-              <th className="sticky left-0 z-[1] w-[170px] bg-gray-50 px-3 py-2 font-medium">Agent</th>
+              <th className="sticky left-0 z-[1] w-[170px] bg-[#122c55] px-3 py-2 font-medium">Agent</th>
               {days.map((d) => (
                 <th key={d} className={`px-2 py-2 font-medium ${d === today ? "text-ink" : ""}`}>
                   {d === today ? "Today" : dayLabel(d, "weekday")} <span className="tabular text-gray-400">{Number(d.slice(8))}</span>
@@ -385,7 +385,7 @@ function TeamWeek({
               const byDay = groupByDay(r.list, tz);
               return (
                 <tr key={r.id} className="border-b border-gray-100 align-top last:border-b-0">
-                  <th scope="row" className="sticky left-0 z-[1] bg-white px-3 py-2.5 text-[13px] font-normal">
+                  <th scope="row" className="sticky left-0 z-[1] bg-[#122c55] px-3 py-2.5 text-[13px] font-normal">
                     <a
                       href={agentLink(r.id)}
                       className={`font-medium no-underline hover:underline ${r.id === "none" ? "text-brass-dark" : "text-ink"}`}

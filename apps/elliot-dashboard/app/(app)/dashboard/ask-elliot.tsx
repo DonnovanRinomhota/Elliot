@@ -25,7 +25,7 @@ export function AskElliotButton({ compact = false, onDark = false }: { compact?:
         className={`inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-medium ${
           onDark
             ? "border border-white/30 bg-[#071a3a]/45 text-white backdrop-blur-sm hover:bg-[#071a3a]/60"
-            : "border border-gray-200 bg-white text-ink shadow-sm hover:bg-gray-50"
+            : "border border-gray-200 bg-glass text-ink shadow-sm hover:bg-glass-hi"
         }`}
       >
         <Sparkles size={15} className={onDark ? "text-gold-light" : "text-brass"} aria-hidden="true" />
@@ -37,7 +37,7 @@ export function AskElliotButton({ compact = false, onDark = false }: { compact?:
     <button
       type="button"
       onClick={() => openAskElliot()}
-      className="flex h-10 w-full items-center gap-2.5 rounded-full border border-white/15 bg-white/[0.07] px-3.5 text-left text-[13px] text-white/70 hover:border-white/25 hover:bg-white/10"
+      className="flex h-10 w-full items-center gap-2.5 rounded-full border border-white/15 bg-white/[0.07] px-3.5 text-left text-[13px] text-white/70 hover:border-white/25 hover:bg-glass-hi"
     >
       <Sparkles size={15} className="flex-shrink-0 text-gold-light" aria-hidden="true" />
       <span className="flex-1 truncate">Search or ask Elliot</span>
@@ -128,13 +128,13 @@ export default function AskElliot() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/25 px-3 pt-[8vh] backdrop-blur-[2px]" onMouseDown={() => setOpen(false)}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#020c20]/45 px-3 pt-[8vh] backdrop-blur-[3px]" onMouseDown={() => setOpen(false)}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Ask Elliot"
         onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-full max-w-[680px] flex-col overflow-hidden rounded-[22px] border border-[rgba(15,31,56,0.08)] bg-white shadow-lift"
+        className="flex max-h-[80vh] w-full max-w-[680px] flex-col overflow-hidden glass-dark rounded-[22px] border shadow-lift"
       >
         <form
           onSubmit={(e) => {
@@ -160,7 +160,7 @@ export default function AskElliot() {
             type="submit"
             disabled={!q.trim() || busy}
             aria-label="Ask"
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center gold-fill rounded-full text-ink disabled:bg-none disabled:bg-gray-200 disabled:text-gray-400"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center gold-fill rounded-full text-navy disabled:bg-none disabled:bg-gray-200 disabled:text-gray-400"
           >
             <ArrowUp size={16} aria-hidden="true" />
           </button>
@@ -213,7 +213,7 @@ export default function AskElliot() {
 
 function Chip({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[12.5px] text-gray-700 hover:border-accent/40 hover:bg-accent-soft hover:text-accent-dark">
+    <button type="button" onClick={onClick} className="rounded-full border border-gray-200 bg-glass px-3 py-1.5 text-[12.5px] text-gray-700 hover:border-accent/40 hover:bg-accent-soft hover:text-accent-dark">
       {children}
     </button>
   );
@@ -251,7 +251,7 @@ function AnswerView({ a, onAsk, onGo }: { a: Answer; onAsk: (q: string) => void;
             return (
               <li key={i} className="min-w-0">
                 {it.href ? (
-                  <a href={it.href} onClick={onGo} className="flex items-center gap-3 rounded-xl px-2 py-2 no-underline hover:bg-gray-50">
+                  <a href={it.href} onClick={onGo} className="flex items-center gap-3 rounded-xl px-2 py-2 no-underline hover:bg-glass-hi">
                     {body}
                   </a>
                 ) : (
@@ -265,7 +265,7 @@ function AnswerView({ a, onAsk, onGo }: { a: Answer; onAsk: (q: string) => void;
       {(a.more || a.suggestions?.length) && (
         <div className="flex flex-wrap items-center gap-2">
           {a.more && (
-            <a href={a.more.href} onClick={onGo} className="inline-flex items-center gap-1 rounded-full bg-ink px-3.5 py-1.5 text-[12.5px] font-medium text-white no-underline hover:bg-ink-800">
+            <a href={a.more.href} onClick={onGo} className="inline-flex items-center gap-1 rounded-full bg-navy px-3.5 py-1.5 text-[12.5px] font-medium text-white no-underline hover:bg-navy-800">
               {a.more.label} <ChevronRight size={14} aria-hidden="true" />
             </a>
           )}

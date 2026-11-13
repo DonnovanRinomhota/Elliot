@@ -124,7 +124,7 @@ export default function ChatControls({
 
   if (onEmail) {
     return (
-      <section className="rounded-[18px] border border-accent/25 bg-white px-5 py-3.5 shadow-[0_-4px_16px_rgba(16,24,40,0.10)]">
+      <section className="rounded-[18px] border border-accent/25 bg-glass px-5 py-3.5 shadow-[0_-4px_16px_rgba(16,24,40,0.10)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <h2 className="m-0 text-[14px] font-semibold text-ink">You&apos;re handling this conversation. Elliot is paused.</h2>
@@ -140,7 +140,7 @@ export default function ChatControls({
   }
 
   return (
-    <section className="rounded-[18px] border border-accent/25 bg-white shadow-[0_-4px_16px_rgba(16,24,40,0.10)]">
+    <section className="rounded-[18px] border border-accent/25 bg-glass shadow-[0_-4px_16px_rgba(16,24,40,0.10)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-2.5">
         <h2 className="m-0 text-[14px] font-semibold text-ink">You&apos;re handling this chat. Elliot is paused.</h2>
         <button type="button" disabled={busy} onClick={() => call("hand_back_conversation", { p_conversation_id: conversationId })} className={`${btn.secondary} ${btn.small}`}>

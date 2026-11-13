@@ -23,7 +23,7 @@ export default function PhotoGallery({ photos, title }: { photos: string[]; titl
               type="button"
               onClick={() => go(-1)}
               aria-label="Previous photo"
-              className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-ink shadow-sm hover:bg-white"
+              className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-glass text-ink shadow-sm hover:bg-glass-hi"
             >
               <ChevronLeft size={18} aria-hidden="true" />
             </button>
@@ -31,11 +31,11 @@ export default function PhotoGallery({ photos, title }: { photos: string[]; titl
               type="button"
               onClick={() => go(1)}
               aria-label="Next photo"
-              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-ink shadow-sm hover:bg-white"
+              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-glass text-ink shadow-sm hover:bg-glass-hi"
             >
               <ChevronRight size={18} aria-hidden="true" />
             </button>
-            <span className="tabular absolute bottom-2 right-2 rounded bg-ink/80 px-2 py-0.5 text-[12px] font-medium text-white">
+            <span className="tabular absolute bottom-2 right-2 rounded bg-navy/80 px-2 py-0.5 text-[12px] font-medium text-white">
               {i + 1} / {n}
             </span>
           </>

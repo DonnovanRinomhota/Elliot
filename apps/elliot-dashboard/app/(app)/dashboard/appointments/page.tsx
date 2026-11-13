@@ -76,13 +76,13 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
   ];
 
   const viewSwitch = (
-    <div className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 shadow-sm" role="group" aria-label="View">
+    <div className="inline-flex rounded-full border border-gray-200 bg-glass p-0.5 shadow-sm" role="group" aria-label="View">
       {(["list", "calendar"] as const).map((v) => (
         <a
           key={v}
           href={href({ view: v === "calendar" ? "calendar" : undefined, page: undefined, month: undefined })}
           aria-current={view === v ? "page" : undefined}
-          className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium no-underline ${view === v ? "bg-ink text-white" : "text-ink-600 hover:bg-ink-soft"}`}
+          className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium no-underline ${view === v ? "bg-[#fff] text-navy" : "text-ink-600 hover:bg-ink-soft"}`}
         >
           {v === "list" ? "List" : "Calendar"}
         </a>
@@ -150,13 +150,19 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
   const pageUpcoming = pg.items.filter((a) => upcomingIds.has(a.id));
   const pagePast = pg.items.filter((a) => !upcomingIds.has(a.id));
 
-  const table = (title: string, rows: Appointment[], total: number) =>
+  // Upcoming viewings are the work; past ones fold away (open when there's
+  // nothing upcoming on this page).
+  const table = (title: string, rows: Appointment[], total: number, fold = false) =>
     rows.length > 0 && (
-      <section className="card mb-5 p-3 md:p-4">
-        <h2 className="m-0 mb-2 flex items-center gap-2 px-1.5 pt-1 text-[17px] font-semibold tracking-[-0.01em] text-ink">
-          {title} <span className="tabular rounded-full bg-gray-100 px-2 py-0.5 text-[12px] font-bold text-gray-600">{total}</span>
-        </h2>
-        <div>
+      <details className="fold card mb-5 p-3 md:p-4" open={!fold}>
+        <summary className="px-1.5 pb-1 pt-1">
+          <span className="text-[17px] font-semibold tracking-[-0.01em] text-ink">{title}</span>
+          <span className="tabular rounded-full bg-gray-100 px-2 py-0.5 text-[12px] font-bold text-gray-600">{total}</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="fold-chevron flex-shrink-0 text-gray-500">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </summary>
+        <div className="mt-2">
           <div className={`hidden px-3.5 pb-2 pt-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-gray-500 ${APPOINTMENT_GRID}`}>
             <span>#</span>
             <span>When</span>
@@ -172,7 +178,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
             ))}
           </ul>
         </div>
-      </section>
+      </details>
     );
 
   return (
@@ -183,7 +189,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
       ) : (
         <>
           {table("Upcoming", pageUpcoming, upcoming.length)}
-          {table("Past", pagePast, past.length)}
+          {table("Past", pagePast, past.length, pageUpcoming.length > 0)}
         </>
       )}
       <Pagination

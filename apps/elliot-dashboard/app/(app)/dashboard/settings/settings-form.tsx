@@ -72,23 +72,30 @@ function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolea
     <button
       onClick={onClick}
       disabled={saving}
-      className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {saving ? "Saving…" : saved ? "Saved" : "Save changes"}
     </button>
   );
 }
 
-function Card({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+// Each section folds; only the business profile is open at first, so the
+// page reads as a short list of topics. Each section saves on its own.
+function Card({ title, description, children, open = false }: { title: string; description: string; children: React.ReactNode; open?: boolean }) {
   const canEdit = useContext(CanEdit);
   return (
-    <section className="mb-6 card">
-      <header className="border-b border-gray-100 px-5 py-4">
-        <h2 className="m-0 text-[15px] font-semibold text-ink">{title}</h2>
-        <p className="m-0 mt-0.5 text-[13px] text-gray-500">{description}</p>
-      </header>
-      <fieldset disabled={!canEdit} className="m-0 min-w-0 border-0 p-5">{children}</fieldset>
-    </section>
+    <details className="fold card mb-4" open={open}>
+      <summary className="px-5 py-4">
+        <span className="min-w-0">
+          <span className="block text-[15.5px] font-semibold text-ink">{title}</span>
+          <span className="block text-[13px] text-gray-500">{description}</span>
+        </span>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="fold-chevron flex-shrink-0 text-gray-500">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </summary>
+      <fieldset disabled={!canEdit} className="m-0 min-w-0 border-0 border-t border-white/10 p-5">{children}</fieldset>
+    </details>
   );
 }
 
@@ -286,7 +293,7 @@ export default function SettingsForm({
           You can see these settings, but only an admin of your agency can change them.
         </p>
       )}
-      <Card title="Business profile" description="Used in Elliot's replies and in your reports.">
+      <Card open title="Business profile" description="Used in Elliot's replies and in your reports.">
         <div className="mb-3 grid grid-cols-2 gap-3">
           <div>
             <label className={labelClass}>Business name</label>
@@ -398,11 +405,11 @@ export default function SettingsForm({
             Set your inbox to forward a copy of incoming email to this address. You keep every email; Elliot answers the enquiries and skips newsletters and automatic emails.
           </p>
           <div className="mb-3 flex items-center gap-2">
-            <code className="min-w-0 flex-1 break-all rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-ink">{inboundAddress(tenant.slug)}</code>
+            <code className="min-w-0 flex-1 break-all rounded-lg border border-gray-200 bg-glass px-3 py-2 text-[13px] text-ink">{inboundAddress(tenant.slug)}</code>
             <button
               type="button"
               onClick={copyInbound}
-              className="h-9 shrink-0 cursor-pointer rounded-full border border-gray-200 bg-white px-3.5 text-[13px] font-medium text-ink hover:bg-gray-50"
+              className="h-9 shrink-0 cursor-pointer rounded-full border border-gray-200 bg-glass px-3.5 text-[13px] font-medium text-ink hover:bg-glass-hi"
             >
               {copied ? "Copied" : "Copy"}
             </button>

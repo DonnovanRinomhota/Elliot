@@ -35,7 +35,7 @@ const STAGE_CONTROL: Record<string, string> = {
   WARM: "bg-brass-soft text-brass-dark",
   HOT: "bg-alert-soft text-alert-dark",
   COLD: "bg-gray-100 text-gray-600",
-  CONVERTED: "bg-[#e3f6ea] text-[#1f6b40]",
+  CONVERTED: "bg-[#4ade80]/15 text-[#86efac]",
   LOST: "bg-gray-100 text-gray-500",
 };
 const SCORE_COLOR = (n: number) => (n >= 80 ? "#F07167" : n >= 50 ? "#D9A56C" : "#97A6BC");
@@ -198,12 +198,12 @@ export default function LeadCard({
   const nextStep = nextViewing || (runningRun ? `Follow-up: ${runningRun.sequenceName}` : followUpText === "None" ? null : followUpText);
 
   return (
-    <li className="rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] transition-colors hover:border-gold/40 hover:bg-white">
+    <li className="rounded-2xl border border-white/10 bg-glass transition-colors hover:border-gold/40 hover:bg-glass-hi">
       <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3 ${LEAD_GRID}`}>
         {/* The person */}
         <div className="flex min-w-0 flex-1 basis-[220px] items-center gap-3 xl:basis-auto">
           <span className="hidden w-6 flex-shrink-0 text-right text-[12px] text-gray-400 xl:block">{number}</span>
-          <span aria-hidden="true" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#e3e9f2] text-[12px] font-bold text-accent-dark">
+          <span aria-hidden="true" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/15 text-[12px] font-bold text-accent-dark">
             {initials(name) || "?"}
           </span>
           <div className="min-w-0">
@@ -271,7 +271,7 @@ export default function LeadCard({
         {/* Owner */}
         <div className="hidden xl:block">
           {ownerName ? (
-            <span title={ownerName} className="gold-fill flex h-7 w-7 items-center justify-center rounded-full text-[10.5px] font-bold text-ink">
+            <span title={ownerName} className="gold-fill flex h-7 w-7 items-center justify-center rounded-full text-[10.5px] font-bold text-navy">
               {initials(ownerName)}
             </span>
           ) : (
@@ -282,7 +282,7 @@ export default function LeadCard({
         </div>
 
         {/* Next step */}
-        <div className={`min-w-0 basis-full truncate text-[13px] xl:basis-auto ${nextViewing ? "font-medium text-[#237a49]" : runningRun ? "text-ink" : "text-gray-500"}`}>
+        <div className={`min-w-0 basis-full truncate text-[13px] xl:basis-auto ${nextViewing ? "font-medium text-[#86efac]" : runningRun ? "text-ink" : "text-gray-500"}`}>
           <span className="text-gray-500 xl:hidden">{wants ? `${wants} · ` : ""}</span>
           {nextStep || "No next step yet"}
         </div>
@@ -310,7 +310,7 @@ export default function LeadCard({
       )}
 
       {open && (
-        <div id={detailsId} className="grid gap-6 rounded-b-2xl border-t border-gray-200 bg-white px-5 py-5 md:grid-cols-2">
+        <div id={detailsId} className="grid gap-6 rounded-b-2xl border-t border-gray-200 bg-glass px-5 py-5 md:grid-cols-2">
           {valuation && (
             <div className="md:col-span-2">
               <h3 className="m-0 mb-2 text-[13px] font-semibold text-ink">Property to value</h3>
@@ -350,7 +350,7 @@ export default function LeadCard({
                   {showRaw ? "Hide all answers" : "Show all answers"}
                 </button>
                 {showRaw && (
-                  <pre className="mb-0 mt-2 overflow-x-auto rounded-md border border-gray-200 bg-white p-3 text-[12px]">
+                  <pre className="mb-0 mt-2 overflow-x-auto rounded-md border border-gray-200 bg-glass p-3 text-[12px]">
                     {JSON.stringify(lead.qualification_answers, null, 2)}
                   </pre>
                 )}

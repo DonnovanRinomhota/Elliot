@@ -138,7 +138,7 @@ export default async function TenantDetailPage({ params }: { params: { id: strin
                       <span
                         aria-label={s.done ? "Done" : "Not done"}
                         className={`mt-0.5 inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                          s.done ? "bg-ink text-white" : s.required ? "border border-brass text-brass-dark" : "border border-gray-300 text-gray-400"
+                          s.done ? "bg-navy text-white" : s.required ? "border border-brass text-brass-dark" : "border border-gray-300 text-gray-400"
                         }`}
                       >
                         {s.done ? "✓" : ""}

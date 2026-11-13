@@ -156,7 +156,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
         title="Inbox"
         description="Chats that need a person, and website chats happening right now. Open one to take over from Elliot. Updates by itself."
         actions={
-          <div className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 text-[13px] shadow-sm">
+          <div className="inline-flex rounded-full border border-gray-200 bg-glass p-0.5 text-[13px] shadow-sm">
             {[
               ["all", "Everyone"],
               ["mine", "Mine"],
@@ -165,7 +165,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
                 key={k}
                 href={k === "all" ? "/dashboard/inbox" : "/dashboard/inbox?view=mine"}
                 aria-current={view === k ? "page" : undefined}
-                className={`rounded-full px-3.5 py-1.5 font-medium no-underline ${view === k ? "bg-ink text-white" : "text-gray-600 hover:text-ink"}`}
+                className={`rounded-full px-3.5 py-1.5 font-medium no-underline ${view === k ? "bg-[#fff] text-navy" : "text-gray-600 hover:text-ink"}`}
               >
                 {l}
               </a>
@@ -179,7 +179,7 @@ export default async function InboxPage({ searchParams }: { searchParams: { view
         {[
           { label: "Waiting for a person", value: needsPerson.filter((r) => r.state.tone !== "ink" && r.state.tone !== "neutral").length, icon: Users, tone: "text-alert-dark" },
           { label: "You're handling", value: needsPerson.filter((r) => r.mine).length, icon: UserCheck, tone: "text-ink" },
-          { label: "Live on your website", value: liveRows.length, icon: Radio, tone: "text-[#237a49]" },
+          { label: "Live on your website", value: liveRows.length, icon: Radio, tone: "text-[#86efac]" },
         ].map((f) => {
           const Icon = f.icon;
           return (
@@ -227,14 +227,14 @@ function Section({ title, count, rows, empty, live = false }: { title: string; c
         <span className="tabular rounded-full bg-gray-100 px-2 py-0.5 text-[12px] font-bold text-gray-600">{count}</span>
       </h2>
       {rows.length === 0 ? (
-        <p className="m-0 rounded-2xl bg-[#f3f6fb] px-4 py-4 text-[13.5px] text-gray-600">{empty}</p>
+        <p className="m-0 rounded-2xl bg-glass px-4 py-4 text-[13.5px] text-gray-600">{empty}</p>
       ) : (
         <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-2 p-0">
           {rows.map((r) => (
             <li key={r.id}>
               <a
                 href={`/dashboard/conversations/${r.id}`}
-                className="group flex gap-3 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-3.5 py-3 no-underline transition-colors hover:border-gold/40 hover:bg-white"
+                className="group flex gap-3 rounded-2xl border border-white/10 bg-glass px-3.5 py-3 no-underline transition-colors hover:border-gold/40 hover:bg-glass-hi"
               >
                 <ChannelTile channel={r.channel} size={36} />
                 <span className="min-w-0 flex-1">
@@ -245,11 +245,11 @@ function Section({ title, count, rows, empty, live = false }: { title: string; c
                       {humanize(r.channel)} · {timeAgo(r.lastAt)}
                     </span>
                   </span>
-                  {r.detail && <span className="mt-1.5 block rounded-xl border border-gold/35 bg-white px-3 py-2 text-[13px] leading-snug text-gray-800">{r.detail}</span>}
+                  {r.detail && <span className="mt-1.5 block rounded-xl border border-gold/35 bg-glass px-3 py-2 text-[13px] leading-snug text-gray-800">{r.detail}</span>}
                   {r.lastMessage && <span className="mt-1.5 block truncate text-[13px] text-gray-600">{r.lastMessage}</span>}
                   <span className="mt-2 flex flex-wrap items-center gap-2">
                     {r.contactPhone && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-0.5 text-[12.5px] text-gray-700 ring-1 ring-gray-200">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-glass px-2.5 py-0.5 text-[12.5px] text-gray-700 ring-1 ring-gray-200">
                         <Phone size={12} aria-hidden="true" /> {r.contactPhone}
                       </span>
                     )}

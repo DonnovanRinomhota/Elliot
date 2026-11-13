@@ -14,7 +14,7 @@ export function BrandTile({ name, size = 32 }: { name: BrandName; size?: number 
   const b = BRANDS[name];
   return (
     <span
-      className="inline-flex flex-shrink-0 items-center justify-center rounded-[10px] border border-[rgba(15,31,56,0.06)] bg-white shadow-[0_4px_12px_-6px_rgba(0,0,0,0.35)]"
+      className="inline-flex flex-shrink-0 items-center justify-center rounded-[10px] border border-white/10 bg-glass shadow-[0_4px_12px_-6px_rgba(0,0,0,0.35)]"
       style={{ width: size, height: size }}
     >
       <svg viewBox="0 0 24 24" width={Math.round(size * 0.55)} height={Math.round(size * 0.55)} fill={b.hex} role="img" aria-label={b.title}>

@@ -14,7 +14,7 @@ export default function ExitViewAs() {
       type="button"
       onClick={exit}
       disabled={busy}
-      className="rounded-md border border-brass/40 bg-white px-3 py-1 text-[13px] font-medium text-brass-dark hover:bg-brass-soft"
+      className="rounded-md border border-brass/40 bg-glass px-3 py-1 text-[13px] font-medium text-brass-dark hover:bg-brass-soft"
     >
       {busy ? "Leaving…" : "Back to control panel"}
     </button>

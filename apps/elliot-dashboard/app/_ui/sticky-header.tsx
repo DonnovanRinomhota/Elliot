@@ -21,10 +21,10 @@ const SECTIONS: [prefix: string, section: string][] = [
 ];
 
 /**
- * The top of every dashboard page, in the website's colours: a navy sky band
- * with the title, description, buttons and status tabs. Once the page
- * scrolls it folds into a slim navy bar that stays on screen with the title,
- * buttons and tabs. The control panel (/platform) keeps a plain light header.
+ * The top of every dashboard page, straight on the page's sky: the section,
+ * the title, description, buttons and status tabs. Once the page scrolls it
+ * folds into a slim frosted bar that stays on screen with the title, buttons
+ * and tabs. The control panel (/platform) has a plainer version.
  */
 export default function StickyHeader({
   title,
@@ -51,7 +51,7 @@ export default function StickyHeader({
   if (pathname.startsWith("/platform")) {
     return (
       <div
-        className={`sticky top-0 z-10 -mx-4 px-4 md:-mx-8 md:px-8 ${stuck ? "bg-[#eef2f8]/90 backdrop-blur-md" : ""} ${
+        className={`sticky top-0 z-10 -mx-4 px-4 md:-mx-8 md:px-8 ${stuck ? "glass-dark" : ""} ${
           tabs ? `mb-5 ${stuck ? "pt-3" : ""}` : `mb-6 border-b ${stuck ? "border-gray-200 py-3" : "border-transparent"}`
         }`}
       >
@@ -73,14 +73,14 @@ export default function StickyHeader({
   return (
     <div
       data-band
-      className={`sky relative z-10 md:sticky md:top-0 -mx-4 -mt-6 mb-6 px-4 text-white transition-[padding] md:-mx-6 md:-mt-7 md:px-6 lg:-mx-7 lg:px-9 ${
-        stuck ? "py-3 shadow-[0_14px_30px_-18px_rgba(3,24,58,0.7)]" : "pb-8 pt-7 md:pb-10 md:pt-9"
+      className={`relative z-10 -mx-4 mb-6 px-4 text-white transition-[padding] md:sticky md:top-0 md:-mx-6 md:px-6 lg:-mx-7 lg:px-9 ${
+        stuck ? "glass-dark -mt-6 border-b border-white/10 py-3 shadow-[0_14px_30px_-18px_rgba(2,12,32,0.8)] md:-mt-7" : "pb-1 pt-1 md:pt-2"
       }`}
     >
       {back && !stuck && <div className="mb-3">{back}</div>}
       {!stuck && section && (
         <p className="m-0 mb-3 flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.24em] text-white/80">
-          <span aria-hidden="true" className="h-px w-8 bg-white/60" />
+          <span aria-hidden="true" className="h-px w-8 bg-glass" />
           {section}
         </p>
       )}

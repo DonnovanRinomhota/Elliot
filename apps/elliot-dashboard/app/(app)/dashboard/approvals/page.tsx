@@ -5,7 +5,7 @@ import ApprovalCard from "./approval-card";
 import RejectSpamButton from "./reject-spam-button";
 import { ElliotMark } from "../../../_ui/elliot-logo";
 import FolderTabs, { FolderTab } from "../folder-tabs";
-import { EmptyState, FilterDescription, PageHeader, Pagination, paginate } from "../../../_ui/ui";
+import { timeAgo, EmptyState, FilterDescription, PageHeader, Pagination, paginate } from "../../../_ui/ui";
 
 // Real statuses these tables use: "pending" until reviewed, then either
 // approve_*_draft() -> "approved" or reject_*_draft() -> "rejected" (see
@@ -81,7 +81,10 @@ export default async function ApprovalsPage({
   const clientCount = inTab.filter((d: any) => !isSpam(d)).length;
   const spamCount = inTab.length - clientCount;
   const onlySpam = searchParams.show === "spam";
-  const visible = onlySpam ? inTab.filter(isSpam) : [...inTab.filter((d: any) => !isSpam(d)), ...inTab.filter(isSpam)];
+  // Clients' drafts are the work; spam and automatic ones are folded away
+  // underneath (or listed on their own with show=spam).
+  const visible = onlySpam ? inTab.filter(isSpam) : inTab.filter((d: any) => !isSpam(d));
+  const foldedSpam = onlySpam ? [] : inTab.filter(isSpam);
   const pg = paginate(visible, searchParams.page);
 
   // The client's message each draft on this page answers, and the dates.
@@ -150,14 +153,14 @@ export default async function ApprovalsPage({
       {inTab.length > 0 && spamCount > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-[13px]">
           {[
-            ["Clients first", !onlySpam, `/dashboard/approvals${activeStatus !== "pending" ? `?status=${activeStatus}` : ""}`],
+            ["From clients", !onlySpam, `/dashboard/approvals${activeStatus !== "pending" ? `?status=${activeStatus}` : ""}`],
             ["Only spam and automatic", onlySpam, `/dashboard/approvals?show=spam${activeStatus !== "pending" ? `&status=${activeStatus}` : ""}`],
           ].map(([label, on, href]) => (
             <a
               key={label as string}
               href={href as string}
               aria-current={on ? "page" : undefined}
-              className={`inline-flex h-9 items-center rounded-full border px-4 no-underline ${on ? "border-ink bg-ink font-medium text-white" : "border-gray-200 bg-white text-ink hover:bg-gray-50"}`}
+              className={`inline-flex h-9 items-center rounded-full border px-4 no-underline ${on ? "border-white bg-[#fff] font-medium text-navy" : "border-gray-200 bg-glass text-ink hover:bg-glass-hi"}`}
             >
               {label as string}
             </a>
@@ -169,7 +172,7 @@ export default async function ApprovalsPage({
       )}
 
       {visible.length === 0 ? (
-        <EmptyState title={activeStatus === "pending" ? "You're all caught up" : "Nothing here"}>
+        <EmptyState title={activeStatus === "pending" ? (onlySpam ? "No spam waiting" : "No client drafts waiting") : "Nothing here"}>
           {activeStatus === "pending" ? "New drafts appear here when Elliot needs your approval to send." : null}
         </EmptyState>
       ) : (
@@ -179,6 +182,33 @@ export default async function ApprovalsPage({
           ))}
         </div>
       )}
+      {foldedSpam.length > 0 && (
+        <details className="fold card mt-5">
+          <summary className="px-5 py-4">
+            <span className="text-[15.5px] font-semibold text-ink">Spam and automatic emails</span>
+            <span className="tabular rounded-full bg-gray-100 px-2 py-0.5 text-[12px] font-bold text-gray-600">{foldedSpam.length}</span>
+            <span className="text-[13px] text-gray-500">Not clients. Elliot suggests rejecting them.</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="fold-chevron flex-shrink-0 text-gray-500">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </summary>
+          <div className="border-t border-white/10 px-5 pb-5 pt-3">
+            <ul className="m-0 grid list-none grid-cols-[minmax(0,1fr)] gap-1.5 p-0">
+              {foldedSpam.slice(0, 12).map((d: any) => (
+                <li key={d.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-glass px-3 py-2 text-[13px]">
+                  <span className="min-w-0 flex-1 truncate text-ink">{d.to_email || d.to_wa_id}</span>
+                  <span className="hidden min-w-0 flex-1 truncate text-gray-500 md:block">{d.subject || "(no subject)"}</span>
+                  <span className="whitespace-nowrap text-[12px] text-gray-500">{timeAgo(d.created_at)}</span>
+                </li>
+              ))}
+            </ul>
+            <a href={`/dashboard/approvals?show=spam${activeStatus !== "pending" ? `&status=${activeStatus}` : ""}`} className="mt-3 inline-block text-[13px] font-semibold text-brass-dark no-underline hover:text-ink">
+              Review {foldedSpam.length > 12 ? `all ${foldedSpam.length}` : "them"} one by one →
+            </a>
+          </div>
+        </details>
+      )}
+
       <Pagination
         {...pg}
         shown={pg.items.length}

@@ -159,7 +159,7 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
 
       <div className={`mt-4 grid gap-3 ${draft.inbound && !isEditing ? "md:grid-cols-2" : ""}`}>
         {draft.inbound && !isEditing && (
-          <div className="min-w-0 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-4 py-3">
+          <div className="min-w-0 rounded-2xl border border-white/10 bg-glass px-4 py-3">
             <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-[12px] text-gray-500">
               <span className="font-semibold text-gray-700">Client wrote · {draft.inbound.at}</span>
               {draft.conversation_id && (
@@ -171,7 +171,7 @@ export default function ApprovalCard({ draft }: { draft: Draft }) {
             <p className="m-0 line-clamp-6 whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-gray-700">{draft.inbound.content.trim() || "(empty message)"}</p>
           </div>
         )}
-        <div className="min-w-0 rounded-2xl border border-gold/45 bg-white px-4 py-3 shadow-[0_12px_26px_-20px_rgba(185,126,71,0.8)]">
+        <div className="min-w-0 rounded-2xl border border-gold/45 bg-glass px-4 py-3 shadow-[0_12px_26px_-20px_rgba(185,126,71,0.8)]">
           <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-brass-dark">
             <Sparkles size={12} aria-hidden="true" />
             {isPending ? "Elliot's reply" : "Reply"}

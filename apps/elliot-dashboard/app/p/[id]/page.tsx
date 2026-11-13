@@ -76,7 +76,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
 function Fact({ icon: Icon, label, value }: { icon: typeof Ruler; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5">
+    <div className="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-glass px-3.5 py-2.5">
       <Icon size={17} strokeWidth={1.75} className="flex-shrink-0 text-accent" aria-hidden="true" />
       <div className="min-w-0">
         <div className="text-[11.5px] uppercase tracking-wide text-gray-500">{label}</div>
@@ -91,7 +91,7 @@ export default async function PublicListingPage({ params }: { params: { id: stri
 
   if (!l) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#eef2f8] px-4">
+      <main className="flex min-h-screen items-center justify-center px-4">
         <div className="card max-w-md px-7 py-8 text-center">
           <h1 className="m-0 text-[20px] font-semibold text-ink">This property isn&apos;t available any more</h1>
           <p className="m-0 mt-2 text-[14px] text-gray-600">
@@ -122,8 +122,8 @@ export default async function PublicListingPage({ params }: { params: { id: stri
   ].filter(Boolean) as { icon: typeof Ruler; label: string; value: string }[];
 
   return (
-    <main className="min-h-screen bg-[#eef2f8]">
-      <header className="border-b border-gray-200 bg-white">
+    <main className="min-h-screen">
+      <header className="border-b border-gray-200 bg-glass">
         <div className="mx-auto flex max-w-[960px] items-center justify-between gap-3 px-4 py-3.5 md:px-6">
           <span className="truncate text-[15px] font-semibold text-ink">{l.agency}</span>
           {l.reference && <span className="tabular flex-shrink-0 text-[12.5px] text-gray-500">Ref {l.reference}</span>}

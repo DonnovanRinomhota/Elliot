@@ -73,7 +73,7 @@ export default function EscalationCard({ escalation }: { escalation: Escalation 
   const Icon = escalation.status === "resolved" ? CircleCheck : escalation.status === "acknowledged" ? Hand : AlertTriangle;
   const tile =
     escalation.status === "resolved"
-      ? "bg-[#e3f6ea] text-[#1f6b40]"
+      ? "bg-[#4ade80]/15 text-[#86efac]"
       : escalation.status === "acknowledged"
         ? "gold-tile"
         : "bg-alert-soft text-alert-dark";
@@ -99,7 +99,7 @@ export default function EscalationCard({ escalation }: { escalation: Escalation 
         </div>
       </div>
 
-      <p className="m-0 mt-3 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-4 py-3 text-[13.5px] leading-relaxed text-gray-800">
+      <p className="m-0 mt-3 rounded-2xl border border-white/10 bg-glass px-4 py-3 text-[13.5px] leading-relaxed text-gray-800">
         {escalation.context_summary}
       </p>
 

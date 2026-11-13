@@ -98,7 +98,7 @@ export default function MonthCalendar({
                   <div className="mb-1 flex items-center justify-between">
                     <span
                       className={`tabular inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] ${
-                        isToday ? "bg-accent font-semibold text-white" : outside ? "text-gray-400" : "text-gray-700"
+                        isToday ? "gold-fill font-semibold text-navy" : outside ? "text-gray-400" : "text-gray-700"
                       }`}
                     >
                       {Number(day.slice(8))}
@@ -129,7 +129,7 @@ export default function MonthCalendar({
           <ul className="m-0 grid list-none gap-3 p-0">
             {daysWithViewings.map((day) => (
               <li key={day} className="overflow-hidden card">
-                <div className={`border-b border-gray-100 px-4 py-2 text-[13px] font-medium ${day === today ? "bg-accent text-white" : "bg-gray-50 text-ink"}`}>
+                <div className={`border-b border-gray-100 px-4 py-2 text-[13px] font-medium ${day === today ? "gold-fill text-navy" : "bg-gray-50 text-navy"}`}>
                   {day === today ? "Today, " : ""}
                   {dayLabel(day)}
                 </div>

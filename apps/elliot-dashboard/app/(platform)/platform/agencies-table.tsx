@@ -116,7 +116,7 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
                 // 0050: a trial date only means something once the trial was started.
                 const dateIso = r.plan === "trial" ? (r.trial_started_at ? r.trial_ends_at : null) : r.paid_until;
                 return (
-                  <tr key={r.tenant_id} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+                  <tr key={r.tenant_id} className="border-b border-gray-100 last:border-b-0 hover:bg-glass-hi">
                     <td className="tabular px-4 py-3 text-gray-400">{offset + i + 1}</td>
                     <td className="px-4 py-3">
                       <a href={`/platform/tenants/${r.tenant_id}`} className="font-medium text-ink no-underline hover:underline">
@@ -197,7 +197,7 @@ export default function AgenciesTable({ rows }: { rows: TenantOverviewRow[] }) {
                     type="button"
                     onClick={() => setPage(p)}
                     aria-current={p === current ? "page" : undefined}
-                    className={`tabular h-8 min-w-8 rounded-full px-2.5 ${p === current ? "bg-accent font-medium text-white" : "text-gray-600 hover:bg-ink-soft"}`}
+                    className={`tabular h-8 min-w-8 rounded-full px-2.5 ${p === current ? "gold-fill font-semibold text-navy" : "text-gray-600 hover:bg-ink-soft"}`}
                   >
                     {p}
                   </button>

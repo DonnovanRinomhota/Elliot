@@ -130,7 +130,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Saving..." : "Save new password"}
             </button>
@@ -147,7 +147,7 @@ export default function ResetPasswordPage() {
                 router.push("/");
                 router.refresh();
               }}
-              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Go to dashboard
             </button>
