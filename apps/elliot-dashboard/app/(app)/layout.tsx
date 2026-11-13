@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ElliotLogo, ElliotMark } from "@/app/_ui/elliot-logo";
+import FastLinks from "@/app/_ui/fast-links";
 import { isAdminEmail } from "@/lib/admin";
 import { getAdminView, getMembership } from "@/lib/tenant";
 import SignOutButton from "./dashboard/sign-out-button";
@@ -168,7 +169,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     </a>
   );
 
-  const brand = <ElliotLogo size={28} color="#eef2f9" />;
+  const brand = <ElliotLogo />;
 
   // The agency this dashboard belongs to.
   const agency = (
@@ -243,6 +244,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </details>
       </header>
 
+      <FastLinks />
       <main className="min-w-0 flex-1">
         {adminView && (
           <div className="mx-3 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brass/25 bg-brass-soft px-4 py-2.5 text-[13px] text-brass-dark md:ml-6 md:mr-6">

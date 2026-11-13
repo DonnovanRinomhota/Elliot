@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 // A link in the navy sidebar. The page you're on is marked in gold, as on
 // the website.
@@ -21,6 +22,20 @@ export default function NavLink({
   const pathname = usePathname();
   const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
 
+  // Keep the page you're on in view in the sidebar's own scroll area (for
+  // Settings and Team at the bottom), without moving the page itself.
+  const ref = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!active || !el) return;
+    let box: HTMLElement | null = el.parentElement;
+    while (box && !(box.scrollHeight > box.clientHeight && /(auto|scroll)/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
+    if (!box) return;
+    const a = el.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    if (a.top < b.top || a.bottom > b.bottom) box.scrollTop += a.top - b.top - (b.height - a.height) / 2;
+  }, [active]);
+
   const badgeClass = {
     neutral: "bg-white/15 text-white",
     danger: "bg-[#d9483d] text-white",
@@ -28,8 +43,12 @@ export default function NavLink({
   }[badgeTone];
 
   return (
-    <a
+    // A client-side link: the sidebar stays put and only the page changes.
+    <Link
+      ref={ref}
       href={href}
+      prefetch
+      onClick={() => ref.current?.closest("details[open]")?.removeAttribute("open")}
       aria-current={active ? "page" : undefined}
       className={`relative flex h-10 items-center gap-3 rounded-xl px-3 text-[13.5px] no-underline transition-colors ${
         active
@@ -43,6 +62,6 @@ export default function NavLink({
       {badge != null && badge > 0 && (
         <span className={`tabular ml-auto min-w-[22px] rounded-full px-1.5 text-center text-[11.5px] font-bold leading-5 ${badgeClass}`}>{badge}</span>
       )}
-    </a>
+    </Link>
   );
 }

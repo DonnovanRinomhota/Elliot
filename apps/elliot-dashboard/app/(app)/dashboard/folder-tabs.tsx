@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 // Status filter tabs used across Appointments, Leads, Approvals, Escalations
 // and Conversations. Plain links: the active tab is just a `status` query
 // param read server-side by each page, so no client JS is needed.
@@ -40,8 +42,9 @@ export default function FolderTabs({
 
           // Chips on the page's navy band: white when chosen, glass otherwise.
           return (
-            <a
+            <Link
               key={tab.key}
+              scroll={false}
               href={href}
               aria-current={active ? "page" : undefined}
               className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[13.5px] no-underline transition-colors ${
@@ -50,7 +53,7 @@ export default function FolderTabs({
             >
               {tab.label}
               <span className={`tabular text-[12.5px] font-bold ${active ? "text-navy" : "text-white"}`}>{tab.count}</span>
-            </a>
+            </Link>
           );
         })}
       </div>
