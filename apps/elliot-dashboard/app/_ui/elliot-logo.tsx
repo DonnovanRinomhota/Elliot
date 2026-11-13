@@ -49,11 +49,12 @@ export function ElliotWordmark({ height = 14, color = "currentColor", className 
 }
 
 /** Mark + wordmark side by side, labelled "Elliot" for screen readers. */
-export function ElliotLogo({ size = 30, color = "currentColor", tone = "gold", className = "" }: { size?: number; color?: string; tone?: "gold" | string; className?: string }) {
+// Same as the website's navbar: the gold mark, and the wordmark in pale gold.
+export function ElliotLogo({ size = 34, color = "#EBCB9E", tone = "gold", className = "" }: { size?: number; color?: string; tone?: "gold" | string; className?: string }) {
   return (
-    <span role="img" aria-label="Elliot" className={`inline-flex items-center ${className}`} style={{ gap: size * 0.38 }}>
+    <span role="img" aria-label="Elliot" className={`inline-flex items-center ${className}`} style={{ gap: size * 0.41 }}>
       <ElliotMark size={size} tone={tone} />
-      <ElliotWordmark height={size * 0.42} color={color} />
+      <ElliotWordmark height={size * 0.41} color={color} />
     </span>
   );
 }

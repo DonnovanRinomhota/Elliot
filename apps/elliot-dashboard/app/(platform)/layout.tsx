@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ElliotMark } from "@/app/_ui/elliot-logo";
+import { ElliotLogo } from "@/app/_ui/elliot-logo";
 import { getPlatformAdminStatus } from "@/lib/platform-auth";
 import PlatformTabs from "./platform-tabs";
+import FastLinks from "@/app/_ui/fast-links";
 
 // The control panel: every agency on Elliot, for platform admins only
 // (ADMIN_EMAILS). Separate from the agency dashboard on purpose -- different
@@ -23,17 +24,15 @@ export default async function PlatformLayout({ children }: { children: React.Rea
 
   return (
     <div className="min-h-screen">
-      <header className="navy text-white">
+      {/* Stays at the top while the page scrolls. */}
+      <header className="navy sticky top-0 z-30 border-b border-white/10 text-white">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 md:px-8">
-          <div className="flex items-center gap-2.5">
-            <ElliotMark size={32} />
-            <div className="leading-tight">
-              <div className="text-[14px] font-semibold">Elliot</div>
-              <div className="text-[12px] text-ink-200">Control panel</div>
-            </div>
+          <div className="flex items-center gap-4">
+            <ElliotLogo />
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-0.5 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-gold-light">Control panel</span>
           </div>
           <div className="flex items-center gap-4 text-[13px]">
-            <span className="hidden text-ink-200 sm:inline">{user.email}</span>
+            <span className="hidden text-white/75 sm:inline">{user.email}</span>
             <a href="/" className="rounded-full border border-white/25 px-3.5 py-1.5 text-white no-underline hover:bg-glass-hi">
               My dashboard
             </a>
@@ -43,6 +42,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           <PlatformTabs />
         </div>
       </header>
+      <FastLinks />
       <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-8 md:py-8">{children}</main>
     </div>
   );

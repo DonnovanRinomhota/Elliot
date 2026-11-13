@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
@@ -17,16 +18,16 @@ export default function PlatformTabs() {
       {TABS.map((t) => {
         const active = t.match(pathname);
         return (
-          <a
+          <Link
             key={t.href}
             href={t.href}
             aria-current={active ? "page" : undefined}
-            className={`border-b-2 pb-2.5 pt-1 text-[13.5px] no-underline ${
-              active ? "border-white font-medium text-white" : "border-transparent text-ink-200 hover:text-white"
+            className={`border-b-2 pb-2.5 pt-1 text-[13.5px] no-underline transition-colors ${
+              active ? "border-gold font-semibold text-gold-light" : "border-transparent text-white/75 hover:text-white"
             }`}
           >
             {t.label}
-          </a>
+          </Link>
         );
       })}
     </nav>

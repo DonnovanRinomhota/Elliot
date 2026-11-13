@@ -205,7 +205,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
     <div className="sky flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-[380px]">
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <ElliotLogo size={34} className="text-white" />
+          <ElliotLogo />
         </div>
         <div className="card p-7">{children}</div>
         <p className="mt-6 text-center text-[12.5px] text-white/70">Your AI front office for leads, viewings and client messages.</p>
