@@ -79,7 +79,7 @@ export default function OnboardingForm() {
             setIndustry("");
             setPlan("trial");
           }}
-          className="mt-4 rounded-md border border-gray-300 px-3 py-1.5 text-[12.5px] font-medium hover:bg-gray-50"
+          className="mt-4 rounded-md border border-gray-300 px-3 py-1.5 text-[12.5px] font-medium hover:bg-glass-hi"
         >
           Onboard another
         </button>
@@ -156,7 +156,7 @@ export default function OnboardingForm() {
       <button
         onClick={handleSubmit}
         disabled={busy || !name.trim() || !slug.trim()}
-        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? "Creating…" : "Create tenant"}
       </button>

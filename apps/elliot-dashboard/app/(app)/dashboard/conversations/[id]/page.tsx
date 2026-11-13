@@ -145,10 +145,10 @@ export default async function ConversationDetailPage({ params }: { params: { id:
                     <div
                       className={`max-w-[78%] whitespace-pre-wrap [overflow-wrap:anywhere] px-4 py-2.5 text-[14px] leading-relaxed ${
                         isHuman
-                          ? "gold-fill rounded-[18px_18px_6px_18px] text-ink"
+                          ? "gold-fill rounded-[18px_18px_6px_18px] text-navy"
                           : isOutbound
                             ? "rounded-[18px_18px_6px_18px] bg-[linear-gradient(135deg,#071631,#14325c)] text-white"
-                            : "rounded-[18px_18px_18px_6px] border border-[rgba(15,31,56,0.07)] bg-[#f3f6fb] text-gray-800"
+                            : "rounded-[18px_18px_18px_6px] border border-white/10 bg-glass text-gray-800"
                       }`}
                     >
                       {m.role === "user" ? withoutAttachedNote(m.content) : m.content}
@@ -189,7 +189,7 @@ export default async function ConversationDetailPage({ params }: { params: { id:
             <>
               {conversation.assigned_human && <AutoRefresh seconds={4} />}
               {/* Pinned to the bottom of the screen while the messages scroll. */}
-              <div className="sticky bottom-0 z-10 -mx-2 mt-6 bg-gradient-to-t from-[#eef2f8] from-70% to-transparent px-2 pb-4 pt-3">
+              <div className="sticky bottom-0 z-10 -mx-2 mt-6 bg-gradient-to-t from-[#173b6c] from-70% to-transparent px-2 pb-4 pt-3">
                 <ChatControls
                   conversationId={conversation.id}
                   handledByMe={handledByMe}
@@ -236,7 +236,7 @@ function AttachmentList({ files }: { files: Attachment[] }) {
   return (
     <ul className="m-0 mt-2 grid w-full max-w-[78%] list-none gap-1.5 p-0">
       {files.map((f) => (
-        <li key={f.id} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+        <li key={f.id} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-glass px-3 py-2">
           <span className="inline-flex h-8 w-9 shrink-0 items-center justify-center rounded-md bg-gray-100 text-[10.5px] font-semibold tracking-wide text-gray-600">
             {KIND_LABEL[fileKind(f.content_type, f.filename)]}
           </span>

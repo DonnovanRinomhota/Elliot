@@ -148,7 +148,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .join("");
 
   const yourDay = (
-    <a href="/dashboard/calendar" className="block rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-3 no-underline hover:bg-white/10">
+    <a href="/dashboard/calendar" className="block rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-3 no-underline hover:bg-glass-hi">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[13px] font-semibold text-white">Your day</span>
         <span className="tabular text-[12px] text-white/60">
@@ -207,7 +207,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-3">
               {agency}
               <div className="mt-3 flex min-w-0 items-center gap-2.5 border-t border-white/10 pt-3">
-                <span aria-hidden="true" className="gold-fill flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold text-ink">
+                <span aria-hidden="true" className="gold-fill flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold text-navy">
                   {initials || "?"}
                 </span>
                 <span className="min-w-0 flex-1 leading-tight">
@@ -264,7 +264,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 ? "border-alert/25 bg-alert-soft text-alert-dark"
                 : trial.tone === "warning"
                   ? "border-brass/25 bg-brass-soft text-brass-dark"
-                  : "border-gray-200 bg-white/80 text-gray-600"
+                  : "border-gray-200 bg-glass text-gray-600"
             }`}
           >
             {trial.text}

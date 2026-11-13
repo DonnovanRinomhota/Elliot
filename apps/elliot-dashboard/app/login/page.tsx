@@ -107,7 +107,7 @@ export default function LoginPage() {
             setMode("sign-in");
             setPassword("");
           }}
-          className="mt-5 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-5 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Back to sign in
         </button>
@@ -152,7 +152,7 @@ export default function LoginPage() {
 
           {error && <p className="mb-3 mt-0 text-[13px] text-alert" role="alert">{error}</p>}
 
-          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60">
             {loading ? "Signing in…" : "Sign in"}
           </button>
 
@@ -191,7 +191,7 @@ export default function LoginPage() {
 
           {error && <p className="mb-3 mt-0 text-[13px] text-alert" role="alert">{error}</p>}
 
-          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="submit" disabled={loading} className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill text-[14px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60">
             {loading ? "Creating…" : "Create business"}
           </button>
         </form>
@@ -221,7 +221,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`h-9 cursor-pointer rounded border-0 text-[13px] font-medium ${active ? "bg-white text-ink shadow-sm" : "bg-transparent text-gray-500 hover:text-ink"}`}
+      className={`h-9 cursor-pointer rounded border-0 text-[13px] font-medium ${active ? "bg-glass text-ink shadow-sm" : "bg-transparent text-gray-500 hover:text-ink"}`}
     >
       {children}
     </button>

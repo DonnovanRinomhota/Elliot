@@ -34,7 +34,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           </div>
           <div className="flex items-center gap-4 text-[13px]">
             <span className="hidden text-ink-200 sm:inline">{user.email}</span>
-            <a href="/" className="rounded-full border border-white/25 px-3.5 py-1.5 text-white no-underline hover:bg-white/10">
+            <a href="/" className="rounded-full border border-white/25 px-3.5 py-1.5 text-white no-underline hover:bg-glass-hi">
               My dashboard
             </a>
           </div>

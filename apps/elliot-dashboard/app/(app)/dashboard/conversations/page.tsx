@@ -35,7 +35,7 @@ const STATUS_PILL: Record<string, [string, string]> = {
   closed: ["Closed", "bg-gray-100 text-gray-600"],
 };
 
-const TONE_TEXT = { ok: "text-[#237a49]", wait: "text-brass-dark", alert: "text-alert", muted: "text-gray-500" } as const;
+const TONE_TEXT = { ok: "text-[#86efac]", wait: "text-brass-dark", alert: "text-alert", muted: "text-gray-500" } as const;
 
 export default async function ConversationsPage({
   searchParams,
@@ -185,7 +185,7 @@ export default async function ConversationsPage({
 
   const chip = (on: boolean) =>
     `inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13.5px] no-underline transition-colors ${
-      on ? "border-white bg-white font-medium text-ink" : "border-white/25 bg-[#071a3a]/45 text-white backdrop-blur-sm hover:bg-[#071a3a]/65"
+      on ? "border-white bg-[#fff] font-medium text-navy" : "border-white/25 bg-[#071a3a]/45 text-white backdrop-blur-sm hover:bg-[#071a3a]/65"
     }`;
 
   const sel = selected;
@@ -311,8 +311,8 @@ export default async function ConversationsPage({
                   </>
                 );
                 const rowClass = `flex items-center gap-3 rounded-2xl border px-3 py-3 no-underline transition-colors ${
-                  isSel ? "lg:border-gold/60 lg:bg-white lg:shadow-card" : ""
-                } border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] hover:border-gold/40 hover:bg-white`;
+                  isSel ? "lg:border-gold/60 lg:bg-glass-hi lg:shadow-card" : ""
+                } border-white/10 bg-glass hover:border-gold/40 hover:bg-glass-hi`;
                 return (
                   <li key={c.id}>
                     {/* Phones open the conversation; wider screens show it on the right. */}
@@ -361,7 +361,7 @@ export default async function ConversationsPage({
                 ["Status", sel.archived_at ? "Archived" : notClient.has(sel.id) ? "Not a client" : STATUS_PILL[sel.status]?.[0] ?? humanize(sel.status)],
                 ["Started", `${dayKey(sel.created_at, tz) === dayKey(new Date(), tz) ? "Today" : new Date(sel.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: tz })} ${timeOf(sel.created_at, tz)}`],
               ].map(([label, value]) => (
-                <div key={label as string} className="min-w-0 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] px-3 py-2.5">
+                <div key={label as string} className="min-w-0 rounded-2xl border border-white/10 bg-glass px-3 py-2.5">
                   <p className="m-0 text-[11.5px] text-gray-500">{label}</p>
                   <p className="m-0 mt-0.5 truncate text-[13.5px] font-semibold text-ink" title={(value as string) || undefined}>
                     {value || "Not known yet"}
@@ -383,7 +383,7 @@ export default async function ConversationsPage({
                         className={`max-w-[82%] whitespace-pre-line break-words px-3.5 py-2.5 text-[13.5px] leading-relaxed ${
                           mine
                             ? "self-end rounded-[16px_16px_6px_16px] bg-[linear-gradient(135deg,#071631,#14325c)] text-white"
-                            : "self-start rounded-[16px_16px_16px_6px] border border-[rgba(15,31,56,0.07)] bg-[#f3f6fb] text-ink"
+                            : "self-start rounded-[16px_16px_16px_6px] border border-white/10 bg-glass text-ink"
                         }`}
                       >
                         <span className="line-clamp-[8]">{m.content}</span>
@@ -397,7 +397,7 @@ export default async function ConversationsPage({
               )}
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] p-3">
+            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-glass p-3">
               <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#0b1426] ring-1 ring-gold/60">
                 <ElliotMark size={15} />
               </span>

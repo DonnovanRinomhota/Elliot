@@ -45,11 +45,11 @@ export default function FolderTabs({
               href={href}
               aria-current={active ? "page" : undefined}
               className={`inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[13.5px] no-underline transition-colors ${
-                active ? "border-white bg-white font-medium text-ink" : "border-white/25 bg-[#071a3a]/45 text-white backdrop-blur-sm hover:bg-[#071a3a]/65"
+                active ? "border-white bg-[#fff] font-medium text-navy" : "border-white/25 bg-[#071a3a]/45 text-white backdrop-blur-sm hover:bg-[#071a3a]/65"
               }`}
             >
               {tab.label}
-              <span className={`tabular text-[12.5px] font-bold ${active ? "text-ink" : "text-white"}`}>{tab.count}</span>
+              <span className={`tabular text-[12.5px] font-bold ${active ? "text-navy" : "text-white"}`}>{tab.count}</span>
             </a>
           );
         })}

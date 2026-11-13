@@ -8,22 +8,31 @@
    any of these (unlayered CSS would beat every utility). */
 @layer base {
   :root {
-    color-scheme: light;
+    color-scheme: dark;
   }
 
-  html,
+  html {
+    background: #0a1f42;
+  }
+
   body {
     margin: 0;
-    /* Pale sky, like the light sections of getelliot.eu. */
+    min-height: 100vh;
+    /* The website's blue sky, on every page: deep navy at the top, lighter
+       blue below, with soft light behind the glass panels. It stays put
+       while the page scrolls. */
     background:
-      radial-gradient(1100px 520px at 85% -10%, rgba(196, 218, 250, 0.55), transparent 65%),
-      #eef2f8;
+      radial-gradient(900px 520px at 88% -8%, rgba(150, 190, 250, 0.34), transparent 62%),
+      radial-gradient(760px 520px at 12% 108%, rgba(217, 165, 108, 0.16), transparent 60%),
+      radial-gradient(700px 600px at 55% 55%, rgba(90, 140, 230, 0.2), transparent 65%),
+      linear-gradient(180deg, #0a1f42 0%, #173b6c 58%, #2c5289 100%);
     background-attachment: fixed;
-    color: #0f1f38;
+    color: #f4f7fc;
     font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
   }
 
   /* Figures line up in tables and stats. */
@@ -37,57 +46,80 @@
 
   /* One visible focus style everywhere, for keyboard users. */
   :where(a, button, input, select, textarea, summary):focus-visible {
-    outline: 2px solid #2b5590;
+    outline: 2px solid #f3d4a4;
     outline-offset: 2px;
     border-radius: 6px;
   }
 
-  /* Form controls share one look, so every page's inputs match without each
-     file restating it. Component classes can still override. */
+  /* Form controls share one look (frosted, like the panels), so every page's
+     inputs match without each file restating it. Component classes can
+     still override. */
   :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
     font: inherit;
     font-size: 14px;
-    color: #0f1f38;
-    background: #fff;
-    border: 1px solid #d9e1ec;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
   }
+  :where(input, textarea)::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  /* The opened list of a select is drawn by the system: give it a solid navy. */
+  :where(option, optgroup) {
+    background: #13305c;
+    color: #fff;
+  }
   :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus {
-    border-color: #2b5590;
+    border-color: #f3d4a4;
     outline: none;
-    box-shadow: 0 0 0 3px #d5e1f2;
+    box-shadow: 0 0 0 3px rgba(217, 165, 108, 0.28);
   }
   :where(input, select, textarea):disabled {
-    background: #f1f4f9;
-    color: #97a6bc;
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.45);
   }
   :where(input[type="checkbox"], input[type="radio"]) {
-    accent-color: #2b5590;
+    accent-color: #d9a56c;
+  }
+  :where(input[type="date"], input[type="time"], input[type="datetime-local"])::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.7;
   }
 }
 
-/* A white card on the pale page: the building block of every page. */
 @layer components {
+  /* A frosted glass panel: the building block of every page. The sky shows
+     through, blurred. */
   .card {
-    background: linear-gradient(180deg, #fff, rgba(255, 255, 255, 0.92));
-    border: 1px solid rgba(15, 31, 56, 0.07);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.05));
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 22px;
-    box-shadow: 0 1px 2px rgba(15, 31, 56, 0.04), 0 22px 44px -34px rgba(15, 40, 80, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 24px 48px -30px rgba(2, 12, 32, 0.7);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.2);
   }
 
-  /* The website's sky: deep navy at the top, lighter blue below. */
+  /* Darker glass: floating layers that must stay readable over anything
+     (the page bar once you scroll, pop-ups, the sign-in pages' backdrop). */
+  .glass-dark {
+    background: rgba(8, 24, 54, 0.72);
+    border-color: rgba(255, 255, 255, 0.12);
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    backdrop-filter: blur(20px) saturate(1.3);
+  }
+
+  /* Kept for the sign-in pages, which sit straight on the page's sky. */
   .sky {
-    background:
-      radial-gradient(900px 420px at 88% 0%, rgba(180, 206, 240, 0.45), transparent 62%),
-      radial-gradient(700px 400px at 0% 0%, rgba(2, 16, 40, 0.85), transparent 65%),
-      linear-gradient(180deg, #03183a 0%, #0b2851 45%, #2f5a92 100%);
+    background: transparent;
   }
 
-  /* Navy panel (the sidebar, dark cards). */
+  /* The sidebar and the phone menu bar: deep navy glass. */
   .navy {
-    background:
-      radial-gradient(420px 300px at 0% 0%, rgba(110, 155, 255, 0.16), transparent 70%),
-      linear-gradient(180deg, #03183a 0%, #061632 55%, #050f24 100%);
+    background: linear-gradient(180deg, rgba(3, 18, 45, 0.78), rgba(4, 16, 40, 0.66));
+    border-right: 1px solid rgba(255, 255, 255, 0.09);
+    -webkit-backdrop-filter: blur(22px) saturate(1.3);
+    backdrop-filter: blur(22px) saturate(1.3);
   }
 
   /* Gold, as on the website's buttons and headline. */
@@ -107,10 +139,125 @@
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    color: #a06a33;
+    color: #f3d4a4;
     background: rgba(217, 165, 108, 0.16);
-    border: 1px solid rgba(176, 122, 66, 0.28);
+    border: 1px solid rgba(243, 212, 164, 0.3);
   }
+
+  /* A section that folds away (details/summary), for the less urgent parts
+     of a page. */
+  .fold > summary {
+    display: flex;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    gap: 10px;
+  }
+  .fold > summary::-webkit-details-marker {
+    display: none;
+  }
+  .fold > summary .fold-chevron {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+  }
+  .fold[open] > summary .fold-chevron {
+    transform: rotate(180deg);
+  }
+}
+
+/* ── The Overview's "Open inbox" button: hovering it feels like a win ── */
+.win-btn {
+  isolation: isolate;
+  overflow: visible;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease;
+}
+.win-btn::after {
+  /* the light that sweeps across */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.75) 48%, transparent 64%);
+  background-size: 250% 100%;
+  background-position: 120% 0;
+  pointer-events: none;
+  z-index: -1;
+}
+.win-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 0 0 4px rgba(243, 212, 164, 0.22), 0 18px 40px -12px rgba(217, 165, 108, 0.85);
+}
+.win-btn:hover::after {
+  animation: win-sweep 0.9s ease-out;
+}
+.win-btn .win-letter {
+  opacity: 0;
+  transform: translateY(-14px);
+}
+.win-btn:hover .win-letter {
+  animation: win-drop 0.7s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+.win-btn:hover .win-tray {
+  animation: win-catch 0.7s ease-out;
+}
+.win-btn:hover .win-count {
+  animation: win-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.55s both;
+}
+.win-sparks {
+  position: absolute;
+  left: 28px;
+  top: 50%;
+  pointer-events: none;
+}
+.win-sparks i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border-radius: 999px;
+  background: #f3d4a4;
+  box-shadow: 0 0 10px 2px rgba(243, 212, 164, 0.9);
+  opacity: 0;
+}
+.win-sparks i:nth-child(even) {
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
+  background: #fff;
+}
+.win-btn:hover .win-sparks i {
+  animation: win-burst 0.8s ease-out 0.5s both;
+}
+.win-sparks i:nth-child(1) { --x: -46px; --y: -32px; }
+.win-sparks i:nth-child(2) { --x: -12px; --y: -44px; }
+.win-sparks i:nth-child(3) { --x: 30px; --y: -40px; }
+.win-sparks i:nth-child(4) { --x: -50px; --y: 22px; }
+.win-sparks i:nth-child(5) { --x: 10px; --y: 42px; }
+.win-sparks i:nth-child(6) { --x: 44px; --y: 28px; }
+@keyframes win-sweep {
+  from { background-position: 120% 0; }
+  to { background-position: -40% 0; }
+}
+@keyframes win-drop {
+  0% { opacity: 0; transform: translateY(-16px) rotate(-12deg); }
+  25% { opacity: 1; }
+  75% { opacity: 1; transform: translateY(1px) rotate(0); }
+  100% { opacity: 0; transform: translateY(5px) scale(0.6); }
+}
+@keyframes win-catch {
+  0%, 60% { transform: none; }
+  75% { transform: translateY(2px) scaleY(0.86); }
+  100% { transform: none; }
+}
+@keyframes win-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+@keyframes win-burst {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -120,23 +267,6 @@
     transition: none !important;
     animation: none !important;
   }
-}
-
-/* Text inside a page's navy band (see sticky-header.tsx): the greys and navy
-   that pages use on white turn light, except on things with their own
-   background (badges, white buttons, form fields). Unlayered on purpose, so
-   it wins over the text colour utilities. */
-[data-band] :is(.text-ink, .text-ink-600, .text-gray-700, .text-gray-600):not([class*="bg-"], [class*="gold-fill"], select, input, option, [class*="bg-"] *, [class*="gold-fill"] *) {
-  color: rgba(255, 255, 255, 0.92);
-}
-[data-band] :is(.text-gray-500, .text-gray-400):not([class*="bg-"], [class*="gold-fill"], select, input, option, [class*="bg-"] *, [class*="gold-fill"] *) {
-  color: rgba(255, 255, 255, 0.72);
-}
-[data-band] .band-actions :is(a, button):not([class*="bg-"], [class*="gold-fill"], [class*="bg-"] *) {
-  color: #fff;
-}
-[data-band] :is(select, input) {
-  border-color: rgba(255, 255, 255, 0.85);
 }
 
 /* The navy sidebar's scrollbar: slim and dark instead of the system's white one. */

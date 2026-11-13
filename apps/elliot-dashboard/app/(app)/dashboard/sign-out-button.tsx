@@ -17,7 +17,7 @@ export default function SignOutButton() {
     <button
       type="button"
       onClick={handleSignOut}
-      className="h-8 flex-shrink-0 cursor-pointer whitespace-nowrap rounded-full border-0 bg-transparent px-2.5 text-left text-[13px] text-white/60 hover:bg-white/10 hover:text-white"
+      className="h-8 flex-shrink-0 cursor-pointer whitespace-nowrap rounded-full border-0 bg-transparent px-2.5 text-left text-[13px] text-white/60 hover:bg-glass-hi hover:text-white"
     >
       Sign out
     </button>

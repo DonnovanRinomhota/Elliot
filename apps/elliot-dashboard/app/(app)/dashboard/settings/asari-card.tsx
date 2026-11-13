@@ -126,7 +126,7 @@ export default function AsariCard({ status, canChange, timeZone }: { status: Asa
                 type="button"
                 onClick={() => call("save")}
                 disabled={!!busy}
-                className="inline-flex h-9 cursor-pointer items-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:opacity-50"
+                className="inline-flex h-9 cursor-pointer items-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:opacity-50"
               >
                 {busy === "save" ? "Saving…" : connected ? "Save changes" : "Connect ASARI"}
               </button>
@@ -136,7 +136,7 @@ export default function AsariCard({ status, canChange, timeZone }: { status: Asa
                     type="button"
                     onClick={() => call("sync")}
                     disabled={!!busy}
-                    className="inline-flex h-9 cursor-pointer items-center rounded-full border border-gray-200 bg-white px-3.5 text-[13px] font-medium text-ink hover:bg-gray-50 disabled:opacity-50"
+                    className="inline-flex h-9 cursor-pointer items-center rounded-full border border-gray-200 bg-glass px-3.5 text-[13px] font-medium text-ink hover:bg-glass-hi disabled:opacity-50"
                   >
                     {busy === "sync" ? "Starting…" : "Sync now"}
                   </button>

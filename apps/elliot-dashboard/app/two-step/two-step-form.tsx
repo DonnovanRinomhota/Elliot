@@ -81,7 +81,7 @@ export default function TwoStepForm({ mode, email }: { mode: "enroll" | "verify"
         <div className="mb-4 flex flex-col items-center gap-2">
           {setup ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={setup.qr} alt="QR code for your authenticator app" width={180} height={180} className="rounded-lg border border-gray-200 bg-white p-2" />
+            <img src={setup.qr} alt="QR code for your authenticator app" width={180} height={180} className="rounded-lg border border-gray-200 bg-glass p-2" />
           ) : (
             !error && <div className="h-[180px] w-[180px] animate-pulse rounded-lg bg-gray-100" aria-label="Loading" />
           )}
@@ -112,7 +112,7 @@ export default function TwoStepForm({ mode, email }: { mode: "enroll" | "verify"
       <button
         type="submit"
         disabled={busy || !factorId || code.replace(/\s+/g, "").length !== 6}
-        className="mt-4 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-4 text-[14px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-4 inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-4 text-[14px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? "Checking…" : mode === "enroll" ? "Turn on and continue" : "Continue"}
       </button>

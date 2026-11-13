@@ -365,7 +365,7 @@ export default function ImportForm() {
             )}
             <div className="max-h-[480px] overflow-auto">
               <table className="w-full min-w-[760px] border-collapse text-left text-[13px]">
-                <thead className="sticky top-0 bg-white">
+                <thead className="sticky top-0 bg-glass">
                   <tr className="border-b border-gray-200 text-[12px] text-gray-500">
                     <th className="px-5 py-2 font-medium">Title</th>
                     <th className="px-3 py-2 font-medium">Type</th>

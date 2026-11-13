@@ -18,14 +18,14 @@ export default function AppointmentCard({ appointment, number }: { appointment: 
   const href = `/dashboard/appointments/${a.id}`;
 
   return (
-    <li className="rounded-2xl border border-[rgba(15,31,56,0.06)] bg-[#f3f6fb] transition-colors hover:border-gold/40 hover:bg-white">
+    <li className="rounded-2xl border border-white/10 bg-glass transition-colors hover:border-gold/40 hover:bg-glass-hi">
       <div className={`grid gap-2 px-3.5 py-3 ${APPOINTMENT_GRID}`}>
         <span className="tabular hidden text-right text-[12px] text-gray-400 xl:block">{number}</span>
         <div className={`flex items-center gap-3 ${isFinal ? "text-gray-500" : "text-ink"}`}>
           {/* A small calendar page: weekday and day, gold while it's still to come */}
           <span
             aria-hidden="true"
-            className={`flex h-12 w-12 flex-shrink-0 flex-col items-center justify-center rounded-xl ${isFinal ? "bg-gray-100 text-gray-500" : "gold-fill text-ink shadow-gold"}`}
+            className={`flex h-12 w-12 flex-shrink-0 flex-col items-center justify-center rounded-xl ${isFinal ? "bg-gray-100 text-gray-500" : "gold-fill text-navy shadow-gold"}`}
           >
             <span className="text-[10px] font-semibold uppercase tracking-[0.08em]">{dayLabel(dayKey(a.starts_at, tz), "weekday")}</span>
             <span className="tabular text-[18px] font-bold leading-none">{Number(dayKey(a.starts_at, tz).slice(8))}</span>
@@ -52,7 +52,7 @@ export default function AppointmentCard({ appointment, number }: { appointment: 
           {contactLine && <div className="truncate text-[12.5px] text-gray-500">{contactLine}</div>}
         </div>
 
-        <a href={href} className={`block min-w-0 rounded-xl no-underline hover:bg-white ${isCancelled ? "opacity-60" : ""}`}>
+        <a href={href} className={`block min-w-0 rounded-xl no-underline hover:bg-glass-hi ${isCancelled ? "opacity-60" : ""}`}>
           <ListingLine appointment={a} />
         </a>
 
@@ -60,7 +60,7 @@ export default function AppointmentCard({ appointment, number }: { appointment: 
           <span className="text-gray-400 xl:hidden">Agent: </span>
           {a.agent ? (
             <span className="inline-flex min-w-0 items-center gap-2 text-gray-700">
-              <span aria-hidden="true" className="gold-fill flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold text-ink">
+              <span aria-hidden="true" className="gold-fill flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold text-navy">
                 {personName(a.agent)
                   .split(/[\s.@_-]+/)
                   .filter(Boolean)

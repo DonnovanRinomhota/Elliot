@@ -151,10 +151,10 @@ export default function TeamManager({
                 const busy = busyId === m.id;
                 const digest = m.notify_digest ?? m.role === "admin";
                 return (
-                  <tr key={m.id} className="[&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl [&>td]:bg-[#f3f6fb]">
+                  <tr key={m.id} className="[&>td:first-child]:rounded-l-2xl [&>td:last-child]:rounded-r-2xl [&>td]:bg-glass">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                      <span aria-hidden="true" className="gold-fill flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-ink">
+                      <span aria-hidden="true" className="gold-fill flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-navy">
                         {(m.full_name || m.email)
                           .split(/[\s.@_-]+/)
                           .filter(Boolean)

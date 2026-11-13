@@ -27,7 +27,7 @@ export default function SupportSwitch({ required }: { required: boolean }) {
   return (
     <section
       className={`mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-[13px] ${
-        required ? "border-gray-200 bg-white" : "border-brass/25 bg-brass-soft text-brass-dark"
+        required ? "border-gray-200 bg-glass" : "border-brass/25 bg-brass-soft text-brass-dark"
       }`}
     >
       <div className="min-w-0">
@@ -45,7 +45,7 @@ export default function SupportSwitch({ required }: { required: boolean }) {
         type="button"
         onClick={flip}
         disabled={busy}
-        className="h-9 shrink-0 cursor-pointer rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:opacity-50"
+        className="h-9 shrink-0 cursor-pointer rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:opacity-50"
       >
         {busy ? "Saving…" : required ? "Pause for testing" : "Require permission"}
       </button>

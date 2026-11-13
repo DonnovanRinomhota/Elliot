@@ -151,7 +151,7 @@ export default function SequenceEditor({
   const errorCount = (errors.name ? 1 : 0) + (errors.steps ? 1 : 0) + Object.keys(errors.stepErrors).length;
 
   return (
-    <div className="mb-6 rounded-lg border border-gray-300 bg-white p-5">
+    <div className="mb-6 rounded-lg border border-gray-300 bg-glass p-5">
       <div className="mb-4">
         <div className="text-sm font-medium">{isNew ? "New sequence" : "Edit sequence"}</div>
         <div className="text-[12.5px] text-gray-500">
@@ -216,7 +216,7 @@ export default function SequenceEditor({
                       aria-checked={step.channel === c}
                       onClick={() => updateStep(step.key, { channel: c })}
                       className={`h-7 cursor-pointer rounded-full border-0 px-3 text-[12.5px] font-medium ${
-                        step.channel === c ? "bg-ink text-white" : "bg-transparent text-gray-600 hover:text-ink"
+                        step.channel === c ? "bg-[#fff] text-navy" : "bg-transparent text-gray-600 hover:text-ink"
                       }`}
                     >
                       {c === "email" ? "Email" : "WhatsApp"}
@@ -298,7 +298,7 @@ export default function SequenceEditor({
         type="button"
         onClick={addStep}
         disabled={steps.length >= MAX_STEPS}
-        className="mb-5 rounded-md border border-gray-200 px-3 py-1.5 text-[12.5px] font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mb-5 rounded-md border border-gray-200 px-3 py-1.5 text-[12.5px] font-medium text-gray-700 hover:bg-glass-hi disabled:cursor-not-allowed disabled:opacity-50"
       >
         {steps.length >= MAX_STEPS ? `Limit of ${MAX_STEPS} steps reached` : "Add step"}
       </button>
@@ -319,7 +319,7 @@ export default function SequenceEditor({
           type="button"
           onClick={save}
           disabled={saving}
-          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-ink shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 cursor-pointer items-center justify-center rounded-full border-0 gold-fill px-3.5 text-[13px] font-semibold text-navy shadow-gold hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save sequence"}
         </button>
@@ -327,7 +327,7 @@ export default function SequenceEditor({
           type="button"
           onClick={onClose}
           disabled={saving}
-          className="rounded-md px-3 py-2 text-[12.5px] text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          className="rounded-md px-3 py-2 text-[12.5px] text-gray-600 hover:bg-glass-hi disabled:opacity-50"
         >
           Cancel
         </button>

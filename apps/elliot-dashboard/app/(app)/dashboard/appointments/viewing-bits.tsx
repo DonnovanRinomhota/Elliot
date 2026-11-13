@@ -66,7 +66,7 @@ const CHIP_TONE: Record<string, string> = {
   rescheduled: "border-brass/30 bg-brass-soft text-brass-dark",
   completed: "border-gray-200 bg-gray-50 text-gray-600",
   no_show: "border-alert/20 bg-alert-soft text-alert",
-  cancelled: "border-gray-200 bg-white text-gray-400 line-through",
+  cancelled: "border-gray-200 bg-glass text-gray-400 line-through",
 };
 
 /** One viewing in a calendar cell: time, client, and (if there's room) the property. */
