@@ -4,7 +4,7 @@ Tells you when part of Elliot stops working, before a client notices.
 Migration `0036_health_alerts.sql`; tests in
 `n8n/workflows/tests/health_alerts.test.js` and `db/seed/test_0036_health.sql`.
 
-## What it checks (every 15 minutes)
+## What it checks (every hour)
 
 | Check | How | Typical failure |
 |---|---|---|

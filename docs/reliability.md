@@ -3,7 +3,7 @@
 The rule: **nothing is sent twice, and nothing fails silently.** Every
 failure ends in one of three places a person will see: a holding reply to the
 client plus an escalation for the team, a note in the conversation, or the
-audit log (which the health alerts in workflow 33 read every 15 minutes).
+audit log (which the health alerts in workflow 33 read every hour).
 
 Migration `0048_reliability.sql`; tests `db/seed/test_0048_reliability.sql`
 and `n8n/workflows/tests/reliability.test.js`.

@@ -6,7 +6,7 @@ now only a hand-called webhook (21) created runs, so sequences sent
 nothing on their own. This is the missing "who joins a sequence" half.
 
 ## Trigger
-Schedule, every 15 minutes (same cadence as 20).
+Schedule, every hour (same cadence as 20). The trigger node keeps its old name, "Every 15 Minutes".
 
 ## Nodes
 | Node | What it does |

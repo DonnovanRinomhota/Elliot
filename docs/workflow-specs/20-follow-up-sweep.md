@@ -32,7 +32,7 @@
 **Output:** `{ success: true, run_id, next_run_at }` or a clean error (404 tenant/lead/sequence not found or inactive, 409 a run is already active for this lead+sequence, 422 sequence has no steps).
 
 ## Workflow 20 — Follow-Up Sweep
-**Trigger:** cron, every 15 minutes (matches `docs/architecture.md` section 4 — adjust directly in the n8n trigger node, no code change needed).
+**Trigger:** cron, every hour (was 15 minutes; see `docs/n8n-schedules.md`; the node keeps its old name) (matches `docs/architecture.md` section 4 — adjust directly in the n8n trigger node, no code change needed).
 **Per due run, one of three outcomes** (decided in the database by `claim_due_follow_up_runs`, 0048; see [`../reliability.md`](../reliability.md)):
 | Outcome | Condition | Result |
 |---|---|---|

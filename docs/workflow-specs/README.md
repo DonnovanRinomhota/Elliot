@@ -34,7 +34,7 @@ saved. Internal webhooks need the "Elliot Internal Webhook Secret" header
 | 30 | Cancel Appointment | Cancels a viewing and its calendar event | [30](30-cancel-appointment.md) |
 | 31 | Daily Summary Email | 08:00 summary for each agency | [control panel doc](../control-panel-listings-inbox.md) |
 | 32 | Send WhatsApp Message | A team member's reply on WhatsApp | [32](32-send-whatsapp-message.md) |
-| 33 / 34 | Health Check & Alerts / Workflow Error Recorder | Checks every 15 minutes; failures from other workflows | [33](33-health-check.md) |
+| 33 / 34 | Health Check & Alerts / Workflow Error Recorder | Checks every hour; failures from other workflows | [33](33-health-check.md) |
 | 35 / 36 | Website Booking & Demo Access / Demo Clean-up | getelliot.eu calls and the demo agency | [website doc](../website-sales-and-demo.md) |
 | 37 / 38 | Client Viewing Changes / Viewing Reminders | Confirm, move, cancel by message; reminders the day before | [37-38](37-38-viewing-changes-reminders.md) |
 | 39 | Send Email | Every email Elliot sends, via Resend, in the agency's name | [agency email](../agency-email.md) |
