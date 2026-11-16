@@ -14,7 +14,7 @@
 **No dedup.** Calling this twice for the same entity creates two log rows; acceptable for an audit-log-shaped table with no unique constraint to conflict on.
 
 ## Workflow 23 — CRM Sync Sweep
-**Trigger:** cron, every 5 minutes — shorter than the follow-up sweep's 15, since this is closer to real-time integration than a multi-day drip sequence.
+**Trigger:** cron, every 30 minutes (was 5; see `docs/n8n-schedules.md`). The trigger node keeps its old name, "Every 5 Minutes".
 **Per pending row:**
 | Case | Result |
 |---|---|
